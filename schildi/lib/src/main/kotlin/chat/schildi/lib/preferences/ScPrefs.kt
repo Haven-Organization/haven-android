@@ -77,7 +77,7 @@ object ScPrefs {
     val COMPACT_ROOT_SPACES = ScBoolPref("COMPACT_ROOT_SPACES", true, R.string.sc_compact_root_spaces_title, R.string.sc_compact_root_spaces_summary, authorsChoice = true, dependencies = SPACE_NAV.asDependencies()) // Haven: default true (SC: false)
     val SPACE_UNREAD_COUNTS = ScStringListPref(
         "SPACE_UNREAD_COUNTS",
-        SpaceUnreadCountMode.MESSAGES,
+        SpaceUnreadCountMode.CHATS, // Haven: default CHATS (SC: MESSAGES)
         arrayOf(SpaceUnreadCountMode.MESSAGES, SpaceUnreadCountMode.CHATS, SpaceUnreadCountMode.HIDE),
         R.array.sc_space_unread_counts_names,
         null,
@@ -118,7 +118,7 @@ object ScPrefs {
     val URL_PREVIEWS = ScBoolPref("URL_PREVIEWS", true, R.string.sc_url_previews_title, R.string.sc_url_previews_summary, authorsChoice = true, upstreamChoice = false) // Haven: default true (SC: false)
     val URL_PREVIEWS_IN_E2EE_ROOMS = ScBoolPref("URL_PREVIEWS_IN_E2EE_ROOMS", true, R.string.sc_url_previews_in_e2ee_rooms_title, R.string.sc_url_previews_in_e2ee_rooms_summary, authorsChoice = true, upstreamChoice = false, dependencies = URL_PREVIEWS.asDependencies(), disabledValue = false) // Haven: default true (SC: false)
     val URL_PREVIEWS_REQUIRE_EXPLICIT_LINKS = ScBoolPref("URL_PREVIEWS_REQUIRE_EXPLICIT_LINKS", true, R.string.sc_url_previews_require_explicit_links_title, R.string.sc_url_previews_require_explicit_links_summary, authorsChoice = true, dependencies = URL_PREVIEWS.asDependencies(), disabledValue = null)
-    val REPLY_PREVIEW_LINE_COUNT = ScIntPref("REPLY_PREVIEW_LINE_COUNT", 4, R.string.sc_reply_preview_line_count_title, R.string.sc_reply_preview_line_count_summary, minValue = 1, authorsChoice = 4, upstreamChoice = 2)
+    val REPLY_PREVIEW_LINE_COUNT = ScIntPref("REPLY_PREVIEW_LINE_COUNT", 2, R.string.sc_reply_preview_line_count_title, R.string.sc_reply_preview_line_count_summary, minValue = 1, authorsChoice = 4, upstreamChoice = 2) // Haven: default 2 (SC: 4)
     val FULLY_EXPAND_MESSAGE_MENU = ScBoolPref("FULLY_EXPAND_MESSAGE_MENU", true, R.string.sc_pref_fully_expand_message_menu_title, R.string.sc_pref_fully_expand_message_menu_summary, authorsChoice = true, upstreamChoice = false)
     val MESSAGE_CONTEXT_MENU_TEXT_SELECTABLE = ScBoolPref("MESSAGE_CONTEXT_MENU_TEXT_SELECTABLE", false, R.string.sc_pref_message_context_menu_text_selectable_title, R.string.sc_pref_message_context_menu_text_selectable_summary, authorsChoice = true, upstreamChoice = false) // Haven: default false (SC: true)
     val VIEW_HIDDEN_EVENTS = ScBoolPref("VIEW_HIDDEN_EVENTS", false, R.string.sc_pref_view_hidden_events_title, authorsChoice = false, upstreamChoice = false)
@@ -128,10 +128,10 @@ object ScPrefs {
     val VERBOSE_CONVERSATION_ICONS = ScBoolPref("VERBOSE_CONVERSATION_ICONS", true, R.string.sc_pref_verbose_room_title_icons_title, R.string.sc_pref_verbose_room_title_icons_summary, authorsChoice = false, upstreamChoice = true) // Haven: default true (SC: false)
 
     // Advanced theming options - Light theme
-    val BUBBLE_BG_LIGHT_OUTGOING = ScColorPref("BUBBLE_BG_LIGHT_OUTGOING", R.string.sc_pref_bubble_color_outgoing_title)
+    val BUBBLE_BG_LIGHT_OUTGOING = ScColorPref("BUBBLE_BG_LIGHT_OUTGOING", R.string.sc_pref_bubble_color_outgoing_title, defaultValue = 0xFFD9F2E4.toInt(), upstreamChoice = ScColorPref.FOLLOW_THEME_VALUE) // Haven: pale brand green (SC: follow theme)
     val BUBBLE_BG_LIGHT_INCOMING = ScColorPref("BUBBLE_BG_LIGHT_INCOMING", R.string.sc_pref_bubble_color_incoming_title)
     // Advanced theming options - Dark theme
-    val BUBBLE_BG_DARK_OUTGOING = ScColorPref("BUBBLE_BG_DARK_OUTGOING", R.string.sc_pref_bubble_color_outgoing_title)
+    val BUBBLE_BG_DARK_OUTGOING = ScColorPref("BUBBLE_BG_DARK_OUTGOING", R.string.sc_pref_bubble_color_outgoing_title, defaultValue = 0xFF105C64.toInt(), upstreamChoice = ScColorPref.FOLLOW_THEME_VALUE) // Haven: brand teal (SC: follow theme)
     val BUBBLE_BG_DARK_INCOMING = ScColorPref("BUBBLE_BG_DARK_INCOMING", R.string.sc_pref_bubble_color_incoming_title)
 
     // Tests to be removed before release
