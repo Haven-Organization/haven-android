@@ -44,7 +44,7 @@ android {
 
     defaultConfig {
         //applicationId = BuildTimeConfig.APPLICATION_ID
-        applicationId = "software.haven.android"
+        applicationId = "software.haven.HavenAndroid"
         versionCode = 10
         versionName = "0.1.0-ex_26_11_0"
         targetSdk = Versions.TARGET_SDK
@@ -229,20 +229,20 @@ android {
         // SC variants for different release tracks. Cannot do actual release types for those since fdroid build tools always want `release` builds.
         create("default") {
             dimension = "sc-variant"
-            applicationId = "software.haven.android"
+            applicationId = "software.haven.HavenAndroid"
             isDefault = true
             resValue("string", "sc_app_name", "Haven")
             resValue("string", "sc_app_name_launcher", "Haven")
         }
         create("beta") {
             dimension = "sc-variant"
-            applicationId = "software.haven.android.beta"
+            applicationId = "software.haven.HavenAndroid.beta"
             resValue("string", "sc_app_name", "Haven (Beta)")
             resValue("string", "sc_app_name_launcher", "Haven β")
         }
         create("internal") {
             dimension = "sc-variant"
-            applicationId = "software.haven.android.internal"
+            applicationId = "software.haven.HavenAndroid.internal"
             resValue("string", "sc_app_name", "Haven (Internal)")
             resValue("string", "sc_app_name_launcher", "Haven[i]")
         }

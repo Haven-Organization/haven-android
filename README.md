@@ -48,13 +48,20 @@ Builds work like Element X: JDK 21 and the Android SDK (platform 37). Only the F
 ./gradlew assembleFdroidScDefaultDebug
 ```
 
-| Variant  | Application ID                    | Launcher name |
-|----------|-----------------------------------|---------------|
-| default  | `software.haven.android`          | Haven         |
-| beta     | `software.haven.android.beta`     | Haven β       |
-| internal | `software.haven.android.internal` | Haven[i]      |
+| Variant  | Application ID                         | Launcher name |
+|----------|----------------------------------------|---------------|
+| default  | `software.haven.HavenAndroid`          | Haven         |
+| beta     | `software.haven.HavenAndroid.beta`     | Haven β       |
+| internal | `software.haven.HavenAndroid.internal` | Haven[i]      |
 
 Debug builds add `.debug` to the ID and use an amber launcher icon.
+
+## Haven look and feel
+
+Haven ships its own defaults for the SchildiChat settings under **Turtle Tweaks**: Element's theme and typography,
+SchildiChat's chat list and spaces bar with DM, group and unread pseudo-spaces, pinned favourites, link previews, and
+more. They're set in `schildi/lib/.../preferences/ScPrefs.kt`, each marked `// Haven: default ... (SC: ...)`. The
+existing "Restore Element defaults" option (under Developer options → Danger zone) still reverts to stock Element X.
 
 ## Notifications and bug reports
 
