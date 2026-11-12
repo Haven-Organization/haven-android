@@ -44,7 +44,6 @@ dependencies {
 
     // UnifiedPush library
     api(libs.unifiedpush)
-    implementation(libs.unifiedpush.fcm)
 
     testCommonDependencies(libs)
     testImplementation(projects.libraries.matrix.test)

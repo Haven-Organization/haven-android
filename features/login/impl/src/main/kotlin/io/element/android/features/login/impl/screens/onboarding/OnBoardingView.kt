@@ -12,10 +12,8 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
@@ -237,14 +235,7 @@ private fun OnBoardingContent(state: OnBoardingState) {
                     style = ElementTheme.typography.fontHeadingLgBold,
                     textAlign = TextAlign.Center,
                 )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    //text = stringResource(id = R.string.screen_onboarding_welcome_message, state.productionApplicationName),
-                    text = stringResource(id = chat.schildi.lib.R.string.sc_onboarding_welcome_summary),
-                    color = ElementTheme.colors.textPrimary,
-                    style = ElementTheme.typography.fontBodyLgRegular,
-                    textAlign = TextAlign.Center,
-                )
+                // Haven: no tagline under the title for now (SC: sc_onboarding_welcome_summary)
             }
         }
     }

@@ -21,24 +21,9 @@
                 <action android:name="org.unifiedpush.android.connector.REGISTRATION_REFUSED" />
             </intent-filter>
         </receiver>
-        <!-- Note: UnifiedPush cannot tell apart multiple distributors with the same package name, so we disable upstream KeepInternalDistributor below.
-            In the future, we may need to add additional logic to fallback to polling -->
-        <!-- Haven: disabled. SchildiChat's embedded FCM distributor relays through SchildiChat's own gateway
-            (up.spiritcroc.de) and Firebase project, which Haven cannot use. Re-enable with Haven's own gateway
-            and Firebase project. Until then, push needs an external UnifiedPush distributor (e.g. ntfy). -->
-        <receiver
-            android:name="chat.schildi.unifiedpush.FossFcmDistributor"
-            android:enabled="false"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="org.unifiedpush.android.distributor.feature.BYTES_MESSAGE"/>
-                <action android:name="org.unifiedpush.android.distributor.REGISTER"/>
-                <action android:name="org.unifiedpush.android.distributor.UNREGISTER"/>
-            </intent-filter>
-        </receiver>
         <receiver
             android:name=".KeepInternalDistributor"
-            android:enabled="false"
+            android:enabled="true"
             android:exported="false">
             <intent-filter>
                 <!--

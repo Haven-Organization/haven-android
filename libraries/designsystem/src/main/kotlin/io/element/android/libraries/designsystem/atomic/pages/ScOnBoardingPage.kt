@@ -29,7 +29,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
@@ -61,13 +60,7 @@ fun ScOnBoardingPage(
             .fillMaxSize()
     ) {
         // BG
-        val bgBrush = Brush.linearGradient(
-            if (ElementTheme.isLightTheme) {
-                ScBrandingColors.onboardingGradientLight
-            } else {
-                ScBrandingColors.onboardingGradientDark
-            }
-        )
+        val bgBrush = ScBrandingColors.onboardingBrush(isLight = ElementTheme.isLightTheme) // Haven
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -98,7 +91,7 @@ fun ScSunsetBackground(
     modifier: Modifier = Modifier,
 ) {
     // Sunset is forced-dark theme
-    val bgBrush = Brush.linearGradient(ScBrandingColors.onboardingGradientDark)
+    val bgBrush = ScBrandingColors.onboardingBrush(isLight = false) // Haven
     Box(modifier = modifier.fillMaxSize().background(bgBrush))
 }
 

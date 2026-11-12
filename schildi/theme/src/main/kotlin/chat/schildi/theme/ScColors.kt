@@ -1,6 +1,13 @@
 package chat.schildi.theme
 
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RadialGradientShader
+import androidx.compose.ui.graphics.Shader
+import androidx.compose.ui.graphics.ShaderBrush
+import kotlin.math.max
 
 internal object ScColors {
     val colorAccentGreen = Color(0xff8bc34a)
@@ -73,13 +80,28 @@ val ScPowerLevelColors = PowerLevelColors(
 object ScBrandingColors {
     // Haven: brand colours from haven-desktop's logo (green #5bd699, teal #105c64, cream #f7f1de)
     val onboardingGradientLight = listOf(
-        Color(0xfffdfbf5), Color(0xffd9f2e4)
+        Color(0xffd9f2e4), Color(0xfffdfbf5)
     )
     val onboardingGradientDark = listOf(
-        Color(0xff105c64), Color(0xff06262a)
+        Color(0xff5bd699), Color(0xff105c64)
     )
     val onboardingIconBgColors = listOf(
         Color(0xff5bd699), Color(0xff105c64)
     )
     val onboardingLogoOutlineDark = ScColors.colorWhiteAlpha_b3
+
+    /**
+     * Haven: onboarding background matching the Haven logo, a radial gradient with its highlight in the top-right
+     * corner (logo.svg: cx 92%, cy 0%). The radius scales with the screen so the bottom half, where the text and
+     * buttons sit, stays in the darker part of the gradient.
+     */
+    fun onboardingBrush(isLight: Boolean): Brush = havenRadialBrush(if (isLight) onboardingGradientLight else onboardingGradientDark)
+
+    private fun havenRadialBrush(colors: List<Color>): Brush = object : ShaderBrush() {
+        override fun createShader(size: Size): Shader = RadialGradientShader(
+            center = Offset(size.width * 0.92f, 0f),
+            radius = max(size.width, size.height) * 0.9f,
+            colors = colors,
+        )
+    }
 }
