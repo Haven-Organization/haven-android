@@ -116,3 +116,9 @@ lint/tmp/
 .DS_Store
 
 checkouts/**
+
+# Haven: never commit release signing material
+*.jks
+*.keystore
+!app/signature/debug.keystore
+haven-signing.properties

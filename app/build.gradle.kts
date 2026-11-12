@@ -247,6 +247,22 @@ android {
             resValue("string", "sc_app_name_launcher", "Haven[i]")
         }
     }
+    // Haven: release signing key. Configure it outside the repository, either in ~/.gradle/gradle.properties
+    // (signing.haven.release.storeFile / storePassword / keyAlias / keyPassword) or with the matching
+    // HAVEN_ANDROID_RELEASE_* environment variables. Without it, release builds fall back to the debug key, as
+    // upstream does, so that other builds (contributors, F-Droid) keep working.
+    val havenReleaseStoreFile = environmentOrGradleValue("HAVEN_ANDROID_RELEASE_STOREFILE", "signing.haven.release.storeFile")
+    val havenReleaseSigning = if (havenReleaseStoreFile != null) {
+        signingConfigs.register("havenRelease") {
+            storeFile = file(havenReleaseStoreFile)
+            storePassword = environmentOrGradleValue("HAVEN_ANDROID_RELEASE_STOREPASSWORD", "signing.haven.release.storePassword")
+            keyAlias = environmentOrGradleValue("HAVEN_ANDROID_RELEASE_KEYALIAS", "signing.haven.release.keyAlias")
+            keyPassword = environmentOrGradleValue("HAVEN_ANDROID_RELEASE_KEYPASSWORD", "signing.haven.release.keyPassword")
+        }
+    } else {
+        logger.warn("Haven: no release signing key configured, release builds are signed with the debug key")
+        null
+    }
     // Build types to override some more upstream values
     buildTypes {
         named("debug") {
@@ -255,6 +271,7 @@ android {
             buildConfigField("String", "SC_VERSION_ELEMENT", "\"${Versions.VERSION_NAME}\"")
         }
         named("release") {
+            havenReleaseSigning?.let { signingConfig = it.get() }
             resValue("string", "app_name", "Haven")
             buildConfigField("String", "SC_VERSION_MAIN", "\"$scVersionMain\"")
             buildConfigField("String", "SC_VERSION_ELEMENT", "\"${Versions.VERSION_NAME}\"")
