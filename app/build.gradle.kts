@@ -44,9 +44,9 @@ android {
 
     defaultConfig {
         //applicationId = BuildTimeConfig.APPLICATION_ID
-        applicationId = "chat.schildi.android"
-        versionCode = 1260
-        versionName = "0.11.8-ex_26_10_1"
+        applicationId = "software.haven.android"
+        versionCode = 10
+        versionName = "0.1.0-ex_26_11_0"
         targetSdk = Versions.TARGET_SDK
 
         // Keep abiFilter for the universalApk
@@ -210,10 +210,10 @@ android {
 
 // SC: downstream package name and versioning, overriding Element default config while reducing merge conflicts
 val scVersionMajor = 0
-val scVersionMinor = 11
-val scVersionPatch = 8
+val scVersionMinor = 1
+val scVersionPatch = 0
 // Following val is set by increment_version.sh based on the values above
-val scVersionMain = "0.7.6"
+val scVersionMain = "0.1.0"
 android {
     // Use a flavor for common things that the upstream config will not override by the build type
     flavorDimensions += "package"
@@ -222,40 +222,40 @@ android {
         // Common upstream overrides across all sc variants - only one flavor for this dimension to ensure it's picked up!
         create("sc") {
             dimension = "package"
-            versionCode = 1260
-            versionName = "0.11.8-ex_26_10_1"
+            versionCode = 10
+            versionName = "0.1.0-ex_26_11_0"
             isDefault = true
         }
         // SC variants for different release tracks. Cannot do actual release types for those since fdroid build tools always want `release` builds.
         create("default") {
             dimension = "sc-variant"
-            applicationId = "chat.schildi.android"
+            applicationId = "software.haven.android"
             isDefault = true
-            resValue("string", "sc_app_name", "SchildiChat Next")
-            resValue("string", "sc_app_name_launcher", "SchildiNext")
+            resValue("string", "sc_app_name", "Haven")
+            resValue("string", "sc_app_name_launcher", "Haven")
         }
         create("beta") {
             dimension = "sc-variant"
-            applicationId = "chat.schildi.next"
-            resValue("string", "sc_app_name", "SchildiChat Next (Beta)")
-            resValue("string", "sc_app_name_launcher", "SchildiNext β")
+            applicationId = "software.haven.android.beta"
+            resValue("string", "sc_app_name", "Haven (Beta)")
+            resValue("string", "sc_app_name_launcher", "Haven β")
         }
         create("internal") {
             dimension = "sc-variant"
-            applicationId = "chat.schildi.next.internal"
-            resValue("string", "sc_app_name", "SchildiChat Next (Internal)")
-            resValue("string", "sc_app_name_launcher", "SchildiNext[i]")
+            applicationId = "software.haven.android.internal"
+            resValue("string", "sc_app_name", "Haven (Internal)")
+            resValue("string", "sc_app_name_launcher", "Haven[i]")
         }
     }
     // Build types to override some more upstream values
     buildTypes {
         named("debug") {
-            resValue("string", "app_name", "SchildiChat Next dbg")
+            resValue("string", "app_name", "Haven dbg")
             buildConfigField("String", "SC_VERSION_MAIN", "\"$scVersionMain\"")
             buildConfigField("String", "SC_VERSION_ELEMENT", "\"${Versions.VERSION_NAME}\"")
         }
         named("release") {
-            resValue("string", "app_name", "SchildiChat Next")
+            resValue("string", "app_name", "Haven")
             buildConfigField("String", "SC_VERSION_MAIN", "\"$scVersionMain\"")
             buildConfigField("String", "SC_VERSION_ELEMENT", "\"${Versions.VERSION_NAME}\"")
         }

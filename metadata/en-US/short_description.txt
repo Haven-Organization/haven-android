@@ -1,1 +1,1 @@
-2nd-generation SchildiChat Matrix messenger based on Element X
+Matrix messenger: Element X with SchildiChat features and Haven branding

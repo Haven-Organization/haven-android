@@ -13,7 +13,7 @@ object UnifiedPushConfig {
      * It is the push gateway for UnifiedPush.
      * Note: default_push_gateway_http_url should have path '/_matrix/push/v1/notify'
      */
-    const val DEFAULT_PUSH_GATEWAY_HTTP_URL: String = "https://up.schildi.chat/_matrix/push/v1/notify"
+    const val DEFAULT_PUSH_GATEWAY_HTTP_URL: String = "https://matrix.gateway.unifiedpush.org/_matrix/push/v1/notify" // Haven: upstream default, until Haven runs its own gateway
 
     const val UNIFIED_PUSH_DISTRIBUTORS_URL = "https://unifiedpush.org/users/distributors/"
 

@@ -31,19 +31,19 @@ android {
         )
         buildConfigFieldStr(
             name = "CLIENT_URI",
-            value = BuildTimeConfig.URL_WEBSITE ?: "https://schildi.chat"
+            value = BuildTimeConfig.URL_WEBSITE ?: "https://haven.software" // Haven
         )
         buildConfigFieldStr(
             name = "LOGO_URI",
-            value = BuildTimeConfig.URL_LOGO ?: "https://schildi.chat/img/icon-next.png"
+            value = BuildTimeConfig.URL_LOGO ?: "https://app.haven.software/vector-icons/512.png" // Haven
         )
         buildConfigFieldStr(
             name = "TOS_URI",
-            value = BuildTimeConfig.URL_ACCEPTABLE_USE ?: "https://schildi.chat/next/privacy//"
+            value = BuildTimeConfig.URL_ACCEPTABLE_USE ?: "https://haven.software" // Haven: TODO point at Haven's terms once published
         )
         buildConfigFieldStr(
             name = "POLICY_URI",
-            value = BuildTimeConfig.URL_POLICY ?: "https://schildi.chat/next/privacy//"
+            value = BuildTimeConfig.URL_POLICY ?: "https://haven.software" // Haven: TODO point at Haven's privacy policy once published
         )
     }
 }

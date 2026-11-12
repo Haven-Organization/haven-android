@@ -77,7 +77,7 @@ class DefaultPusherSubscriber(
             lang = "en",
             appDisplayName = buildMeta.applicationName,
             // TODO getDeviceInfoUseCase.execute().displayName().orEmpty()
-            deviceDisplayName = "SchildiNext",
+            deviceDisplayName = "Haven",
             url = gateway,
             defaultPayload = createDefaultPayload(pushClientSecret.getSecretForUser(userId)),
             append = false,

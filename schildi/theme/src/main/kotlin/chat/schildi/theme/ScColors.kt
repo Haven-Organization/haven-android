@@ -71,16 +71,15 @@ val ScPowerLevelColors = PowerLevelColors(
 )
 
 object ScBrandingColors {
+    // Haven: brand colours from haven-desktop's logo (green #5bd699, teal #105c64, cream #f7f1de)
     val onboardingGradientLight = listOf(
-        //Color(0xffE3F2FD), Color(0xff90CAF9)
-        Color(0xffffffff), Color(0xffe2f0d2)
+        Color(0xfffdfbf5), Color(0xffd9f2e4)
     )
     val onboardingGradientDark = listOf(
-        Color(0xff0a5c7c), Color(0xff001a2a)
+        Color(0xff105c64), Color(0xff06262a)
     )
     val onboardingIconBgColors = listOf(
-        Color(0xff0a5c7c), Color(0xff001a2a)
-        //Color(0xff0D47A1), Color(0xff06234f)
+        Color(0xff5bd699), Color(0xff105c64)
     )
     val onboardingLogoOutlineDark = ScColors.colorWhiteAlpha_b3
 }

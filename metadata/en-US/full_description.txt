@@ -1,6 +1,13 @@
-SchildiChat Next is a Matrix client based on the Element X app, with various tweaks and additional features.
+Haven is a Matrix client for Android, the companion to Haven Desktop. It is based on Element X and brings in the features of SchildiChat Next.
+
+Highlights:
+- Bottom spaces bar with swipe navigation, including nested spaces
+- Configurable chat list sorting: unread on top, pinned favourites, low priority at the bottom
+- Unread counts, bridge icons and URL previews
+- Richer message rendering: spoilers, collapsible details, tables and inline custom emotes
+- Customisable message bubbles, freeform reactions and many more tweaks in the Turtle Tweaks settings
 
 The Matrix protocol is a decentralized approach to modern messaging, allowing you to select a server provider of your choice (or even self-host your own server), enabling you to communicate with end-to-end encryption, shared message history across multiple devices, and more.
 
-SchildiChat is open source: https://github.com/SchildiChat/schildichat-android-next
+More information about Haven: https://haven.software
 More information about the Matrix protocol: https://matrix.org/

@@ -39,7 +39,7 @@ android {
         )
         buildConfigFieldStr(
             name = "URL_PRIVACY",
-            value = BuildTimeConfig.URL_PRIVACY ?: "https://schildi.chat/next/privacy/",
+            value = BuildTimeConfig.URL_PRIVACY ?: "https://haven.software", // Haven: TODO privacy policy
         )
     }
 }

@@ -5,7 +5,7 @@
     <string name="sc_action_low_priority">Low priority</string>
 
     <!-- Onboarding -->
-    <string name="sc_onboarding_welcome_title">Welcome to SchildiChat</string>
+    <string name="sc_onboarding_welcome_title">Welcome to Haven</string>
     <string name="sc_onboarding_welcome_summary">Bringing turtles into the Matrix</string>
 
     <!-- SchildiChat settings -->

@@ -21,7 +21,7 @@ private const val PRIVACY_URL = BuildConfig.URL_PRIVACY
 */
 private const val COPYRIGHT_URL = "https://element.io/copyright"
 private const val USE_POLICY_URL = "https://element.io/acceptable-use-policy-terms"
-private const val PRIVACY_URL = "https://schildi.chat/next/privacy/"
+private const val PRIVACY_URL = "https://haven.software" // Haven: TODO privacy policy
 
 sealed class ElementLegal(
     @StringRes val titleRes: Int,

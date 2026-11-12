@@ -1,0 +1,1 @@
+Initial Haven release, based on Element X v26.11.0 and SchildiChat Next.

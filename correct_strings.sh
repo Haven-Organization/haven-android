@@ -9,23 +9,27 @@ pushd "$mydir" > /dev/null
 
 mydir="."
 
-# Element -> SchildiChat, but restore Element where it makes sense
-# After resoring some "Element Call" things, redo those call-related stringt pointing to "Element X" anyway
+# Haven: Element -> Haven, but restore Element where it makes sense (Element Call, Element Web/iOS/Desktop,
+# Element Pro, ...). Also migrate strings that still carry SchildiChat's branding from earlier merges.
+# "SchildiChat Legacy" stays: it names the old SchildiChat app that sessions can be imported from.
 find "$mydir" -not -path "./schildi/**" \
     \( -name translations.xml -o -name localazy.xml \) -exec \
-    sed -i 's|Element|SchildiChat|g;
-            s|SchildiChat X|SchildiChat Next|g;
-            s/SchildiChat \(Web\|iOS\|Desktop\)/Element \1/g;
-            s|SchildiChat Matrix Services|Element Matrix Services|g;
-            s|\(name="screen_onboarding_welcome_title".*\)SchildiChat|\1Element|g;
-            s|\(name=".*_call_.*".*\)SchildiChat|\1Element|g;
-            s|\(name=".*element_dot_io.*".*\)SchildiChat|\1Element|g;
-            s|\(name=".*screen_notification_settings_sound_element_.*".*\)SchildiChat|\1Element|g;
-            s|Element X|SchildiChat Next|g;
-            s/SchildiChat\( \|-\)Pro/Element\1Pro/g;
-            s/SchildiChatul/Elementul/g;
-            s/SchildiChat Classic/SchildiChat Legacy/g;
-            s/SchildiChat\( \|-\)Call/Element\1Call/g' '{}' \;
+    sed -i 's|SchildiChat Next|Haven|g;
+            s|SchildiChat Legacy|@@SC_LEGACY@@|g;
+            s|SchildiChat|Haven|g;
+            s|Element|Haven|g;
+            s|Haven X|Haven|g;
+            s/Haven \(Web\|iOS\|Desktop\)/Element \1/g;
+            s|Haven Matrix Services|Element Matrix Services|g;
+            s|\(name="screen_onboarding_welcome_title".*\)Haven|\1Element|g;
+            s|\(name=".*_call_.*".*\)Haven|\1Element|g;
+            s|\(name=".*element_dot_io.*".*\)Haven|\1Element|g;
+            s|\(name=".*screen_notification_settings_sound_element_.*".*\)Haven|\1Element|g;
+            s/Haven\( \|-\)Pro/Element\1Pro/g;
+            s/Havenul/Elementul/g;
+            s/Haven Classic/SchildiChat Legacy/g;
+            s/Haven\( \|-\)Call/Element\1Call/g;
+            s|@@SC_LEGACY@@|SchildiChat Legacy|g' '{}' \;
 
 git --no-pager diff -- '*/translations.xml' '*/localazy.xml'
 
