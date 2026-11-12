@@ -93,7 +93,6 @@ import io.element.android.libraries.matrix.impl.search.RustMessageSearchService
 import io.element.android.libraries.matrix.impl.search.RustSearchBackfillService
 import io.element.android.libraries.matrix.impl.spaces.RustSpaceService
 import io.element.android.libraries.matrix.impl.sync.RustSyncService
-import io.element.android.libraries.matrix.impl.sync.map
 import io.element.android.libraries.matrix.impl.timeline.toRustReceiptType
 import io.element.android.libraries.matrix.impl.user.UserSearchResultMapper
 import io.element.android.libraries.matrix.impl.user.into

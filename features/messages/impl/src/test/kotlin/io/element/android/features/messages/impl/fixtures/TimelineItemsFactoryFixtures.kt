@@ -38,6 +38,7 @@ import io.element.android.libraries.matrix.api.core.UserId
 import io.element.android.libraries.matrix.api.timeline.item.event.EventContent
 import io.element.android.libraries.matrix.test.FakeMatrixClient
 import io.element.android.libraries.matrix.test.permalink.FakePermalinkParser
+import io.element.android.libraries.matrix.test.room.FakeJoinedRoom
 import io.element.android.libraries.mediaviewer.test.util.FileExtensionExtractorWithoutValidation
 import io.element.android.services.toolbox.test.strings.FakeStringProvider
 import io.element.android.tests.testutils.testCoroutineDispatchers
@@ -98,6 +99,7 @@ internal fun TestScope.aTimelineItemsFactory(
                     permalinkParser = FakePermalinkParser(),
                     config = config,
                     summaryFormatter = FakeMessageSummaryFormatter(),
+                    room = FakeJoinedRoom(),
                 )
             }
         },

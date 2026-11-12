@@ -29,11 +29,13 @@ import io.element.android.libraries.designsystem.components.avatar.AvatarData
 import io.element.android.libraries.designsystem.components.avatar.AvatarSize
 import io.element.android.libraries.matrix.api.MatrixClient
 import io.element.android.libraries.matrix.api.permalink.PermalinkParser
+import io.element.android.libraries.matrix.api.room.JoinedRoom
 import io.element.android.libraries.matrix.api.timeline.MatrixTimelineItem
 import io.element.android.libraries.matrix.api.timeline.item.EventThreadInfo
 import io.element.android.libraries.matrix.api.timeline.item.event.getAvatarUrl
 import io.element.android.libraries.matrix.api.timeline.item.event.getDisambiguatedDisplayName
 import io.element.android.libraries.matrix.ui.messages.reply.map
+import io.element.android.libraries.matrix.ui.model.powerLevelOf
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
 
@@ -47,6 +49,7 @@ class TimelineItemEventFactory(
     private val dateFormatter: DateFormatter,
     private val permalinkParser: PermalinkParser,
     private val summaryFormatter: MessageSummaryFormatter,
+    private val room: JoinedRoom, // SC/Haven: sender power levels, now that upstream no longer passes room members here
 ) {
     @AssistedFactory
     interface Creator {
@@ -71,9 +74,8 @@ class TimelineItemEventFactory(
             mode = DateFormatterMode.Day,
             useRelative = true,
         )
-        val senderMember = roomMembers.find { it.userId == currentSender } // SC
         val senderAvatarData = AvatarData(
-            powerLevel = senderMember?.powerLevel, // SC
+            powerLevel = room.info().powerLevelOf(currentSender), // SC
             id = currentSender.value,
             name = senderProfile.getDisambiguatedDisplayName(currentSender),
             url = senderProfile.getAvatarUrl(),

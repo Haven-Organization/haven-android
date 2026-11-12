@@ -234,7 +234,7 @@ private fun RustUtdCause.map(): UtdCause {
         RustUtdCause.HISTORICAL_MESSAGE_AND_DEVICE_IS_UNVERIFIED -> UtdCause.HistoricalMessageAndDeviceIsUnverified
         RustUtdCause.WITHHELD_FOR_UNVERIFIED_OR_INSECURE_DEVICE -> UtdCause.WithheldUnverifiedOrInsecureDevice
         RustUtdCause.WITHHELD_BY_SENDER -> UtdCause.WithheldBySender
-        RustUtdCause.MALFORMED -> UtdCause.Malformed
+        // Haven: SDK compat, RustUtdCause.MALFORMED (upstream: -> UtdCause.Malformed) isn't in the SchildiChat rustcomponents fork yet
     }
 }
 
