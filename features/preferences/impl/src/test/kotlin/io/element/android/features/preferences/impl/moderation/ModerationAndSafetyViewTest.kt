@@ -54,8 +54,8 @@ class ModerationAndSafetyViewTest : RobolectricTest() {
                 eventSink = eventsRecorder,
             ),
         )
-        clickOn(R.string.screen_advanced_settings_share_presence)
-        eventsRecorder.assertSingle(ModerationAndSafetyEvent.SetSharePresenceEnabled(true))
+        clickOn(R.string.haven_screen_moderation_and_safety_send_read_receipts)
+        eventsRecorder.assertSingle(ModerationAndSafetyEvent.SetSendReadReceiptsEnabled(true))
     }
 
     @Test

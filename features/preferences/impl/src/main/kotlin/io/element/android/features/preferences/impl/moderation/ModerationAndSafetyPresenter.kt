@@ -32,8 +32,12 @@ class ModerationAndSafetyPresenter(
 ) : Presenter<ModerationAndSafetyState> {
     @Composable
     override fun present(): ModerationAndSafetyState {
-        val isSharePresenceEnabled by remember {
-            sessionPreferencesStore.isSharePresenceEnabled()
+        // Haven: separate toggles instead of upstream's single "Share presence"
+        val isSendReadReceiptsEnabled by remember {
+            sessionPreferencesStore.isSendPublicReadReceiptsEnabled()
+        }.collectAsState(initial = true)
+        val isSendTypingNotificationsEnabled by remember {
+            sessionPreferencesStore.isSendTypingNotificationsEnabled()
         }.collectAsState(initial = true)
 
         val mediaPreviewConfigState = mediaPreviewConfigStateStore.state()
@@ -46,8 +50,11 @@ class ModerationAndSafetyPresenter(
 
         fun handleEvent(event: ModerationAndSafetyEvent) {
             when (event) {
-                is ModerationAndSafetyEvent.SetSharePresenceEnabled -> sessionCoroutineScope.launch {
-                    sessionPreferencesStore.setSharePresence(event.enabled)
+                is ModerationAndSafetyEvent.SetSendReadReceiptsEnabled -> sessionCoroutineScope.launch {
+                    sessionPreferencesStore.setSendPublicReadReceipts(event.enabled)
+                }
+                is ModerationAndSafetyEvent.SetSendTypingNotificationsEnabled -> sessionCoroutineScope.launch {
+                    sessionPreferencesStore.setSendTypingNotifications(event.enabled)
                 }
                 is ModerationAndSafetyEvent.SetHideInviteAvatars -> mediaPreviewConfigStateStore.setHideInviteAvatars(event.value)
                 is ModerationAndSafetyEvent.SetTimelineMediaPreviewValue -> mediaPreviewConfigStateStore.setTimelineMediaPreviewValue(event.value)
@@ -55,7 +62,8 @@ class ModerationAndSafetyPresenter(
         }
 
         return ModerationAndSafetyState(
-            isSharePresenceEnabled = isSharePresenceEnabled,
+            isSendReadReceiptsEnabled = isSendReadReceiptsEnabled,
+            isSendTypingNotificationsEnabled = isSendTypingNotificationsEnabled,
             mediaPreviewConfigState = mediaPreviewConfigState,
             numberOfBlockedUsers = numberOfBlockedUsers,
             eventSink = ::handleEvent,

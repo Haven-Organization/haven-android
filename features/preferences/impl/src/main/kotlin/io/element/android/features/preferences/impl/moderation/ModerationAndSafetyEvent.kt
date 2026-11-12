@@ -10,7 +10,9 @@ package io.element.android.features.preferences.impl.moderation
 import io.element.android.libraries.matrix.api.media.MediaPreviewValue
 
 sealed interface ModerationAndSafetyEvent {
-    data class SetSharePresenceEnabled(val enabled: Boolean) : ModerationAndSafetyEvent
+    // Haven: separate toggles instead of upstream's single "Share presence"
+    data class SetSendReadReceiptsEnabled(val enabled: Boolean) : ModerationAndSafetyEvent
+    data class SetSendTypingNotificationsEnabled(val enabled: Boolean) : ModerationAndSafetyEvent
     data class SetHideInviteAvatars(val value: Boolean) : ModerationAndSafetyEvent
     data class SetTimelineMediaPreviewValue(val value: MediaPreviewValue) : ModerationAndSafetyEvent
 }

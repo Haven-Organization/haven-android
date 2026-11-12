@@ -97,17 +97,30 @@ private fun PresenceSection(state: ModerationAndSafetyState) {
     PreferenceCategory(
         title = stringResource(R.string.screen_moderation_and_safety_share_presence_heading),
     ) {
+        // Haven: separate toggles instead of upstream's single "Share presence"
         ListItem(
             content = {
-                Text(text = stringResource(id = R.string.screen_advanced_settings_share_presence))
+                Text(text = stringResource(id = R.string.haven_screen_moderation_and_safety_send_read_receipts))
             },
             supportingContent = {
-                Text(text = stringResource(id = R.string.screen_advanced_settings_share_presence_description))
+                Text(text = stringResource(id = R.string.haven_screen_moderation_and_safety_send_read_receipts_description))
             },
             trailingContent = ListItemContent.Switch(
-                checked = state.isSharePresenceEnabled,
+                checked = state.isSendReadReceiptsEnabled,
             ),
-            onClick = { state.eventSink(ModerationAndSafetyEvent.SetSharePresenceEnabled(!state.isSharePresenceEnabled)) }
+            onClick = { state.eventSink(ModerationAndSafetyEvent.SetSendReadReceiptsEnabled(!state.isSendReadReceiptsEnabled)) }
+        )
+        ListItem(
+            content = {
+                Text(text = stringResource(id = R.string.haven_screen_moderation_and_safety_send_typing_notifications))
+            },
+            supportingContent = {
+                Text(text = stringResource(id = R.string.haven_screen_moderation_and_safety_send_typing_notifications_description))
+            },
+            trailingContent = ListItemContent.Switch(
+                checked = state.isSendTypingNotificationsEnabled,
+            ),
+            onClick = { state.eventSink(ModerationAndSafetyEvent.SetSendTypingNotificationsEnabled(!state.isSendTypingNotificationsEnabled)) }
         )
     }
 }

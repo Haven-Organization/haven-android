@@ -32,7 +32,8 @@ class ModerationAndSafetyPresenterTest {
     fun `present - initial state`() = runTest {
         createModerationAndSafetyPresenter().test {
             with(awaitItem()) {
-                assertThat(isSharePresenceEnabled).isTrue()
+                assertThat(isSendReadReceiptsEnabled).isTrue()
+                assertThat(isSendTypingNotificationsEnabled).isTrue()
                 assertThat(mediaPreviewConfigState.hideInviteAvatars).isFalse()
                 assertThat(mediaPreviewConfigState.timelineMediaPreviewValue).isEqualTo(MediaPreviewValue.On)
                 assertThat(mediaPreviewConfigState.setHideInviteAvatarsAction).isEqualTo(AsyncAction.Uninitialized)
@@ -57,18 +58,37 @@ class ModerationAndSafetyPresenterTest {
     }
 
     @Test
-    fun `present - share presence off on`() = runTest {
+    fun `present - send read receipts off on`() = runTest {
         createModerationAndSafetyPresenter().test {
             with(awaitItem()) {
-                assertThat(isSharePresenceEnabled).isTrue()
-                eventSink(ModerationAndSafetyEvent.SetSharePresenceEnabled(false))
+                assertThat(isSendReadReceiptsEnabled).isTrue()
+                eventSink(ModerationAndSafetyEvent.SetSendReadReceiptsEnabled(false))
             }
             with(awaitItem()) {
-                assertThat(isSharePresenceEnabled).isFalse()
-                eventSink(ModerationAndSafetyEvent.SetSharePresenceEnabled(true))
+                assertThat(isSendReadReceiptsEnabled).isFalse()
+                assertThat(isSendTypingNotificationsEnabled).isTrue()
+                eventSink(ModerationAndSafetyEvent.SetSendReadReceiptsEnabled(true))
             }
             with(awaitItem()) {
-                assertThat(isSharePresenceEnabled).isTrue()
+                assertThat(isSendReadReceiptsEnabled).isTrue()
+            }
+        }
+    }
+
+    @Test
+    fun `present - send typing notifications off on`() = runTest {
+        createModerationAndSafetyPresenter().test {
+            with(awaitItem()) {
+                assertThat(isSendTypingNotificationsEnabled).isTrue()
+                eventSink(ModerationAndSafetyEvent.SetSendTypingNotificationsEnabled(false))
+            }
+            with(awaitItem()) {
+                assertThat(isSendTypingNotificationsEnabled).isFalse()
+                assertThat(isSendReadReceiptsEnabled).isTrue()
+                eventSink(ModerationAndSafetyEvent.SetSendTypingNotificationsEnabled(true))
+            }
+            with(awaitItem()) {
+                assertThat(isSendTypingNotificationsEnabled).isTrue()
             }
         }
     }

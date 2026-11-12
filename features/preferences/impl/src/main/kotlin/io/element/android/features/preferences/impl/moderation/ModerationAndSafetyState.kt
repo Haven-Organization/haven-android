@@ -8,7 +8,9 @@
 package io.element.android.features.preferences.impl.moderation
 
 data class ModerationAndSafetyState(
-    val isSharePresenceEnabled: Boolean,
+    // Haven: separate toggles instead of upstream's single "Share presence"
+    val isSendReadReceiptsEnabled: Boolean,
+    val isSendTypingNotificationsEnabled: Boolean,
     val mediaPreviewConfigState: MediaPreviewConfigState,
     val numberOfBlockedUsers: Int,
     val eventSink: (ModerationAndSafetyEvent) -> Unit

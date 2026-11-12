@@ -15,7 +15,7 @@ open class ModerationAndSafetyStatePreviewParam : PreviewParameterProvider<Moder
     override val values: Sequence<ModerationAndSafetyState>
         get() = sequenceOf(
             aModerationAndSafetyState(),
-            aModerationAndSafetyState(isSharePresenceEnabled = true),
+            aModerationAndSafetyState(isSendReadReceiptsEnabled = true, isSendTypingNotificationsEnabled = true),
             aModerationAndSafetyState(hideInviteAvatars = true),
             aModerationAndSafetyState(timelineMediaPreviewValue = MediaPreviewValue.Off),
             aModerationAndSafetyState(setHideInviteAvatarsAction = AsyncAction.Loading),
@@ -25,7 +25,8 @@ open class ModerationAndSafetyStatePreviewParam : PreviewParameterProvider<Moder
 }
 
 fun aModerationAndSafetyState(
-    isSharePresenceEnabled: Boolean = false,
+    isSendReadReceiptsEnabled: Boolean = false,
+    isSendTypingNotificationsEnabled: Boolean = false,
     hideInviteAvatars: Boolean = false,
     timelineMediaPreviewValue: MediaPreviewValue = MediaPreviewValue.On,
     setTimelineMediaPreviewAction: AsyncAction<Unit> = AsyncAction.Uninitialized,
@@ -33,7 +34,8 @@ fun aModerationAndSafetyState(
     numberOfBlockedUsers: Int = 0,
     eventSink: (ModerationAndSafetyEvent) -> Unit = {},
 ) = ModerationAndSafetyState(
-    isSharePresenceEnabled = isSharePresenceEnabled,
+    isSendReadReceiptsEnabled = isSendReadReceiptsEnabled,
+    isSendTypingNotificationsEnabled = isSendTypingNotificationsEnabled,
     mediaPreviewConfigState = MediaPreviewConfigState(
         hideInviteAvatars = hideInviteAvatars,
         timelineMediaPreviewValue = timelineMediaPreviewValue,

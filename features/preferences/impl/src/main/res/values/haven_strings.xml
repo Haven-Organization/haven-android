@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Haven-specific strings, kept separate from localazy.xml so upstream merges stay clean -->
+<resources>
+    <string name="haven_screen_moderation_and_safety_send_read_receipts">Send read receipts</string>
+    <string name="haven_screen_moderation_and_safety_send_read_receipts_description">Let others see when you\'ve read their messages. When off, your read position is still kept in sync privately between your own devices.</string>
+    <string name="haven_screen_moderation_and_safety_send_typing_notifications">Send typing notifications</string>
+    <string name="haven_screen_moderation_and_safety_send_typing_notifications_description">Let others see when you\'re typing.</string>
+</resources>
