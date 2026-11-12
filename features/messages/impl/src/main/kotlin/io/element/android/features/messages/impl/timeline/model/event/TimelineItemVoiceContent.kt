@@ -12,8 +12,8 @@ import com.beeper.android.messageformat.MatrixBodyParseResult
 import io.element.android.libraries.htmlrenderer.api.DocumentNode
 import io.element.android.libraries.matrix.api.core.EventId
 import io.element.android.libraries.matrix.api.media.MediaSource
-import kotlin.time.Duration
 import kotlinx.collections.immutable.ImmutableList
+import kotlin.time.Duration
 
 data class TimelineItemVoiceContent(
     val eventId: EventId?,
