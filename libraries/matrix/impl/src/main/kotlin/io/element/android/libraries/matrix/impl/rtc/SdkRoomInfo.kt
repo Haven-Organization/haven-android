@@ -9,6 +9,7 @@ package io.element.android.libraries.matrix.impl.rtc
 
 import io.element.android.libraries.core.coroutine.CoroutineDispatchers
 import io.element.android.libraries.core.extensions.runCatchingExceptions
+import io.element.android.libraries.matrix.impl.compat.membersFetchingGlobalProfiles
 import io.element.android.libraries.matrix.impl.room.roomInfoUpdates
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged

@@ -28,6 +28,7 @@ import io.element.android.libraries.matrix.api.room.powerlevels.RoomPowerLevelsV
 import io.element.android.libraries.matrix.api.room.tombstone.PredecessorRoom
 import io.element.android.libraries.matrix.api.roomdirectory.RoomVisibility
 import io.element.android.libraries.matrix.api.timeline.ReceiptType
+import io.element.android.libraries.matrix.impl.compat.membersFetchingGlobalProfiles
 import io.element.android.libraries.matrix.impl.room.draft.into
 import io.element.android.libraries.matrix.impl.room.member.RoomMemberListFetcher
 import io.element.android.libraries.matrix.impl.room.member.RoomMemberMapper

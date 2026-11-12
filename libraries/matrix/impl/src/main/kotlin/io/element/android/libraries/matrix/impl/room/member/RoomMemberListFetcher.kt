@@ -11,6 +11,7 @@ package io.element.android.libraries.matrix.impl.room.member
 import io.element.android.libraries.matrix.api.room.RoomMember
 import io.element.android.libraries.matrix.api.room.RoomMembersState
 import io.element.android.libraries.matrix.api.room.roomMembers
+import io.element.android.libraries.matrix.impl.compat.membersFetchingGlobalProfiles
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.CoroutineDispatcher

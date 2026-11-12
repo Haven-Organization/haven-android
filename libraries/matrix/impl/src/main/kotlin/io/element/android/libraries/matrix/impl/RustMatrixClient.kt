@@ -61,6 +61,7 @@ import io.element.android.libraries.matrix.api.timeline.ReceiptType
 import io.element.android.libraries.matrix.api.user.MatrixSearchUserResults
 import io.element.android.libraries.matrix.api.user.MatrixUser
 import io.element.android.libraries.matrix.api.user.UserStatus
+import io.element.android.libraries.matrix.impl.compat.totalUnreadNotificationsFlow
 import io.element.android.libraries.matrix.impl.encryption.RustEncryptionService
 import io.element.android.libraries.matrix.impl.exception.mapClientException
 import io.element.android.libraries.matrix.impl.linknewdevice.RustLinkDesktopHandler
@@ -144,7 +145,6 @@ import org.matrix.rustcomponents.sdk.ProfileListener
 import org.matrix.rustcomponents.sdk.RoomInfoListener
 import org.matrix.rustcomponents.sdk.SendQueueRoomErrorListener
 import org.matrix.rustcomponents.sdk.TaskHandle
-import org.matrix.rustcomponents.sdk.TotalUnreadNotificationsListener
 import org.matrix.rustcomponents.sdk.UserProfile
 import org.matrix.rustcomponents.sdk.use
 import timber.log.Timber
@@ -154,9 +154,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.io.encoding.Base64
 import kotlin.jvm.optionals.getOrNull
 import kotlin.time.Duration
-import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
-import kotlin.time.toJavaDuration
 import org.matrix.rustcomponents.sdk.CreateRoomParameters as RustCreateRoomParameters
 import org.matrix.rustcomponents.sdk.RoomPreset as RustRoomPreset
 import org.matrix.rustcomponents.sdk.SyncService as ClientSyncService
@@ -354,14 +352,8 @@ class RustMatrixClient(
         get() = _isShuttingDown.get()
 
     override val totalUnreadCountFlow: StateFlow<Long> =
-        mxCallbackFlow {
-            val listener = object : TotalUnreadNotificationsListener {
-                override fun onUpdate(count: ULong) {
-                    trySend(count.toLong())
-                }
-            }
-            innerClient.observeTotalUnreadNotifications(listener, 100.milliseconds.toJavaDuration())
-        }.stateIn(
+        // Haven: SDK compat, the SchildiChat rustcomponents fork has no observeTotalUnreadNotifications() yet
+        innerClient.totalUnreadNotificationsFlow(pollInterval = 2.seconds).stateIn(
             scope = sessionCoroutineScope,
             started = SharingStarted.WhileSubscribed(),
             initialValue = runCatchingExceptions { innerClient.totalUnreadNotifications().toLong() }.getOrDefault(0L),
