@@ -264,6 +264,7 @@ private fun RoomMemberActionsBottomSheet(
                 overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.Center,
                 modifier = Modifier
+                    .copyTextOnLongPress(user.userId.toString())
                     .padding(start = 16.dp, end = 16.dp, bottom = 12.dp)
                     .fillMaxWidth()
             )
@@ -291,6 +292,7 @@ private fun RoomMemberActionsBottomSheet(
                     overflow = TextOverflow.Ellipsis,
                     textAlign = TextAlign.Center,
                     modifier = Modifier
+                        .copyTextOnLongPress(user.userId.toString())
                         .padding(horizontal = 16.dp)
                         .fillMaxWidth()
                 )

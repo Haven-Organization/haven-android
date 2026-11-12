@@ -54,6 +54,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
+import chat.schildi.lib.preferences.ScPrefs
+import chat.schildi.lib.preferences.fullyExpandBottomSheetValues
 import io.element.android.compound.theme.ElementTheme
 import io.element.android.compound.tokens.generated.CompoundIcons
 import io.element.android.features.messages.impl.R
@@ -115,6 +117,7 @@ fun ActionListView(
 ) {
     val sheetState = rememberBottomSheetState(
         initialValue = SheetValue.Hidden,
+        enabledValues = ScPrefs.FULLY_EXPAND_MESSAGE_MENU.fullyExpandBottomSheetValues(),
     )
     val coroutineScope = rememberCoroutineScope()
     val targetItem = (state.target as? ActionListState.Target.Success)?.event
@@ -282,7 +285,7 @@ private fun MessageSummary(
 
     @Composable
     fun ContentForBody(body: String) {
-        Text(body, style = contentStyle, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        ScMessageContextPreview(body) ?: Text(body, style = contentStyle, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 
     val context = LocalContext.current

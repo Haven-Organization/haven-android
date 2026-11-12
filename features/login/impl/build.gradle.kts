@@ -53,6 +53,7 @@ android {
 setupDependencyInjection()
 
 dependencies {
+    implementation(projects.schildi.lib)
     implementation(projects.appconfig)
     implementation(projects.features.enterprise.api)
     implementation(projects.features.preferences.api)

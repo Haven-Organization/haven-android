@@ -19,6 +19,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.res.ResourcesCompat
+import chat.schildi.lib.preferences.LocalScPreferencesStore
+import chat.schildi.lib.preferences.NotExactlyACompositionLocal
+import chat.schildi.lib.preferences.PreviewScPreferencesStore
+import chat.schildi.theme.ScTheme
 import coil3.annotation.ExperimentalCoilApi
 import coil3.asImage
 import coil3.compose.AsyncImagePreviewHandler
@@ -40,12 +44,13 @@ fun ElementPreview(
     content: @Composable () -> Unit
 ) {
     val context = LocalContext.current
+    LocalScPreferencesStore = NotExactlyACompositionLocal(PreviewScPreferencesStore)
     CompositionLocalProvider(
         LocalAsyncImagePreviewHandler provides AsyncImagePreviewHandler {
             ResourcesCompat.getDrawable(context.resources, drawableFallbackForImages, null)!!.asImage()
         }
     ) {
-        ElementTheme(theme = theme) {
+        ScTheme(theme = theme) {
             val movableContent = remember { movableContentOf { content() } }
             if (showBackground) {
                 // If we have a proper contentColor applied we need a Surface instead of a Box

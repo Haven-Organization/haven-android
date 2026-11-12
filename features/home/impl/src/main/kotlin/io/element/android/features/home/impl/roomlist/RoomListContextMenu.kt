@@ -13,15 +13,23 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.RemoveRedEye
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.tooling.preview.PreviewParameter
+import chat.schildi.features.home.spaces.SpaceListDataSource
+import chat.schildi.lib.preferences.ScPrefs
+import chat.schildi.lib.preferences.value
 import io.element.android.compound.theme.ElementTheme
 import io.element.android.compound.tokens.generated.CompoundIcons
+import io.element.android.features.home.impl.LowPriorityRoomListContextMenuItem
+import io.element.android.features.home.impl.ManageSpacesRoomListContextMenuItems
 import io.element.android.features.home.impl.R
 import io.element.android.libraries.designsystem.components.list.ListItemContent
 import io.element.android.libraries.designsystem.preview.ElementPreview
@@ -31,6 +39,7 @@ import io.element.android.libraries.designsystem.theme.components.ListItem
 import io.element.android.libraries.designsystem.theme.components.ListItemStyle
 import io.element.android.libraries.designsystem.theme.components.ModalBottomSheet
 import io.element.android.libraries.designsystem.theme.components.Text
+import io.element.android.libraries.matrix.api.MatrixClient
 import io.element.android.libraries.matrix.api.core.RoomId
 import io.element.android.libraries.ui.strings.CommonStrings
 
@@ -38,6 +47,8 @@ import io.element.android.libraries.ui.strings.CommonStrings
 @Composable
 fun RoomListContextMenu(
     contextMenu: RoomListState.ContextMenu.Shown,
+    roomListState: RoomListState, // SC
+    matrixClient: MatrixClient?, // SC
     canReportRoom: Boolean,
     eventSink: (RoomListEvent.ContextMenuEvent) -> Unit,
     onRoomSettingsClick: (roomId: RoomId) -> Unit,
@@ -45,10 +56,14 @@ fun RoomListContextMenu(
 ) {
     ModalBottomSheet(
         onDismissRequest = { eventSink(RoomListEvent.HideContextMenu) },
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = ScPrefs.FULLY_EXPAND_MESSAGE_MENU.value()), // SC
         scrollable = false,
     ) {
         RoomListModalBottomSheetContent(
             contextMenu = contextMenu,
+            roomListState = roomListState, // SC
+            matrixClient = matrixClient, // SC
+            onLowPriorityChange = { eventSink(RoomListEvent.SetRoomIsLowPriority(contextMenu.roomId, it))}, // SC
             canReportRoom = canReportRoom,
             onRoomMarkReadClick = {
                 eventSink(RoomListEvent.HideContextMenu)
@@ -80,6 +95,9 @@ fun RoomListContextMenu(
 @Composable
 private fun RoomListModalBottomSheetContent(
     contextMenu: RoomListState.ContextMenu.Shown,
+    roomListState: RoomListState, // SC
+    matrixClient: MatrixClient?, // SC
+    onLowPriorityChange: (isLowPriority: Boolean) -> Unit, // SC
     canReportRoom: Boolean,
     onRoomSettingsClick: () -> Unit,
     onLeaveRoomClick: () -> Unit,
@@ -112,7 +130,8 @@ private fun RoomListModalBottomSheetContent(
                 },
                 onClick = onRoomMarkReadClick,
                 leadingContent = ListItemContent.Icon(
-                    iconSource = IconSource.Vector(CompoundIcons.MarkAsRead())
+                    //iconSource = IconSource.Vector(CompoundIcons.MarkAsRead())
+                    iconSource = IconSource.Vector(Icons.Default.RemoveRedEye),
                 ),
             )
         } else {
@@ -125,7 +144,8 @@ private fun RoomListModalBottomSheetContent(
                 },
                 onClick = onRoomMarkUnreadClick,
                 leadingContent = ListItemContent.Icon(
-                    iconSource = IconSource.Vector(CompoundIcons.MarkAsUnread())
+                    //iconSource = IconSource.Vector(CompoundIcons.MarkAsUnread())
+                    iconSource = IconSource.Vector(Icons.Default.RemoveRedEye),
                 ),
             )
         }
@@ -153,6 +173,7 @@ private fun RoomListModalBottomSheetContent(
                 onFavoriteChange(!contextMenu.isFavorite)
             },
         )
+        LowPriorityRoomListContextMenuItem(contextMenu, onLowPriorityChange) // SC
         ListItem(
             content = {
                 Text(
@@ -167,6 +188,7 @@ private fun RoomListModalBottomSheetContent(
                 )
             ),
         )
+        ManageSpacesRoomListContextMenuItems(contextMenu, roomListState, matrixClient)
         if (canReportRoom) {
             ListItem(
                 content = {
@@ -203,6 +225,8 @@ internal fun RoomListContextMenuPreview(
 ) = ElementPreview(fillMaxSize = true) {
     RoomListContextMenu(
         contextMenu = contextMenu,
+        roomListState = aRoomListState(), // SC
+        matrixClient = null, // SC
         canReportRoom = true,
         onRoomSettingsClick = {},
         onReportRoomClick = {},

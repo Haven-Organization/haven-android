@@ -70,6 +70,15 @@ data class RoomInfo(
      * notification settings.
      */
     val numUnreadMentions: Long,
+    // SC: start
+    val privateRoomName: String? = null,
+    val spaceChildren: List<MatrixSpaceChildInfo> = emptyList(),
+    val spaceCatchAll: SpaceCatchAllInfo? = null,
+    val canUserManageSpaces: Boolean = false,
+    val unreadCount: Long = 0,
+    val bridgeState: List<BridgeState> = emptyList(),
+    val unreadCountUnderestimate: Boolean = false,
+    // SC end
     val heroes: ImmutableList<MatrixUser>,
     val pinnedEventIds: ImmutableList<EventId>,
     val creators: ImmutableList<UserId>,
@@ -84,3 +93,8 @@ data class RoomInfo(
     val aliases: List<RoomAlias>
         get() = listOfNotNull(canonicalAlias) + alternativeAliases
 }
+
+data class SpaceCatchAllInfo(
+    val includeOrphans: Boolean,
+    val filterIsDirect: Boolean?,
+)

@@ -65,6 +65,11 @@ interface RoomListService {
     val allRooms: RoomList
 
     /**
+     * Root spaces.
+     */
+    val allSpaces: RoomList
+
+    /**
      * The sync indicator as a flow.
      */
     val syncIndicator: StateFlow<SyncIndicator>

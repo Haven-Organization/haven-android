@@ -22,8 +22,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
+import chat.schildi.lib.preferences.ScPrefs
+import chat.schildi.lib.preferences.value
 import io.element.android.compound.theme.ElementTheme
 import io.element.android.compound.tokens.generated.CompoundIcons
+import io.element.android.features.messages.impl.moveCallButtonToOverflow
 import io.element.android.features.roomcall.api.RoomCallState
 import io.element.android.features.roomcall.api.RoomCallStatePreviewParam
 import io.element.android.libraries.designsystem.preview.ElementPreview
@@ -44,6 +47,7 @@ internal fun CallMenuItem(
             Box(modifier)
         }
         is RoomCallState.StandBy -> {
+            if (moveCallButtonToOverflow() || ScPrefs.HIDE_CALL_TOOLBAR_ACTION.value()) return // SC-condition
             StandByCallMenuItem(
                 roomCallState = roomCallState,
                 onJoinCallClick = onJoinCallClick,

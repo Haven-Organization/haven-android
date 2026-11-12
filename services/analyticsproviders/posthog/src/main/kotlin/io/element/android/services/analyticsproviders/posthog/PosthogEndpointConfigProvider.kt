@@ -18,7 +18,7 @@ class PosthogEndpointConfigProvider(
     private val buildMeta: BuildMeta,
 ) {
     fun provide(): PosthogEndpointConfig? {
-        return if (buildMeta.isEnterpriseBuild) {
+        return if (true) null else if (buildMeta.isEnterpriseBuild) {
             PosthogEndpointConfig(
                 host = BuildConfig.POSTHOG_HOST,
                 apiKey = BuildConfig.POSTHOG_APIKEY,

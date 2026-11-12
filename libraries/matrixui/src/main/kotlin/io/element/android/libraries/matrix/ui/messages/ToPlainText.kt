@@ -53,7 +53,7 @@ fun FormattedBody.toPlainText(
     return this.toHtmlDocument(
         permalinkParser = permalinkParser,
         prefix = prefix,
-    )?.toPlainText()
+    )?.also(::fixInlineImages)?.stripSpoilers()?.toPlainText()
 }
 
 /**

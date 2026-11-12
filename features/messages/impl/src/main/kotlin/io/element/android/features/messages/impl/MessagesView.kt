@@ -59,6 +59,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
+import chat.schildi.lib.preferences.ScPrefs
+import chat.schildi.lib.preferences.value
+import chat.schildi.theme.ScTheme
 import io.element.android.compound.theme.ElementTheme
 import io.element.android.compound.tokens.generated.CompoundIcons
 import io.element.android.features.location.api.LiveLocationSharingBanner
@@ -239,6 +242,8 @@ fun MessagesView(
         state.customReactionState.eventSink(CustomReactionEvent.ShowCustomReactionSheet(event))
     }
 
+    val syncReadMarkerAndReceipt = ScPrefs.SYNC_READ_RECEIPT_AND_MARKER.value()
+
     val expandableState = rememberExpandableBottomSheetLayoutState()
     ExpandableBottomSheetLayout(
         modifier = modifier
@@ -279,7 +284,9 @@ fun MessagesView(
                             )
                         }
                         else -> {
+                            Column { // SC wrong indention
                             MessagesViewTopBar(
+                                state = state, // SC
                                 roomName = state.roomName,
                                 roomAvatar = state.roomAvatar,
                                 isTombstoned = state.isTombstoned,
@@ -291,6 +298,8 @@ fun MessagesView(
                                 onRoomDetailsClick = { hidingKeyboard { onRoomDetailsClick() } },
                                 menuActions = {
                                     MessagesMenuActions(
+                                        state = state, // SC
+                                        onViewAllPinnedMessagesClick = onViewAllPinnedMessagesClick, // SC
                                         displayThreads = state.timelineState.timelineMode !is Timeline.Mode.Thread && state.threads.hasThreads,
                                         roomCallState = state.roomCallState,
                                         onJoinCallClick = onJoinCallClick,
@@ -298,6 +307,8 @@ fun MessagesView(
                                     )
                                 }
                             )
+                            ScReadMarkerDebug(state.timelineState.scReadState)
+                            } // SC wrong indention
                         }
                     }
                 },
@@ -382,6 +393,9 @@ fun MessagesView(
                 onRoomSuccessorClick = { roomId ->
                     state.timelineState.eventSink(TimelineEvent.NavigateToPredecessorOrSuccessorRoom(roomId = roomId))
                 },
+                scBeforeSend = {
+                    state.timelineState.eventSink(TimelineEvent.ForceMarkAsRead)
+                }.takeIf { syncReadMarkerAndReceipt },
             )
         },
         sheetDragHandle = @Composable { toggleAction ->
@@ -514,6 +528,8 @@ internal fun RowScope.MessagesMenuActions(
     roomCallState: RoomCallState,
     onJoinCallClick: (isAudioCall: Boolean) -> Unit,
     onThreadsListClick: () -> Unit,
+    state: MessagesState, // SC
+    onViewAllPinnedMessagesClick: () -> Unit, // SC
 ) {
     if (displayThreads) {
         Icon(
@@ -527,7 +543,8 @@ internal fun RowScope.MessagesMenuActions(
         roomCallState = roomCallState,
         onJoinCallClick = onJoinCallClick,
     )
-    Spacer(Modifier.width(8.dp))
+    //Spacer(Modifier.width(8.dp)) // SC: moved to scMessagesViewTopBarActions()
+    scMessagesViewTopBarActions(state, roomCallState, onJoinCallClick, onViewAllPinnedMessagesClick)
 }
 
 @Composable
@@ -628,7 +645,7 @@ private fun MessagesViewContent(
                     modifier = Modifier.onSizeChanged { topBannersHeightDp = with(density) { it.height.toDp() } },
                 ) {
                     AnimatedVisibility(
-                        visible = state.pinnedMessagesBannerState is PinnedMessagesBannerState.Visible && scrollBehavior.isVisible,
+                        visible = ScPrefs.PINNED_MESSAGE_OVERLAY.value() && state.pinnedMessagesBannerState is PinnedMessagesBannerState.Visible && scrollBehavior.isVisible,
                         enter = expandVertically(),
                         exit = shrinkVertically(),
                     ) {
@@ -660,6 +677,7 @@ private fun MessagesViewContent(
 @Composable
 private fun MessagesViewComposerBottomSheetContents(
     state: MessagesState,
+    scBeforeSend: (() -> Unit)?,
     onRoomSuccessorClick: (RoomId) -> Unit,
     onLinkClick: (String, Boolean) -> Unit,
 ) {
@@ -698,6 +716,7 @@ private fun MessagesViewComposerBottomSheetContents(
                         state = state.composerState,
                         voiceMessageState = state.voiceMessageComposerState,
                         modifier = Modifier.fillMaxWidth(),
+                        scBeforeSend = scBeforeSend,
                     )
                 }
             }
@@ -713,14 +732,14 @@ private fun CantSendMessageBanner(modifier: Modifier = Modifier) {
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .background(ElementTheme.colors.bgSubtleSecondary)
+            .background(ScTheme.exposures.composerBlockBg ?: ElementTheme.colors.bgSubtleSecondary)
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center
     ) {
         Text(
             text = stringResource(id = R.string.screen_room_timeline_no_permission_to_post),
-            color = ElementTheme.colors.textSecondary,
+            color = ScTheme.exposures.composerBlockFg ?: ElementTheme.colors.textSecondary,
             style = MaterialTheme.typography.bodyMedium,
             textAlign = TextAlign.Center,
             fontStyle = FontStyle.Italic,

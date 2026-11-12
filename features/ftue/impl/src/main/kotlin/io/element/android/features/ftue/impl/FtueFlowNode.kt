@@ -39,6 +39,7 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.parcelize.Parcelize
 import kotlin.time.Duration.Companion.milliseconds
+import timber.log.Timber
 
 @ContributesNode(SessionScope::class)
 @AssistedInject

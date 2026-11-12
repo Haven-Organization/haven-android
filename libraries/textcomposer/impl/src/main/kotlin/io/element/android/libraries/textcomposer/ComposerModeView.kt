@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -41,6 +42,7 @@ import io.element.android.libraries.matrix.ui.media.contentvalidation.collectOve
 import io.element.android.libraries.matrix.ui.media.contentvalidation.rememberEventContentValidationState
 import io.element.android.libraries.matrix.ui.messages.reply.InReplyToDetails
 import io.element.android.libraries.matrix.ui.messages.reply.InReplyToView
+import io.element.android.libraries.matrix.ui.messages.reply.LocalIsInComposer
 import io.element.android.libraries.matrix.ui.messages.reply.eventId
 import io.element.android.libraries.textcomposer.model.MessageComposerMode
 import io.element.android.libraries.ui.strings.CommonStrings
@@ -50,7 +52,7 @@ internal fun ComposerModeView(
     composerMode: MessageComposerMode.Special,
     onResetComposerMode: () -> Unit,
     modifier: Modifier = Modifier,
-) {
+) = CompositionLocalProvider(LocalIsInComposer provides true) {
     when (composerMode) {
         is MessageComposerMode.Edit -> {
             EditingModeView(

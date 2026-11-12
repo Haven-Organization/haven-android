@@ -127,7 +127,7 @@ class DefaultNotificationChannels(
             // Now `SystemDefault` means Android's system tone, so untouched legacy state would
             // silently flip sound. Promote it to `ElementDefault` once, gated on version==0 so the
             // migration is idempotent.
-            if (initial.messageSoundVersion == 0 && initial.messageSound == NotificationSound.SystemDefault) {
+            if (/* SC: no */ false && initial.messageSoundVersion == 0 && initial.messageSound == NotificationSound.SystemDefault) {
                 appPreferencesStore.setMessageSoundAndIncrementVersion(NotificationSound.ElementDefault, title = null)
                 appPreferencesStore.getNotificationSoundChannelConfig()
             } else {
@@ -151,7 +151,7 @@ class DefaultNotificationChannels(
         // Migration - Remove deprecated channels
         for (channelId in listOf(
             "DEFAULT_SILENT_NOTIFICATION_CHANNEL_ID",
-            "DEFAULT_NOISY_NOTIFICATION_CHANNEL_ID",
+            // "DEFAULT_NOISY_NOTIFICATION_CHANNEL_ID", // SC: still keeping that one
             "CALL_NOTIFICATION_CHANNEL_ID",
             "CALL_NOTIFICATION_CHANNEL_ID_V2",
             "LISTEN_FOR_EVENTS_NOTIFICATION_CHANNEL_ID",
@@ -213,6 +213,9 @@ class DefaultNotificationChannels(
                 accentColor = accentColor,
             )
         )
+
+        // SC addons
+        notificationManager.updateScNotificationChannels(stringProvider)
     }
 
     private fun buildNoisyChannel(channelId: String, soundUri: Uri?, accentColor: Int): NotificationChannelCompat {

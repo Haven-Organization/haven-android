@@ -39,7 +39,7 @@ android {
         )
         buildConfigFieldStr(
             name = "URL_PRIVACY",
-            value = BuildTimeConfig.URL_PRIVACY ?: "https://element.io/privacy",
+            value = BuildTimeConfig.URL_PRIVACY ?: "https://schildi.chat/next/privacy/",
         )
     }
 }
@@ -47,6 +47,9 @@ android {
 setupDependencyInjection()
 
 dependencies {
+    api(projects.schildi.lib)
+    api(projects.schildi.components)
+
     implementation(projects.libraries.androidutils)
     implementation(projects.libraries.core)
     implementation(projects.libraries.architecture)

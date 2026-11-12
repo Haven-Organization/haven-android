@@ -14,6 +14,7 @@ import androidx.compose.ui.res.stringResource
 import io.element.android.features.preferences.impl.R
 import io.element.android.features.preferences.impl.account.PreferencesAccountState
 import io.element.android.features.preferences.impl.userstatus.UserStatusState
+import io.element.android.libraries.core.meta.BuildMeta
 import io.element.android.libraries.designsystem.components.preferences.DropdownOption
 import io.element.android.libraries.designsystem.utils.snackbar.SnackbarMessage
 import io.element.android.libraries.matrix.api.user.MatrixUser
@@ -27,6 +28,7 @@ data class PreferencesRootState(
     val availableThemeOptions: ImmutableList<ThemeOption>,
     val userStatusState: UserStatusState?,
     val version: String,
+    val buildMeta: BuildMeta? = null, // SC
     val isMultiAccountEnabled: Boolean,
     val isOtherAccountsSectionExpanded: Boolean,
     val otherSessions: ImmutableList<OtherAccount>,

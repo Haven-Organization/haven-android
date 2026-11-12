@@ -99,6 +99,7 @@ class TimelineItemContentMessageFactory(
                     body = emoteBody,
                     htmlDocument = dom,
                     formattedBody = formattedBody,
+                    formattedBodySc = scFormattedBody(messageType, dom, content.isRoomMention, emoteBody),
                     isEdited = content.isEdited,
                     messageTree = parseMessageTree(dom),
                 )
@@ -112,6 +113,7 @@ class TimelineItemContentMessageFactory(
                     body = body,
                     htmlDocument = htmlDocument,
                     formattedBody = formattedBody,
+                    formattedBodySc = scFormattedBody(messageType, htmlDocument, content.isRoomMention),
                     isEdited = content.isEdited,
                     messageTree = parseMessageTree(htmlDocument),
                 )
@@ -129,6 +131,7 @@ class TimelineItemContentMessageFactory(
                     fileSize = messageType.info?.size ?: 0,
                     caption = messageType.caption?.trimEnd(),
                     formattedCaption = formattedCaption,
+                    formattedCaptionSc = scFormattedBody(messageType, dom, content.isRoomMention),
                     htmlCaption = messageType.formattedCaption?.body?.takeIf { messageType.formattedCaption?.format == MessageFormat.HTML },
                     captionTree = parseMessageTree(dom),
                     isEdited = content.isEdited,
@@ -155,6 +158,7 @@ class TimelineItemContentMessageFactory(
                     fileSize = messageType.info?.size ?: 0,
                     caption = messageType.caption?.trimEnd(),
                     formattedCaption = formattedCaption,
+                    formattedCaptionSc = scFormattedBody(messageType, dom, content.isRoomMention),
                     htmlCaption = messageType.formattedCaption?.body?.takeIf { messageType.formattedCaption?.format == MessageFormat.HTML },
                     captionTree = parseMessageTree(dom),
                     isEdited = content.isEdited,
@@ -177,6 +181,7 @@ class TimelineItemContentMessageFactory(
                         body = body,
                         htmlDocument = null,
                         formattedBody = body,
+                        formattedBodySc = scFormattedPlaintextBody(body, content.isRoomMention),
                         isEdited = content.isEdited,
                     )
                 } else {
@@ -199,6 +204,7 @@ class TimelineItemContentMessageFactory(
                     fileSize = messageType.info?.size ?: 0,
                     caption = messageType.caption?.trimEnd(),
                     formattedCaption = formattedCaption,
+                    formattedCaptionSc = scFormattedBody(messageType, dom, content.isRoomMention),
                     htmlCaption = messageType.formattedCaption?.body?.takeIf { messageType.formattedCaption?.format == MessageFormat.HTML },
                     captionTree = parseMessageTree(dom),
                     isEdited = content.isEdited,
@@ -225,6 +231,7 @@ class TimelineItemContentMessageFactory(
                     fileSize = messageType.info?.size ?: 0,
                     caption = messageType.caption?.trimEnd(),
                     formattedCaption = formattedCaption,
+                    formattedCaptionSc = scFormattedBody(messageType, dom, content.isRoomMention),
                     htmlCaption = messageType.formattedCaption?.body?.takeIf { messageType.formattedCaption?.format == MessageFormat.HTML },
                     captionTree = parseMessageTree(dom),
                     isEdited = content.isEdited,
@@ -245,6 +252,7 @@ class TimelineItemContentMessageFactory(
                     fileSize = messageType.info?.size ?: 0,
                     caption = messageType.caption?.trimEnd(),
                     formattedCaption = formattedCaption,
+                    formattedCaptionSc = scFormattedBody(messageType, dom, content.isRoomMention),
                     htmlCaption = messageType.formattedCaption?.body?.takeIf { messageType.formattedCaption?.format == MessageFormat.HTML },
                     captionTree = parseMessageTree(dom),
                     isEdited = content.isEdited,
@@ -266,6 +274,7 @@ class TimelineItemContentMessageFactory(
                     fileSize = messageType.info?.size ?: 0,
                     caption = messageType.caption?.trimEnd(),
                     formattedCaption = formattedCaption,
+                    formattedCaptionSc = scFormattedBody(messageType, dom, content.isRoomMention),
                     htmlCaption = messageType.formattedCaption?.body?.takeIf { messageType.formattedCaption?.format == MessageFormat.HTML },
                     captionTree = parseMessageTree(dom),
                     isEdited = content.isEdited,
@@ -285,6 +294,7 @@ class TimelineItemContentMessageFactory(
                     body = body,
                     htmlDocument = htmlDocument,
                     formattedBody = formattedBody,
+                    formattedBodySc = scFormattedBody(messageType, htmlDocument, content.isRoomMention),
                     isEdited = content.isEdited,
                     messageTree = parseMessageTree(htmlDocument),
                 )
@@ -438,6 +448,7 @@ class TimelineItemContentMessageFactory(
                     body = body,
                     htmlDocument = null,
                     formattedBody = textPillificator.pillify(body).safeLinkify(),
+                    formattedBodySc = scFormattedPlaintextBody(body, content.isRoomMention),
                     isEdited = content.isEdited,
                 )
             }

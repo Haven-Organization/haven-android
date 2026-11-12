@@ -33,6 +33,8 @@ class DefaultUnifiedPushDistributorProvider(
             } else {
                 Distributor(it, context.getApplicationLabel(it))
             }
-        }
+        } +
+            // SC: Append self at the end for our FOSS-FCM-Distributor - at the end is important to favor external distributors
+            listOf(Distributor(context.packageName, "FCM"))
     }
 }

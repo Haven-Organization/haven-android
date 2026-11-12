@@ -8,6 +8,8 @@
 
 package io.element.android.libraries.matrix.impl
 
+import chat.schildi.lib.preferences.ScPreferencesStore
+import chat.schildi.matrixsdk.ScTimelineFilterSettings
 import dev.zacsweers.metro.Assisted
 import dev.zacsweers.metro.AssistedFactory
 import dev.zacsweers.metro.AssistedInject
@@ -55,6 +57,7 @@ import io.element.android.libraries.matrix.api.scanner.ContentScanner
 import io.element.android.libraries.matrix.api.search.SearchBackfillStrategy
 import io.element.android.libraries.matrix.api.spaces.SpaceService
 import io.element.android.libraries.matrix.api.sync.SyncState
+import io.element.android.libraries.matrix.api.timeline.ReceiptType
 import io.element.android.libraries.matrix.api.user.MatrixSearchUserResults
 import io.element.android.libraries.matrix.api.user.MatrixUser
 import io.element.android.libraries.matrix.api.user.UserStatus
@@ -89,6 +92,8 @@ import io.element.android.libraries.matrix.impl.search.RustMessageSearchService
 import io.element.android.libraries.matrix.impl.search.RustSearchBackfillService
 import io.element.android.libraries.matrix.impl.spaces.RustSpaceService
 import io.element.android.libraries.matrix.impl.sync.RustSyncService
+import io.element.android.libraries.matrix.impl.sync.map
+import io.element.android.libraries.matrix.impl.timeline.toRustReceiptType
 import io.element.android.libraries.matrix.impl.user.UserSearchResultMapper
 import io.element.android.libraries.matrix.impl.user.into
 import io.element.android.libraries.matrix.impl.user.map
@@ -170,6 +175,7 @@ class RustMatrixClient(
     @Assisted override val isMessageSearchAvailable: Boolean,
     @Assisted private val sessionDelegate: RustClientSessionDelegate,
     private val sessionStore: SessionStore,
+    private val scPreferencesStore: ScPreferencesStore,
     @AppCoroutineScope appCoroutineScope: CoroutineScope,
     dispatchers: CoroutineDispatchers,
     clock: SystemClock,
@@ -208,6 +214,7 @@ class RustMatrixClient(
     override val syncService = RustSyncService(
         inner = innerSyncService,
         dispatcher = sessionDispatcher,
+        scPreferencesStore = scPreferencesStore,
         sessionCoroutineScope = sessionCoroutineScope
     )
     override val pushersService = RustPushersService(
@@ -246,6 +253,7 @@ class RustMatrixClient(
             analyticsService = analyticsService,
         ),
         roomSyncSubscriber = roomSyncSubscriber,
+        scPreferencesStore = scPreferencesStore,
     )
 
     override val spaceService: SpaceService = RustSpaceService(
@@ -427,8 +435,8 @@ class RustMatrixClient(
         roomFactory.getBaseRoom(roomId)
     }
 
-    override suspend fun getJoinedRoom(roomId: RoomId): JoinedRoom? = withContext(sessionDispatcher) {
-        (roomFactory.getJoinedRoomOrPreview(roomId, emptyList()) as? GetRoomResult.Joined)?.joinedRoom
+    override suspend fun getJoinedRoom(roomId: RoomId, scTimelineFilterSettings: ScTimelineFilterSettings): JoinedRoom? = withContext(sessionDispatcher) {
+        (roomFactory.getJoinedRoomOrPreview(roomId, emptyList(), scTimelineFilterSettings) as? GetRoomResult.Joined)?.joinedRoom
     }
 
     /**
@@ -451,6 +459,33 @@ class RustMatrixClient(
                 .also { innerClient.awaitRoomRemoteEcho(roomId.value).destroy() }
         }
     }
+
+    // SC additions
+    override suspend fun getRoomAccountData(roomId: RoomId, eventType: String): String? = withContext(sessionDispatcher) {
+        runCatching {
+            innerClient.roomAccountData(roomId.value, eventType)
+        }.getOrNull()
+    }
+    override suspend fun setRoomAccountData(roomId: RoomId, eventType: String, content: String) = withContext(sessionDispatcher) {
+        runCatching {
+            innerClient.setRoomAccountData(roomId.value, eventType, content)
+        }
+    }
+    override suspend fun getGlobalAccountData() = withContext(sessionDispatcher) {
+        runCatching {
+            innerClient.accountDataEvents().map(::mapRustAccountDataRawEvent)
+        }
+    }
+    override suspend fun getRoomAccountData(roomId: RoomId) = withContext(sessionDispatcher) {
+        runCatching {
+            innerClient.roomAccountDataEvents(roomId.value).map(::mapRustAccountDataRawEvent)
+        }
+    }
+    override suspend fun getUrlPreviewJson(url: String): String = withContext(sessionDispatcher) {
+        innerClient.getUrlPreviewJson(url)
+    }
+    override suspend fun shutdownClient() = destroy()
+    // SC additions end
 
     override suspend fun findDM(userId: UserId): Result<RoomId?> = withContext(sessionDispatcher) {
         runCatchingExceptions {
@@ -710,13 +745,13 @@ class RustMatrixClient(
         }
     }
 
-    override suspend fun getRoomPreview(roomIdOrAlias: RoomIdOrAlias, serverNames: List<String>): Result<NotJoinedRoom> = withContext(sessionDispatcher) {
+    override suspend fun getRoomPreview(roomIdOrAlias: RoomIdOrAlias, serverNames: List<String>, scTimelineFilterSettings: ScTimelineFilterSettings): Result<NotJoinedRoom> = withContext(sessionDispatcher) {
         runCatchingExceptions {
             when (roomIdOrAlias) {
                 is RoomIdOrAlias.Alias -> {
                     val roomId = innerClient.resolveRoomAlias(roomIdOrAlias.roomAlias.value)?.roomId?.let { RoomId(it) }
 
-                    var room = (roomId?.let { roomFactory.getJoinedRoomOrPreview(it, serverNames) } as? GetRoomResult.NotJoined)?.notJoinedRoom
+                    var room = (roomId?.let { roomFactory.getJoinedRoomOrPreview(it, serverNames, scTimelineFilterSettings) } as? GetRoomResult.NotJoined)?.notJoinedRoom
                     if (room == null) {
                         val preview = innerClient.getRoomPreviewFromRoomAlias(roomIdOrAlias.roomAlias.value)
                         room = NotJoinedRustRoom(sessionId, null, RoomPreviewInfoMapper.map(preview.info()), sessionDispatcher)
@@ -724,7 +759,7 @@ class RustMatrixClient(
                     room
                 }
                 is RoomIdOrAlias.Id -> {
-                    var room = (roomFactory.getJoinedRoomOrPreview(roomIdOrAlias.roomId, serverNames) as? GetRoomResult.NotJoined)?.notJoinedRoom
+                    var room = (roomFactory.getJoinedRoomOrPreview(roomIdOrAlias.roomId, serverNames, scTimelineFilterSettings) as? GetRoomResult.NotJoined)?.notJoinedRoom
 
                     if (room == null) {
                         val preview = innerClient.getRoomPreviewFromRoomId(roomIdOrAlias.roomId.value, serverNames)
@@ -964,10 +999,15 @@ class RustMatrixClient(
         }
     }
 
-    override suspend fun markRoomAsFullyRead(roomId: RoomId, eventId: EventId): Result<Unit> = withContext(sessionDispatcher) {
+    override suspend fun markRoomAsFullyRead(roomId: RoomId, eventId: EventId, withReadReceipt: ReceiptType?): Result<Unit> = withContext(sessionDispatcher) {
         runCatchingExceptions {
             val room = innerClient.getRoom(roomId.value) ?: error("Could not fetch associated room")
             room.markAsFullyReadUnchecked(eventId.value)
+            if (withReadReceipt != null) { // SC
+                room.timeline().use {
+                    it.sendReadReceipt(withReadReceipt.toRustReceiptType(), eventId.value)
+                }
+            }
         }
     }
 

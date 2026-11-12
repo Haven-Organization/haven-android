@@ -12,6 +12,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import chat.schildi.theme.ScTheme
+import chat.schildi.theme.ScThemeExposures
 import io.element.android.compound.theme.ElementTheme
 import io.element.android.compound.tokens.generated.CompoundIcons
 import io.element.android.libraries.designsystem.components.Badge
@@ -40,7 +42,7 @@ object MatrixBadgeAtom {
         data: MatrixBadgeData,
     ) {
         val backgroundColor = when (data.type) {
-            Type.Positive -> ElementTheme.colors.bgBadgeAccent
+            Type.Positive -> ScTheme.exposures.greenBg ?: ElementTheme.colors.bgBadgeAccent
             Type.Neutral -> ElementTheme.colors.bgBadgeDefault
             Type.Negative -> ElementTheme.colors.bgCriticalSubtle
             Type.Info -> ElementTheme.colors.bgBadgeInfo
@@ -52,13 +54,13 @@ object MatrixBadgeAtom {
             Type.Info -> null
         }
         val textColor = when (data.type) {
-            Type.Positive -> ElementTheme.colors.textBadgeAccent
+            Type.Positive -> ScTheme.exposures.greenFg ?: ElementTheme.colors.textBadgeAccent
             Type.Neutral -> ElementTheme.colors.textPrimary
             Type.Negative -> ElementTheme.colors.textCriticalPrimary
             Type.Info -> ElementTheme.colors.textBadgeInfo
         }
         val iconColor = when (data.type) {
-            Type.Positive -> ElementTheme.colors.iconAccentPrimary
+            Type.Positive -> ScTheme.exposures.greenFg ?: ElementTheme.colors.iconAccentPrimary
             Type.Neutral -> ElementTheme.colors.iconPrimary
             Type.Negative -> ElementTheme.colors.iconCriticalPrimary
             Type.Info -> ElementTheme.colors.iconInfoPrimary

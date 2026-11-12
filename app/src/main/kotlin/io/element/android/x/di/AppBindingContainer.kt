@@ -66,7 +66,12 @@ object AppBindingContainer {
     @Provides
     @SingleIn(AppScope::class)
     fun providesBuildType(): BuildType {
-        return BuildType.valueOf(BuildConfig.BUILD_TYPE.uppercase())
+        return when (val type = BuildType.valueOf(BuildConfig.BUILD_TYPE.uppercase())) {
+            BuildType.NIGHTLY,
+            BuildType.RELEASE -> BuildType.RELEASE_SC
+            BuildType.DEBUG -> BuildType.DEBUG_SC
+            else -> type
+        }
     }
 
     @Provides
@@ -79,6 +84,7 @@ object AppBindingContainer {
         val applicationName = ApplicationConfig.APPLICATION_NAME.takeIf { it.isNotEmpty() } ?: context.getString(R.string.app_name)
         val isEnterprise = isEnterpriseBuild()
         return BuildMeta(
+            scBuildMeta = createScBuildMeta(),
             isDebuggable = BuildConfig.DEBUG,
             buildType = buildType,
             applicationName = applicationName,

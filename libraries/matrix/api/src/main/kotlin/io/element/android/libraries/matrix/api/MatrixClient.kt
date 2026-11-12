@@ -8,6 +8,7 @@
 
 package io.element.android.libraries.matrix.api
 
+import chat.schildi.matrixsdk.ScTimelineFilterSettings
 import io.element.android.libraries.core.data.tryOrNull
 import io.element.android.libraries.matrix.api.analytics.SdkStoreSizes
 import io.element.android.libraries.matrix.api.core.DeviceId
@@ -44,6 +45,7 @@ import io.element.android.libraries.matrix.api.search.MessageSearchService
 import io.element.android.libraries.matrix.api.search.SearchBackfillService
 import io.element.android.libraries.matrix.api.spaces.SpaceService
 import io.element.android.libraries.matrix.api.sync.SyncService
+import io.element.android.libraries.matrix.api.timeline.ReceiptType
 import io.element.android.libraries.matrix.api.timeline.Timeline
 import io.element.android.libraries.matrix.api.user.MatrixSearchUserResults
 import io.element.android.libraries.matrix.api.user.MatrixUser
@@ -134,6 +136,15 @@ interface MatrixClient : ClientUrlContentFetcher {
     /** Scans media content before it is displayed, or `null` when no content scanner is configured for this session. */
     val contentScanner: ContentScanner?
 
+    // SC start
+    suspend fun getGlobalAccountData(): Result<List<AccountDataRawEvent>>
+    suspend fun getRoomAccountData(roomId: RoomId): Result<List<AccountDataRawEvent>>
+    suspend fun getRoomAccountData(roomId: RoomId, eventType: String): String?
+    suspend fun setRoomAccountData(roomId: RoomId, eventType: String, content: String): Result<Unit>
+    suspend fun getUrlPreviewJson(url: String): String
+    suspend fun shutdownClient()
+    // SC end
+
     /** Backfills messages from the homeserver for searching for messages in a room. */
     val searchBackfillService: SearchBackfillService
 
@@ -152,7 +163,7 @@ interface MatrixClient : ClientUrlContentFetcher {
      * @param roomId the id of the room to open.
      * @return the room, or `null` if it is unknown to the client or the user is not joined.
      */
-    suspend fun getJoinedRoom(roomId: RoomId): JoinedRoom?
+    suspend fun getJoinedRoom(roomId: RoomId, scTimelineFilterSettings: ScTimelineFilterSettings = ScTimelineFilterSettings()): JoinedRoom?
 
     /**
      * Returns the room with the given id whatever the current membership is, without building a timeline.
@@ -403,7 +414,7 @@ interface MatrixClient : ClientUrlContentFetcher {
      * @param roomIdOrAlias the id or the alias of the room to preview.
      * @param serverNames servers to ask about the room, used when it cannot be resolved locally.
      */
-    suspend fun getRoomPreview(roomIdOrAlias: RoomIdOrAlias, serverNames: List<String>): Result<NotJoinedRoom>
+    suspend fun getRoomPreview(roomIdOrAlias: RoomIdOrAlias, serverNames: List<String>, scTimelineFilterSettings: ScTimelineFilterSettings = ScTimelineFilterSettings()): Result<NotJoinedRoom>
 
     /** Whether this account can be deactivated from the app, which depends on the authentication method used by the homeserver. */
     fun canDeactivateAccount(): Boolean
@@ -469,7 +480,7 @@ interface MatrixClient : ClientUrlContentFetcher {
      * @param roomId the id of the room to mark as read.
      * @param eventId the event up to which the room is considered read.
      */
-    suspend fun markRoomAsFullyRead(roomId: RoomId, eventId: EventId): Result<Unit>
+    suspend fun markRoomAsFullyRead(roomId: RoomId, eventId: EventId, withReadReceipt: ReceiptType?): Result<Unit>
 
     /**
      * Mark all joined rooms as read by sending public, private and fully-read receipts

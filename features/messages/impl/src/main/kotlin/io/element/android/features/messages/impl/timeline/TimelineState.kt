@@ -27,6 +27,7 @@ import kotlinx.collections.immutable.toImmutableList
 import kotlin.time.Duration
 
 data class TimelineState(
+    val scReadState: ScReadState? = null,
     val timelineItems: ImmutableList<TimelineItem>,
     val timelineRoomInfo: TimelineRoomInfo,
     val timelineMode: Timeline.Mode,
@@ -57,13 +58,14 @@ data class TimelineState(
 @Immutable
 sealed interface FocusRequestState {
     data object None : FocusRequestState
-    data class Requested(val eventId: EventId, val debounce: Duration) : FocusRequestState
+    data class Requested(val eventId: EventId, val debounce: Duration, val forReadMarker: Boolean) : FocusRequestState
     data class Loading(val eventId: EventId) : FocusRequestState
     data class Success(
         val eventId: EventId,
         val index: Int = -1,
         // This is used to know if the event has been rendered yet.
         val rendered: Boolean = false,
+        val forReadMarker: Boolean, // SC
     ) : FocusRequestState {
         val isIndexed
             get() = index != -1

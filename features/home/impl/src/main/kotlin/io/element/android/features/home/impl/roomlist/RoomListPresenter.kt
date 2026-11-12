@@ -23,13 +23,24 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import chat.schildi.features.home.spaces.PersistSpaceOnPause
+import chat.schildi.features.home.spaces.ScRoomListDataSource
+import chat.schildi.features.home.spaces.SpaceListDataSource
+import chat.schildi.features.home.spaces.SpaceUnreadCountsDataSource
+import chat.schildi.features.home.spaces.filterByUnread
+import chat.schildi.features.home.spaces.resolveSelection
+import chat.schildi.lib.preferences.ScAppStateStore
+import chat.schildi.lib.preferences.ScPreferencesStore
+import chat.schildi.lib.preferences.ScPrefs
+import chat.schildi.lib.preferences.value
 import dev.zacsweers.metro.Inject
 import im.vector.app.features.analytics.plan.Interaction
 import io.element.android.features.announcement.api.Announcement
 import io.element.android.features.announcement.api.AnnouncementService
-import io.element.android.features.home.impl.datasource.RoomListDataSource
 import io.element.android.features.home.impl.filters.RoomListFiltersState
 import io.element.android.features.home.impl.filters.into
+import io.element.android.features.home.impl.handleLowPriorityFlow
+import io.element.android.features.home.impl.model.hasNewContent
 import io.element.android.features.home.impl.search.GlobalSearchState
 import io.element.android.features.home.impl.search.RoomListSearchEvent
 import io.element.android.features.home.impl.search.RoomListSearchState
@@ -60,6 +71,7 @@ import io.element.android.libraries.sessionstorage.api.SessionStore
 import io.element.android.services.analytics.api.AnalyticsService
 import io.element.android.services.analytics.api.watchers.AnalyticsColdStartWatcher
 import io.element.android.services.analyticsproviders.api.trackers.captureInteraction
+import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.collections.immutable.toImmutableSet
 import kotlinx.coroutines.CoroutineScope
@@ -77,7 +89,14 @@ import kotlinx.coroutines.launch
 class RoomListPresenter(
     private val client: MatrixClient,
     private val leaveRoomPresenter: Presenter<LeaveRoomState>,
-    private val roomListDataSource: RoomListDataSource,
+    //private val roomListDataSource: RoomListDataSource,
+    // SC start
+    private val scPreferencesStore: ScPreferencesStore,
+    private val scAppStateStore: ScAppStateStore,
+    private val scRoomListDataSource: ScRoomListDataSource,
+    private val spaceListDataSource: SpaceListDataSource,
+    private val spaceUnreadCountsDataSource: SpaceUnreadCountsDataSource,
+    // SC end
     private val filtersPresenter: Presenter<RoomListFiltersState>,
     private val searchPresenter: Presenter<RoomListSearchState>,
     private val analyticsService: AnalyticsService,
@@ -95,6 +114,8 @@ class RoomListPresenter(
 ) : Presenter<RoomListState> {
     private val encryptionService = client.encryptionService
 
+    val roomListDataSource = scRoomListDataSource // SC shim
+
     @Composable
     override fun present(): RoomListState {
         val coroutineScope = rememberCoroutineScope()
@@ -106,8 +127,12 @@ class RoomListPresenter(
         val globalSearchState = globalSearchPresenter.present()
 
         LaunchedEffect(Unit) {
-            roomListDataSource.launchIn(this)
+            spaceListDataSource.launchIn(this)
+            //roomListDataSource.launchIn(this)
+            scRoomListDataSource.launchIn(this, spaceListDataSource, scAppStateStore)
+            spaceUnreadCountsDataSource.launchIn(this, scRoomListDataSource, spaceListDataSource)
         }
+        PersistSpaceOnPause(scAppStateStore, scRoomListDataSource)
 
         var securityBannerDismissed by rememberSaveable { mutableStateOf(false) }
         val showNewNotificationSoundBanner by remember {
@@ -137,6 +162,7 @@ class RoomListPresenter(
 
         fun handleEvent(event: RoomListEvent) {
             when (event) {
+                is RoomListEvent.UpdateSpaceFilter -> { scRoomListDataSource.updateSpaceSelection(event.spaceSelectionHierarchy.toImmutableList()) }
                 is RoomListEvent.UpdateVisibleRange -> coroutineScope.launch {
                     roomListDataSource.updateVisibleRange(event.range)
                 }
@@ -159,6 +185,7 @@ class RoomListPresenter(
                     leaveRoomState.eventSink(LeaveRoomEvent.LeaveRoom(event.roomId, needsConfirmation = event.needsConfirmation))
                 }
                 is RoomListEvent.SetRoomIsFavorite -> coroutineScope.setRoomIsFavorite(event.roomId, event.isFavorite)
+                is RoomListEvent.SetRoomIsLowPriority -> coroutineScope.launch { client.getRoom(event.roomId)?.use { it.setIsLowPriority(event.isLowPriority) } } // SC
                 is RoomListEvent.MarkAsRead -> coroutineScope.markAsRead(event.roomId)
                 is RoomListEvent.MarkAsUnread -> coroutineScope.markAsUnread(event.roomId)
                 is RoomListEvent.AcceptInvite -> {
@@ -255,20 +282,27 @@ class RoomListPresenter(
         showUnreadCount: Boolean,
         showAllActivity: Boolean,
     ): RoomListContentState {
+        // SC spaces
+        val spaceNavEnabled = ScPrefs.SPACE_NAV.value()
+        val spaceSelectionHierarchy = if (spaceNavEnabled) scRoomListDataSource.spaceSelectionHierarchy.collectAsState().value else persistentListOf()
+        val totalUnreadCounts = if (spaceNavEnabled) spaceUnreadCountsDataSource.totalUnreadCounts.collectAsState().value else null
+        val spacesList = if (spaceNavEnabled) spaceUnreadCountsDataSource.enrichedSpaces.collectAsState().value?.filterByUnread(spaceSelectionHierarchy) else null
+        // SC end
+
         val roomSummaries by produceState(initialValue = AsyncData.Loading()) {
             roomListDataSource.roomSummariesFlow.collect { value = AsyncData.Success(it) }
         }
-        val loadingState by roomListDataSource.loadingState.collectAsState()
-        val showEmpty by remember {
-            derivedStateOf {
+        val loadingState by scRoomListDataSource.loadingState.collectAsState()
+        val showEmpty = //by remember {
+            //derivedStateOf {
                 (loadingState as? RoomList.LoadingState.Loaded)?.numberOfRooms == 0
-            }
-        }
-        val showSkeleton by remember {
-            derivedStateOf {
+            //}
+        //}
+        val showSkeleton = //by remember {
+            //derivedStateOf {
                 loadingState == RoomList.LoadingState.NotLoaded || roomSummaries is AsyncData.Loading
-            }
-        }
+            //}
+        //}
         val seenRoomInvites by remember { seenInvitesStore.seenRoomIds() }.collectAsState(emptySet())
         val securityBannerState by rememberSecurityBannerState(securityBannerDismissed)
         return when {
@@ -280,6 +314,11 @@ class RoomListPresenter(
                 coldStartWatcher.onRoomListVisible()
 
                 RoomListContentState.Rooms(
+                    // SC start
+                    spacesList = spacesList.orEmpty().toImmutableList(),
+                    spaceSelectionHierarchy = spaceSelectionHierarchy?.takeIf { spacesList?.resolveSelection(it) != null } ?: persistentListOf(),
+                    totalUnreadCounts = totalUnreadCounts,
+                    // SC end
                     securityBannerState = securityBannerState,
                     showNewNotificationSoundBanner = showNewNotificationSoundBanner,
                     showSwipeAvatarBanner = showSwipeAvatarBanner,
@@ -301,7 +340,8 @@ class RoomListPresenter(
             roomName = event.roomSummary.name,
             isDm = event.roomSummary.isDm,
             isFavorite = event.roomSummary.isFavorite,
-            hasNewContent = event.roomSummary.hasNewContent,
+            isLowPriority = event.roomSummary.isLowPriority, // SC
+            hasNewContent = event.roomSummary.hasNewContent(scPreferencesStore),
         )
         contextMenuState.value = initialState
 
@@ -310,13 +350,16 @@ class RoomListPresenter(
             val isShowingContextMenuFlow = snapshotFlow { contextMenuState.value is RoomListState.ContextMenu.Shown }
                 .distinctUntilChanged()
 
+            handleLowPriorityFlow(room, contextMenuState, initialState, isShowingContextMenuFlow) // SC: same as favourite flow below, but launchIn instead of collect
+
             val isFavoriteFlow = room.roomInfoFlow
                 .map { it.isFavorite }
                 .distinctUntilChanged()
 
             isFavoriteFlow
                 .onEach { isFavorite ->
-                    contextMenuState.value = initialState.copy(isFavorite = isFavorite)
+                    //contextMenuState.value = initialState.copy(isFavorite = isFavorite)
+                    contextMenuState.value = (contextMenuState.value as? RoomListState.ContextMenu.Shown ?: initialState).copy(isFavorite = isFavorite)
                 }
                 .flatMapLatest { isShowingContextMenuFlow }
                 .takeWhile { isShowingContextMenu -> isShowingContextMenu }

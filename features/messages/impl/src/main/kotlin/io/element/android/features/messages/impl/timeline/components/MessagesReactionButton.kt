@@ -36,6 +36,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import chat.schildi.theme.ScTheme
 import coil3.compose.AsyncImage
 import io.element.android.compound.theme.ElementTheme
 import io.element.android.features.messages.impl.R
@@ -94,7 +95,7 @@ fun MessagesReactionButton(
             .background(Color.Transparent)
             // Outer border, same colour as background
             .border(
-                BorderStroke(2.dp, ElementTheme.colors.bgCanvasDefault),
+                BorderStroke(2.dp, if (ScTheme.yes) ElementTheme.materialColors.background else ElementTheme.colors.bgCanvasDefault),
                 shape = RoundedCornerShape(corner = CornerSize(14.dp))
             )
             .padding(vertical = 2.dp, horizontal = 2.dp)
@@ -186,6 +187,7 @@ private fun ReactionContent(
     } else {
         Text(
             text = reaction.displayKey,
+            color = ElementTheme.colors.textPrimary, // Prefer text color without alpha for emojis!
             style = ElementTheme.typography.fontBodyMdRegular.copy(
                 fontSize = 15.sp,
                 lineHeight = REACTION_EMOJI_LINE_HEIGHT,

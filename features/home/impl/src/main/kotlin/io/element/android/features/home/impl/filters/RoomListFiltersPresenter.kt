@@ -33,6 +33,8 @@ class RoomListFiltersPresenter(
             }
         }
 
+        ScClearRoomFiltersEffect(filterSelectionStrategy)
+
         val filters by filterSelectionStrategy.filterSelectionStates.collectAsState()
         return RoomListFiltersState(
             filterSelectionStates = filters.toImmutableList(),

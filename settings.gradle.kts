@@ -30,6 +30,8 @@ dependencyResolutionManagement {
         maven {
             url = uri("https://www.jitpack.io")
             content {
+                includeModule("com.github.SchildiChat", "element-compound-android")
+                includeModule("com.github.beeper.matrix-messageformat-compose", "messageformat-android")
                 includeModule("com.github.matrix-org", "matrix-analytics-events")
                 // Required transitively by androidx.media3:media3-exoplayer-midi for MIDI playback.
                 includeModule("com.github.philburk", "jsyn")
@@ -37,6 +39,21 @@ dependencyResolutionManagement {
                 includeModule("com.github.jmartinesp", "konsist")
             }
         }
+        // SC forks of upstream Rust projects
+        maven {
+            url = uri("https://maven.spiritcroc.de")
+            content {
+                includeModule("chat.schildi.rustcomponents", "sdk-android")
+                includeModule("chat.schildi", "wysiwyg")
+                includeModule("chat.schildi", "wysiwyg-compose")
+            }
+        }
+        mavenLocal {
+            mavenContent {
+                includeModule("com.beeper.android.messageformat", "messageformat-android")
+            }
+        }
+        // SC forks end
         // Check for official Android-related packages only in Google's maven repo
         exclusiveContent {
             forRepository {
@@ -114,7 +131,7 @@ dependencyResolutionManagement {
 
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
-rootProject.name = "ElementX"
+rootProject.name = "SchildiNext"
 include(":app")
 include(":appnav")
 include(":appconfig")
@@ -146,12 +163,4 @@ includeProjects(File(rootDir, "enterprise"), ":enterprise", maxDepth = 2)
 includeProjects(File(rootDir, "features"), ":features")
 includeProjects(File(rootDir, "libraries"), ":libraries")
 includeProjects(File(rootDir, "services"), ":services")
-
-// Uncomment to include the compound-android module as a local dependency so you can work on it locally.
-// You will also need to clone it in the specified folder.
-// includeBuild("checkouts/compound-android") {
-//    dependencySubstitution {
-//        // substitute remote dependency with local module
-//        substitute(module("io.element.android:compound-android")).using(project(":compound"))
-//    }
-// }
+includeProjects(File(rootDir, "schildi"), ":schildi")

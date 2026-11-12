@@ -28,6 +28,11 @@ android {
 setupDependencyInjection()
 
 dependencies {
+    implementation(projects.schildi.lib)
+    implementation(projects.schildi.matrixsdk)
+    implementation(projects.schildi.components)
+    implementation(projects.schildi.theme)
+
     implementation(projects.appconfig)
     implementation(projects.libraries.core)
     implementation(projects.libraries.androidutils)

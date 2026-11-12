@@ -36,6 +36,7 @@ fun StateEventType.map(): RustStateEventType = when (this) {
     StateEventType.RoomTopic -> RustStateEventType.RoomTopic
     StateEventType.SpaceChild -> RustStateEventType.SpaceChild
     StateEventType.SpaceParent -> RustStateEventType.SpaceParent
+    StateEventType.SpaceCatchAll -> RustStateEventType.SpaceCatchAll // SC
     StateEventType.BeaconInfo -> RustStateEventType.BeaconInfo
     StateEventType.MemberHints -> RustStateEventType.MemberHints
     StateEventType.RoomImagePack -> RustStateEventType.RoomImagePack
@@ -67,12 +68,14 @@ fun RustStateEventType.map(): StateEventType = when (this) {
     RustStateEventType.RoomTopic -> StateEventType.RoomTopic
     RustStateEventType.SpaceChild -> StateEventType.SpaceChild
     RustStateEventType.SpaceParent -> StateEventType.SpaceParent
+    RustStateEventType.SpaceCatchAll -> StateEventType.SpaceCatchAll // SC
     RustStateEventType.BeaconInfo -> StateEventType.BeaconInfo
     RustStateEventType.MemberHints -> StateEventType.MemberHints
     RustStateEventType.RoomImagePack -> StateEventType.RoomImagePack
     RustStateEventType.RoomLanguage -> StateEventType.RoomLanguage
     RustStateEventType.RoomPolicy -> StateEventType.RoomPolicy
     RustStateEventType.RoomRetention -> StateEventType.RoomRetention
+    RustStateEventType.Bridge, // SC
     is RustStateEventType.Custom -> StateEventType.Custom(this.toString())
 }
 
@@ -98,6 +101,7 @@ fun TimelineEventType.Companion.fromState(stateEventType: StateEventType): Timel
     StateEventType.RoomTopic -> TimelineEventType.RoomTopic
     StateEventType.SpaceChild -> TimelineEventType.SpaceChild
     StateEventType.SpaceParent -> TimelineEventType.SpaceParent
+    StateEventType.SpaceCatchAll -> TimelineEventType.SpaceCatchAll // SC
     StateEventType.BeaconInfo -> TimelineEventType.BeaconInfo
     StateEventType.MemberHints -> TimelineEventType.MemberHints
     StateEventType.RoomImagePack -> TimelineEventType.RoomImagePack

@@ -21,6 +21,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+import chat.schildi.lib.preferences.ScPrefs
+import chat.schildi.lib.preferences.state
+import chat.schildi.lib.preferences.value
 import dev.zacsweers.metro.Assisted
 import dev.zacsweers.metro.AssistedFactory
 import dev.zacsweers.metro.AssistedInject
@@ -184,6 +188,11 @@ class TimelinePresenter(
             timelineController.isLive()
         }.collectAsState(initial = true)
 
+        // SC start
+        val syncReadReceiptAndMarker = ScPrefs.SYNC_READ_RECEIPT_AND_MARKER.state()
+        val context = LocalContext.current
+        // SC end
+
         val displayThreadSummaries by produceState(false) {
             value = featureFlagService.isFeatureEnabled(FeatureFlags.Threads)
         }
@@ -209,6 +218,10 @@ class TimelinePresenter(
 
         fun handleEvent(event: TimelineEvent) {
             when (event) {
+                // SC start
+                is TimelineEvent.OnUnreadLineVisible -> timelineController.scReadState.sawUnreadLine.value = true
+                is TimelineEvent.ForceMarkAsRead -> forceSetReceipts(context, sessionCoroutineScope, room, timelineController.scReadState, sessionPreferencesStore)
+                // SC end
                 is TimelineEvent.LoadMore -> {
                     if (event.direction == Timeline.PaginationDirection.FORWARDS) {
                         if (timelineMode is Timeline.Mode.Thread) {
@@ -228,6 +241,17 @@ class TimelinePresenter(
                         if (event.firstIndex == 0) {
                             newEventState.value = NewEventState.None
                         }
+
+                        if (syncReadReceiptAndMarker.value) { // SC block
+                            sessionCoroutineScope.scOnScrollFinished(
+                                dispatchers = dispatchers,
+                                scReadState = timelineController.scReadState,
+                                firstVisibleIndex = event.firstIndex,
+                                timelineItems = timelineItems,
+                            )
+                            return
+                        }
+
                         Timber.tag(tag).d("## sendReadReceiptIfNeeded firstVisibleIndex: ${event.firstIndex}")
                         sessionCoroutineScope.launch {
                             val sendPublicReadReceipts = sessionPreferencesStore.isSendPublicReadReceiptsEnabled().first()
@@ -268,10 +292,10 @@ class TimelinePresenter(
                     liveLocationShareManager.stopShare(room.roomId)
                 }
                 is TimelineEvent.FocusOnEvent -> room.roomCoroutineScope.launch {
-                    focusRequestState.value = FocusRequestState.Requested(event.eventId, event.debounce)
+                    focusRequestState.value = FocusRequestState.Requested(event.eventId, event.debounce, event.forReadMarker)
                     delay(event.debounce)
                     Timber.tag(tag).d("Started focus on ${event.eventId}")
-                    focusOnEvent(event.eventId, focusRequestState)
+                    focusOnEvent(event.eventId, focusRequestState, forReadMarker = event.forReadMarker)
                 }.start()
                 is TimelineEvent.OnFocusEventRender -> {
                     // If there was a pending 'notification tap opens timeline' transaction, finish it now we're focused in the required event
@@ -311,7 +335,16 @@ class TimelinePresenter(
                         Timber.tag(tag).w(it, "Failed to get latest event id to mark as fully read")
                         null
                     } ?: return@launch
-                    markAsFullyRead(room.roomId, latestEventId)
+                    val withReadReceipt = if (syncReadReceiptAndMarker.value) {
+                        if (sessionPreferencesStore.isSendPublicReadReceiptsEnabled().first()) {
+                            ReceiptType.READ
+                        } else {
+                            ReceiptType.READ_PRIVATE
+                        }
+                    } else {
+                        null
+                    }
+                    markAsFullyRead(room.roomId, latestEventId, withReadReceipt)
                     suppressJumpToUnread.value = true
                 }
                 is TimelineEvent.ShowShieldDialog -> messageShieldDialogData.value = event.messageShieldData
@@ -489,8 +522,8 @@ class TimelinePresenter(
             if (currentFocusRequestState is FocusRequestState.Success && !currentFocusRequestState.rendered) {
                 val eventId = currentFocusRequestState.eventId
                 if (timelineItemIndexer.isKnown(eventId)) {
-                    val index = timelineItemIndexer.indexOf(eventId)
-                    focusRequestState.value = FocusRequestState.Success(eventId = eventId, index = index)
+                    val index = timelineItemIndexer.indexOf(eventId).offsetForUnreadMarkerFocus(currentFocusRequestState.forReadMarker)
+                    focusRequestState.value = FocusRequestState.Success(eventId = eventId, index = index, forReadMarker = currentFocusRequestState.forReadMarker)
                 } else {
                     Timber.w("Unknown timeline item for focused item, can't render focus")
                 }
@@ -525,6 +558,7 @@ class TimelinePresenter(
         }
 
         return TimelineState(
+            scReadState = timelineController.scReadState,
             timelineItems = timelineItems,
             timelineMode = timelineMode,
             timelineRoomInfo = timelineRoomInfo,
@@ -546,10 +580,11 @@ class TimelinePresenter(
     private suspend fun focusOnEvent(
         eventId: EventId,
         focusRequestState: MutableState<FocusRequestState>,
+        forReadMarker: Boolean,
     ) {
         if (timelineItemIndexer.isKnown(eventId)) {
-            val index = timelineItemIndexer.indexOf(eventId)
-            focusRequestState.value = FocusRequestState.Success(eventId = eventId, index = index)
+            val index = timelineItemIndexer.indexOf(eventId).offsetForUnreadMarkerFocus(forReadMarker)
+            focusRequestState.value = FocusRequestState.Success(eventId = eventId, index = index, forReadMarker = forReadMarker)
             return
         }
 
@@ -571,15 +606,15 @@ class TimelinePresenter(
                 .onSuccess { result ->
                     when (result) {
                         is EventFocusResult.FocusedOnLive -> {
-                            focusRequestState.value = FocusRequestState.Success(eventId = eventId)
+                            focusRequestState.value = FocusRequestState.Success(eventId = eventId, forReadMarker = forReadMarker)
                         }
                         is EventFocusResult.IsInThread -> {
                             val currentThreadId = (timelineController.mainTimelineMode() as? Timeline.Mode.Thread)?.threadRootId
                             if (currentThreadId == result.threadId) {
                                 // It's the same thread, we just focus on the event
-                                focusRequestState.value = FocusRequestState.Success(eventId = eventId)
+                                focusRequestState.value = FocusRequestState.Success(eventId = eventId, forReadMarker = forReadMarker)
                             } else {
-                                focusRequestState.value = FocusRequestState.Success(eventId = result.threadId.asEventId())
+                                focusRequestState.value = FocusRequestState.Success(eventId = result.threadId.asEventId(), forReadMarker = forReadMarker)
                                 // It's part of a thread we're not in, let's open it in another timeline
                                 navigator.navigateToThread(result.threadId, eventId)
                             }

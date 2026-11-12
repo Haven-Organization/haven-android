@@ -64,6 +64,7 @@ fun TimelineItemGroupedEventsRow(
             TimelineItemEventContentView(
                 eventId = event.eventId,
                 content = event.content,
+                debugInfoProvider = event.timelineItemDebugInfoProvider, // SC
                 timelineProtectionState = timelineProtectionState,
                 onLinkClick = onLinkClick,
                 onLinkLongClick = onLinkLongClick,
@@ -71,7 +72,7 @@ fun TimelineItemGroupedEventsRow(
                 modifier = contentModifier,
                 onContentClick = null,
                 onGalleryItemClick = {},
-                onLongClick = null,
+                onLongClick = { onLongClick(event) }, // SC: non-null
                 onContentLayoutChange = onContentLayoutChange
             )
         },
@@ -136,6 +137,7 @@ private fun TimelineItemGroupedEventsRowContent(
             TimelineItemEventContentView(
                 eventId = event.eventId,
                 content = event.content,
+                debugInfoProvider = event.timelineItemDebugInfoProvider, // SC
                 timelineProtectionState = timelineProtectionState,
                 onLinkClick = onLinkClick,
                 onLinkLongClick = onLinkLongClick,
@@ -143,7 +145,7 @@ private fun TimelineItemGroupedEventsRowContent(
                 modifier = contentModifier,
                 onContentClick = null,
                 onGalleryItemClick = {},
-                onLongClick = null,
+                onLongClick = { onLongClick(event) }, // SC: non-null
                 onContentLayoutChange = onContentLayoutChange
             )
         },

@@ -36,8 +36,8 @@
   <string name="screen_login_form_header">"詳細を入力"</string>
   <string name="screen_login_subtitle">"Matrix は安全で分散型のオープンなネットワークです。"</string>
   <string name="screen_login_title_with_homeserver">"%1$s にサインイン"</string>
-  <string name="screen_missing_key_backup_open_element_classic">"Element Classic を開く"</string>
-  <string name="screen_missing_key_backup_step_1">"Element Classic をこの端末で開く"</string>
+  <string name="screen_missing_key_backup_open_element_classic">"SchildiChat Legacy を開く"</string>
+  <string name="screen_missing_key_backup_step_1">"SchildiChat Legacy をこの端末で開く"</string>
   <string name="screen_missing_key_backup_step_2_android">"「設定- セキュリティとプライバシー」に移動します"</string>
   <string name="screen_missing_key_backup_step_3_android">"暗号鍵の管理から、暗号化されたメッセージの回復を選択します"</string>
   <string name="screen_missing_key_backup_step_4">"指示に従って、鍵の保管庫を有効化してください"</string>

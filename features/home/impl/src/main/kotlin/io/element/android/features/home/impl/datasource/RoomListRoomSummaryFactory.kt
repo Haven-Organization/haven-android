@@ -42,6 +42,20 @@ class RoomListRoomSummaryFactory(
             numberOfUnreadMessages = roomInfo.numUnreadMessages,
             numberOfUnreadMentions = roomInfo.numUnreadMentions,
             numberOfUnreadNotifications = roomInfo.numUnreadNotifications,
+            // SC start
+            privateRoomName = roomInfo.privateRoomName,
+            rawRoomName = roomInfo.rawName,
+            canUserManageSpaces = roomInfo.canUserManageSpaces,
+            spaceChildren = roomInfo.spaceChildren.toImmutableList(),
+            spaceCatchAll = roomInfo.spaceCatchAll,
+            notificationCount = roomInfo.notificationCount,
+            highlightCount = roomInfo.highlightCount,
+            unreadCount = roomInfo.unreadCount,
+            unreadCountUnderestimate = roomInfo.unreadCountUnderestimate,
+            lastMessageTimestamp = roomSummary.latestEventTimestamp,
+            isLowPriority = roomInfo.isLowPriority,
+            bridgeState = roomInfo.bridgeState.toImmutableList(),
+            // SC end
             isMarkedUnread = roomInfo.isMarkedUnread,
             timestamp = dateFormatter.format(
                 timestamp = roomSummary.latestEventTimestamp,

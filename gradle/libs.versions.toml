@@ -42,7 +42,7 @@ coil = "3.6.3"
 # When upgrading this version, check state restoration still works fine.
 appyx = "1.7.1"
 sqldelight = "2.4.1"
-wysiwyg = "2.42.1"
+wysiwyg = "3.1.16"
 telephoto = "0.19.0"
 maplibre-compose = "0.20.0"
 
@@ -182,7 +182,11 @@ test_detekt_test = { module = "io.gitlab.arturbosch.detekt:detekt-test", version
 # https://github.com/matrix-org/matrix-rust-components-kotlin/commits/main/sdk/sdk-android/src/main/kotlin/org/matrix/rustcomponents/sdk/matrix_sdk_ffi.kt
 # All new features should not be implemented in the pull request that upgrades the version, developers should
 # only fix API breaks and may add some TODOs.
-matrix_sdk = "org.matrix.rustcomponents:sdk-android:26.11.05"
+# SC/Haven: SchildiChat's rustcomponents fork, required by the SchildiChat features. Upstream Element X
+# v26.11.0 pins org.matrix.rustcomponents:sdk-android:26.11.05; APIs missing from the fork are shimmed
+# in libraries/matrix/impl (search for "Haven: SDK compat").
+# `strictly` so nothing silently drags in another SDK version.
+matrix_sdk = { module = "chat.schildi.rustcomponents:sdk-android", version = { strictly = "0.4.56" } }
 rustls_platform_verifier = "org.rustls:rustls-platform-verifier:0.2.0"
 
 # Others
@@ -199,8 +203,8 @@ jsoup = "org.jsoup:jsoup:1.23.2"
 appyx_core = { module = "com.bumble.appyx:core", version.ref = "appyx" }
 molecule-runtime = "app.cash.molecule:molecule-runtime:2.2.0"
 timber = "com.jakewharton.timber:timber:5.0.1"
-matrix_richtexteditor = { module = "io.element.android:wysiwyg", version.ref = "wysiwyg" }
-matrix_richtexteditor_compose = { module = "io.element.android:wysiwyg-compose", version.ref = "wysiwyg" }
+matrix_richtexteditor = { module = "chat.schildi:wysiwyg", version.ref = "wysiwyg" }
+matrix_richtexteditor_compose = { module = "chat.schildi:wysiwyg-compose", version.ref = "wysiwyg" }
 sqldelight-driver-android = { module = "app.cash.sqldelight:android-driver", version.ref = "sqldelight" }
 sqldelight-driver-jvm = { module = "app.cash.sqldelight:sqlite-driver", version.ref = "sqldelight" }
 sqldelight-coroutines = { module = "app.cash.sqldelight:coroutines-extensions", version.ref = "sqldelight" }
@@ -249,6 +253,14 @@ google_autoservice_annotations = { module = "com.google.auto.service:auto-servic
 
 # Miscellaneous
 androidx-test-ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidx-test-ext-junit" }
+
+# SC additions
+colorpicker = "com.godaddy.android.colorpicker:compose-color-picker:0.7.0"
+beeper-messageformat = { module = "com.github.beeper.matrix-messageformat-compose:messageformat-android", version = "e38f150eff24644f2ffc451a7b0ec506f819c08d" }
+#beeper-messageformat = { module = "com.beeper.android.messageformat:messageformat-android", version = "1.0" }
+unifiedpush_fcm = "org.unifiedpush.android:embedded-fcm-distributor:3.1.0"
+androidx_emoji2 = "androidx.emoji2:emoji2:1.7.0"
+androidx_emoji2_bundled = "androidx.emoji2:emoji2-bundled:1.7.0"
 
 [bundles]
 

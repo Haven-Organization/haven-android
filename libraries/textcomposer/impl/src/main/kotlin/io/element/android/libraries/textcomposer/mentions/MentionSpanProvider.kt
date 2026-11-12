@@ -81,6 +81,9 @@ private const val EVERYONE_MENTION_TEXT = "@room"
         }
     }
 
+    // SC: display name for formatted user mentions
+    fun userDisplayName(userId: UserId): String = createUserMentionSpan(userId).displayText.toString().removePrefix("@")
+
     /**
      * Create a mention span for a room mention.
      *

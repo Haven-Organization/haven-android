@@ -240,8 +240,8 @@ fun Project.setupKover() {
 
 fun KoverVariantCreateConfig.defaultVariants(project: Project) {
     if (project.path == ":app") {
-        addWithDependencies("gplayDebug")
+        addWithDependencies("fdroidScDefaultDebug")
     } else {
-        addWithDependencies("debug", "jvm", optional = true)
+        addWithDependencies("fdroidScDefaultDebug", "jvm", optional = true)
     }
 }

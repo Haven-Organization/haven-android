@@ -21,6 +21,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.Lifecycle
+import chat.schildi.matrixsdk.urlpreview.UrlPreviewProvider
+import chat.schildi.matrixsdk.urlpreview.UrlPreviewStateProvider
+import com.beeper.android.messageformat.MatrixToLink
 import com.bumble.appyx.core.lifecycle.subscribe
 import com.bumble.appyx.core.modality.BuildContext
 import com.bumble.appyx.core.node.Node
@@ -41,7 +44,13 @@ import io.element.android.features.messages.impl.timeline.TimelinePresenter
 import io.element.android.features.messages.impl.timeline.TimelineSelectionOwner
 import io.element.android.features.messages.impl.timeline.components.customreaction.CustomReactionBottomSheet
 import io.element.android.features.messages.impl.timeline.di.LocalTimelineItemPresenterFactories
+import io.element.android.features.messages.impl.timeline.di.LocalUrlPreviewStateProvider
 import io.element.android.features.messages.impl.timeline.di.TimelineItemPresenterFactories
+import io.element.android.features.messages.impl.timeline.factories.event.LocalMatrixBodyDrawStyle
+import io.element.android.features.messages.impl.timeline.factories.event.LocalMatrixBodyFormatter
+import io.element.android.features.messages.impl.timeline.factories.event.LocalSessionId
+import io.element.android.features.messages.impl.timeline.factories.event.matrixBodyDrawStyle
+import io.element.android.features.messages.impl.timeline.factories.event.matrixBodyFormatter
 import io.element.android.features.messages.impl.timeline.model.TimelineItem
 import io.element.android.features.roommembermoderation.api.ModerationAction
 import io.element.android.features.roommembermoderation.api.RoomMemberModerationEvent
@@ -59,6 +68,7 @@ import io.element.android.libraries.di.annotations.SessionCoroutineScope
 import io.element.android.libraries.emoji.api.picker.EmojiPickerRenderer
 import io.element.android.libraries.matrix.api.analytics.toAnalyticsViewRoom
 import io.element.android.libraries.matrix.api.core.EventId
+import io.element.android.libraries.matrix.api.core.RoomAlias
 import io.element.android.libraries.matrix.api.core.RoomId
 import io.element.android.libraries.matrix.api.core.ThreadId
 import io.element.android.libraries.matrix.api.core.UserId
@@ -79,9 +89,11 @@ import io.element.android.services.analytics.api.AnalyticsLongRunningTransaction
 import io.element.android.services.analytics.api.AnalyticsService
 import io.element.android.services.analytics.api.finishLongRunningTransaction
 import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import timber.log.Timber
 
 @ContributesNode(RoomScope::class)
 @AssistedInject
@@ -98,6 +110,7 @@ class MessagesNode(
     actionListPresenterFactory: ActionListPresenter.Factory,
     private val timelineItemPresenterFactories: TimelineItemPresenterFactories,
     private val mediaPlayer: MediaPlayer,
+    urlPreviewProvider: UrlPreviewProvider, // SC
     private val permalinkParser: PermalinkParser,
     private val knockRequestsBannerRenderer: KnockRequestsBannerRenderer,
     private val roomMemberModerationRenderer: RoomMemberModerationRenderer,
@@ -123,6 +136,9 @@ class MessagesNode(
         ),
         timelineController = timelineController,
     )
+
+    // SC: in order to avoid keeping too many url preview state holders around, limit this to a per-room-open scope
+    private val urlPreviewStateProvider = UrlPreviewStateProvider(urlPreviewProvider)
 
     interface Callback : Plugin {
         fun handleEventClick(timelineMode: Timeline.Mode, event: TimelineItem.Event, canUseOverlay: Boolean): Boolean
@@ -160,6 +176,7 @@ class MessagesNode(
             },
             onDestroy = {
                 mediaPlayer.close()
+                urlPreviewStateProvider.clear()
             }
         )
     }
@@ -269,15 +286,67 @@ class MessagesNode(
     override fun View(modifier: Modifier) {
         val activity = requireNotNull(LocalActivity.current)
         val isDark = ElementTheme.isLightTheme.not()
+        val state = presenter.present() // SC: moved up for click listener provides
         val canUseOverlay = !isTalkbackActive() && !hasExternalKeyboard()
         CompositionLocalProvider(
             LocalTimelineItemPresenterFactories provides timelineItemPresenterFactories,
+            // SC start
+            LocalUrlPreviewStateProvider provides urlPreviewStateProvider.takeIfUrlPreviewsEnabledForRoom(room),
+            LocalSessionId provides room.sessionId,
+            LocalMatrixBodyFormatter provides matrixBodyFormatter(
+                room.sessionId,
+                onLinkClick = {
+                    activity.openUrlInExternalApp(it)
+                },
+                onMatrixLinkClick = {
+                    when (it) {
+                        is MatrixToLink.MessageLink -> {
+                            val roomIdOrAlias = when {
+                                it.roomId.startsWith("!") -> RoomId(it.roomId).toRoomIdOrAlias()
+                                it.roomId.startsWith("#") -> RoomAlias(it.roomId).toRoomIdOrAlias()
+                                else -> {
+                                    // ???
+                                    activity.openUrlInExternalApp(it.rawUrl)
+                                    return@matrixBodyFormatter
+                                }
+                            }
+                            val permalinkData = PermalinkData.RoomLink(
+                                roomIdOrAlias,
+                                EventId(it.messageId),
+                                viaParameters = it.via?.toImmutableList() ?: persistentListOf(),
+                            )
+                            handleRoomLinkClick(permalinkData, state.timelineState.eventSink)
+                        }
+                        is MatrixToLink.RoomLink -> {
+                            val roomIdOrAlias = when {
+                                it.roomId.startsWith("!") -> RoomId(it.roomId).toRoomIdOrAlias()
+                                it.roomId.startsWith("#") -> RoomAlias(it.roomId).toRoomIdOrAlias()
+                                else -> {
+                                    // ???
+                                    activity.openUrlInExternalApp(it.rawUrl)
+                                    return@matrixBodyFormatter
+                                }
+                            }
+                            val permalinkData = PermalinkData.RoomLink(
+                                roomIdOrAlias,
+                                viaParameters = it.via?.toImmutableList() ?: persistentListOf(),
+                            )
+                            handleRoomLinkClick(permalinkData, state.timelineState.eventSink)
+                        }
+                        is MatrixToLink.UserMention -> {
+                            callback.navigateToRoomMemberDetails(UserId(it.userId))
+                        }
+                    }
+                },
+            ),
+            LocalMatrixBodyDrawStyle provides matrixBodyDrawStyle(room.sessionId),
+            // SC end
             LocalEventContentValidationState provides eventContentValidationCache,
         ) {
-            val state = presenter.present()
+            //val state = presenter.present()
 
             BackHandler {
-                state.eventSink(MessagesEvent.MarkAsFullyReadAndExit)
+                state.eventSink(MessagesEvent.MarkAsFullyReadAndExit(timelineController.scReadState))
             }
 
             OnLifecycleEvent { _, event ->
@@ -288,7 +357,7 @@ class MessagesNode(
             }
             MessagesView(
                 state = state,
-                onBackClick = { state.eventSink(MessagesEvent.MarkAsFullyReadAndExit) },
+                onBackClick = { state.eventSink(MessagesEvent.MarkAsFullyReadAndExit(timelineController.scReadState)) },
                 onRoomDetailsClick = callback::navigateToRoomDetails,
                 onEventContentClick = { isLive, event ->
                     if (isLive) {
@@ -337,6 +406,9 @@ class MessagesNode(
                         state = state.customReactionState,
                         onSelectEmoji = { uniqueId, emoji ->
                             state.eventSink(MessagesEvent.ToggleReaction(emoji.unicode, uniqueId))
+                        },
+                        onSelectCustomEmoji = { uniqueId, emoji -> // SC
+                            state.eventSink(MessagesEvent.ToggleReaction(emoji, uniqueId))
                         },
                         emojiPickerRenderer = emojiPickerRenderer,
                     )

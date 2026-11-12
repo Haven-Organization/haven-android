@@ -11,6 +11,7 @@ package io.element.android.features.messages.impl.timeline.components.customreac
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.SheetState
@@ -20,6 +21,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import chat.schildi.lib.preferences.ScPrefs
+import chat.schildi.lib.preferences.fullyExpandBottomSheetValues
 import io.element.android.emojibasebindings.Emoji
 import io.element.android.features.messages.impl.timeline.a11y.a11yReactionAction
 import io.element.android.libraries.designsystem.theme.components.ModalBottomSheet
@@ -32,10 +35,14 @@ import io.element.android.libraries.matrix.api.timeline.item.event.EventOrTransa
 fun CustomReactionBottomSheet(
     state: CustomReactionState,
     onSelectEmoji: (EventOrTransactionId, Emoji) -> Unit,
+    onSelectCustomEmoji: (EventOrTransactionId, String) -> Unit, // SC
     emojiPickerRenderer: EmojiPickerRenderer,
     modifier: Modifier = Modifier,
 ) {
-    val sheetState = rememberBottomSheetState(initialValue = SheetValue.Hidden)
+    val sheetState = rememberBottomSheetState(
+        initialValue = SheetValue.Hidden,
+        enabledValues = ScPrefs.PREFER_FULLSCREEN_REACTION_SHEET.fullyExpandBottomSheetValues(),
+    )
     val coroutineScope = rememberCoroutineScope()
 
     when (state.target) {
@@ -49,6 +56,14 @@ fun CustomReactionBottomSheet(
                 }
             }
 
+            // SC
+            fun onCustomEmojiSelectedDismiss(emoji: String) {
+                sheetState.hide(coroutineScope) {
+                    state.eventSink(CustomReactionEvent.DismissCustomReactionSheet)
+                    onSelectCustomEmoji(state.target.event.eventOrTransactionId, emoji)
+                }
+            }
+
             fun onDismiss() {
                 state.eventSink(CustomReactionEvent.DismissCustomReactionSheet)
             }
@@ -56,13 +71,14 @@ fun CustomReactionBottomSheet(
             ModalBottomSheet(
                 onDismissRequest = ::onDismiss,
                 sheetState = sheetState,
-                modifier = modifier,
+                modifier = modifier.imePadding(), // SC: upstream missed padding?
                 scrollable = false,
             ) {
                 ExpandSheetWhenImeIsVisible(sheetState)
                 emojiPickerRenderer.Render(
                     state = state.target.emojiPickerState,
                     onSelectEmoji = ::onEmojiSelectedDismiss,
+                    onSelectCustomEmoji = ::onCustomEmojiSelectedDismiss,
                     selectedEmojis = state.selectedEmoji,
                     modifier = Modifier.fillMaxSize(),
                     contentDescription = { emoji, isSelected ->

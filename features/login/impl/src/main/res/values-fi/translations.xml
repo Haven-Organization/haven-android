@@ -38,8 +38,8 @@
   <string name="screen_login_form_header">"Anna tietosi"</string>
   <string name="screen_login_subtitle">"Matrix on avoin verkko turvallista, hajautettua viestintää varten."</string>
   <string name="screen_login_title_with_homeserver">"Kirjaudu sisään %1$s -palvelimelle"</string>
-  <string name="screen_missing_key_backup_open_element_classic">"Avaa Element Classic"</string>
-  <string name="screen_missing_key_backup_step_1">"Avaa Element Classic laitteellasi"</string>
+  <string name="screen_missing_key_backup_open_element_classic">"Avaa SchildiChat Legacy"</string>
+  <string name="screen_missing_key_backup_step_1">"Avaa SchildiChat Legacy laitteellasi"</string>
   <string name="screen_missing_key_backup_step_2_android">"Mene kohtaan Asetukset &gt; Tietoturva ja yksityisyys"</string>
   <string name="screen_missing_key_backup_step_3_android">"Osiossa \"Salausavainten hallinta\", paina \"Salattujen viestien palautus\"."</string>
   <string name="screen_missing_key_backup_step_4">"Noudata ohjeita"</string>

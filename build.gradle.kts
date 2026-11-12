@@ -332,3 +332,12 @@ subprojects {
         }
     }
 }
+
+// Haven: the SchildiChat rustcomponents fork (chat.schildi.rustcomponents) replaces the upstream Rust SDK.
+// Upstream artifacts such as element-call bring org.matrix.rustcomponents transitively; drop it everywhere
+// so only one copy of the native library and FFI classes ends up in the app.
+allprojects {
+    configurations.configureEach {
+        exclude(group = "org.matrix.rustcomponents", module = "sdk-android")
+    }
+}

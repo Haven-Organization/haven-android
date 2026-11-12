@@ -22,6 +22,7 @@ import androidx.compose.runtime.saveable.SaverScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import io.element.android.libraries.matrix.api.core.RoomIdOrAlias
+import io.element.android.libraries.matrix.api.core.UserId
 import io.element.android.libraries.matrix.api.core.toRoomIdOrAlias
 import io.element.android.libraries.matrix.api.permalink.PermalinkBuilder
 import io.element.android.libraries.matrix.api.room.IntentionalMention
@@ -88,7 +89,10 @@ class MarkdownTextEditorState(
         }
     }
 
-    fun getMessageMarkdown(permalinkBuilder: PermalinkBuilder): String {
+    fun getMessageMarkdown(
+        permalinkBuilder: PermalinkBuilder,
+        mentionDisplayName: (UserId) -> String = { it.value }, // SC
+    ): String {
         val charSequence = text.value()
         return if (charSequence is Spanned) {
             val mentions = charSequence.getMentionSpans()
@@ -101,7 +105,7 @@ class MarkdownTextEditorState(
                         when (mention.type) {
                             is MentionType.User -> {
                                 permalinkBuilder.permalinkForUser(mention.type.userId).getOrNull()?.let { link ->
-                                    replace(start, end, "[${mention.type.userId}]($link)")
+                                    replace(start, end, "[${mentionDisplayName(mention.type.userId)}]($link)")
                                 }
                             }
                             is MentionType.Everyone -> {

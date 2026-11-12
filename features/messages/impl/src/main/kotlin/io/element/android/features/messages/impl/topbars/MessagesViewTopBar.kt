@@ -31,10 +31,15 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
+import chat.schildi.lib.compose.thenIf
+import chat.schildi.lib.preferences.ScPrefs
+import chat.schildi.lib.preferences.value
 import io.element.android.compound.theme.ElementTheme
 import io.element.android.compound.tokens.generated.CompoundIcons
 import io.element.android.features.messages.impl.MessagesMenuActions
+import io.element.android.features.messages.impl.MessagesState
 import io.element.android.features.messages.impl.SharedHistoryIcon
+import io.element.android.features.messages.impl.aMessagesState
 import io.element.android.features.roomcall.api.RoomCallState
 import io.element.android.features.roomcall.api.aStandByCallState
 import io.element.android.features.roomcall.api.anOngoingCallState
@@ -62,6 +67,7 @@ import kotlinx.collections.immutable.toImmutableList
 
 @Composable
 internal fun MessagesViewTopBar(
+    state: MessagesState, // SC
     roomName: String?,
     roomAvatar: AvatarData,
     isTombstoned: Boolean,
@@ -97,12 +103,12 @@ internal fun MessagesViewTopBar(
                     isTombstoned = isTombstoned,
                     heroes = heroes,
                     dmUserStatus = dmUserStatus,
-                    modifier = titleModifier
+                    modifier = titleModifier.thenIf(ScPrefs.SC_TIMELINE_LAYOUT.value()) { weight(1f, fill = false) }
                 )
 
                 val iconModifier = Modifier.size(16.dp)
 
-                when (dmUserIdentityState) {
+                when (dmUserIdentityState.scOverride()) {
                     IdentityState.Verified -> {
                         Icon(
                             modifier = iconModifier,
@@ -122,7 +128,9 @@ internal fun MessagesViewTopBar(
                     else -> Unit
                 }
 
-                when (sharedHistoryIcon) {
+                ScTitleAdditions(state)
+
+                when (sharedHistoryIcon.scOverride()) {
                     SharedHistoryIcon.NONE -> Unit
                     SharedHistoryIcon.SHARED -> Icon(
                         modifier = iconModifier,
@@ -193,6 +201,7 @@ internal fun MessagesViewTopBarPreview() = ElementPreview {
         dmUserStatus: DisplayedStatus? = null,
         displayThreads: Boolean = false,
     ) = MessagesViewTopBar(
+        state = aMessagesState(), // SC
         roomName = roomName,
         roomAvatar = roomAvatar,
         isTombstoned = isTombstoned,
@@ -208,6 +217,8 @@ internal fun MessagesViewTopBarPreview() = ElementPreview {
                 displayThreads = displayThreads,
                 onJoinCallClick = {},
                 onThreadsListClick = {},
+                state = aMessagesState(), // SC
+                onViewAllPinnedMessagesClick = {}, // SC
             )
         }
     )

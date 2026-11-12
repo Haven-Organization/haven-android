@@ -32,6 +32,8 @@ interface DynamicRoomList : RoomList {
      * @param filter the filter to apply.
      */
     suspend fun updateFilter(filter: RoomListFilter)
+
+    suspend fun updateSettings(filter: RoomListFilter, settings: ScSdkInboxSettings)
 }
 
 suspend fun DynamicRoomList.updateVisibleRange(

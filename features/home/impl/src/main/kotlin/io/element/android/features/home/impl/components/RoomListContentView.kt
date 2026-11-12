@@ -30,6 +30,7 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
@@ -37,9 +38,15 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
+import chat.schildi.features.home.spaces.SpacesPager
+import chat.schildi.features.home.spaces.resolveSelection
+import chat.schildi.lib.preferences.ScPrefs
+import chat.schildi.lib.preferences.value
 import io.element.android.compound.theme.ElementTheme
 import io.element.android.compound.tokens.generated.CompoundIcons
+import io.element.android.features.home.impl.HomeState
 import io.element.android.features.home.impl.R
+import io.element.android.features.home.impl.aHomeState
 import io.element.android.features.home.impl.contentType
 import io.element.android.features.home.impl.filters.RoomListFilter
 import io.element.android.features.home.impl.filters.RoomListFiltersEmptyStateResources
@@ -63,15 +70,24 @@ import io.element.android.libraries.designsystem.theme.components.IconSource
 import io.element.android.libraries.designsystem.theme.components.Text
 import io.element.android.libraries.designsystem.utils.OnVisibleRangeChangeEffect
 import io.element.android.libraries.fullscreenintent.api.FullScreenIntentPermissionsEvent
+import io.element.android.libraries.matrix.api.core.RoomId
 import io.element.android.libraries.push.api.battery.BatteryOptimizationEvent
 import io.element.android.libraries.ui.strings.CommonStrings
 import kotlinx.collections.immutable.ImmutableList
+import kotlinx.coroutines.launch
 
 @Composable
 fun RoomListContentView(
     contentState: RoomListContentState,
     filtersState: RoomListFiltersState,
     spaceFiltersState: SpaceFiltersState,
+    // SC start
+    homeState: HomeState,
+    onUpstreamSpaceClick: (RoomId) -> Unit,
+    onCreateSpaceClick: () -> Unit,
+    onExploreSpaceClick: () -> Unit,
+    onMeasureSpaceBarHeight: (Int) -> Unit = {},
+    // SC end
     lazyListState: LazyListState,
     hideInvitesAvatars: Boolean,
     eventSink: (RoomListEvent) -> Unit,
@@ -107,6 +123,13 @@ fun RoomListContentView(
                 hideInvitesAvatars = hideInvitesAvatars,
                 filtersState = filtersState,
                 spaceFiltersState = spaceFiltersState,
+                // SC start
+                homeState = homeState,
+                onUpstreamSpaceClick = onUpstreamSpaceClick,
+                onCreateSpaceClick = onCreateSpaceClick,
+                onExploreSpaceClick = onExploreSpaceClick,
+                onMeasureSpaceBarHeight = onMeasureSpaceBarHeight,
+                // SC end
                 eventSink = eventSink,
                 onSetUpRecoveryClick = onSetUpRecoveryClick,
                 onConfirmRecoveryKeyClick = onConfirmRecoveryKeyClick,
@@ -194,6 +217,13 @@ private fun RoomsView(
     hideInvitesAvatars: Boolean,
     filtersState: RoomListFiltersState,
     spaceFiltersState: SpaceFiltersState,
+    // SC start
+    homeState: HomeState,
+    onUpstreamSpaceClick: (RoomId) -> Unit,
+    onCreateSpaceClick: () -> Unit,
+    onExploreSpaceClick: () -> Unit,
+    onMeasureSpaceBarHeight: (Int) -> Unit,
+    // SC end
     eventSink: (RoomListEvent) -> Unit,
     onSetUpRecoveryClick: () -> Unit,
     onConfirmRecoveryKeyClick: () -> Unit,
@@ -204,7 +234,7 @@ private fun RoomsView(
 ) {
     val isSpaceFilterSelected = spaceFiltersState is SpaceFiltersState.Selected
     val hasAnyFilterSelected = filtersState.hasAnyFilterSelected || isSpaceFilterSelected
-    if (state.summaries.isEmpty() && hasAnyFilterSelected) {
+    if (state.summaries.isEmpty() && (filtersState.hasAnyFilterSelected && state.spacesList.isEmpty())) {
         EmptyViewForFilterStates(
             selectedFilters = filtersState.selectedFilters(),
             isSpaceFilterSelected = isSpaceFilterSelected,
@@ -213,6 +243,15 @@ private fun RoomsView(
     } else {
         RoomsViewList(
             state = state,
+            // SC start
+            spaceFiltersState = spaceFiltersState,
+            filtersState = filtersState,
+            homeState = homeState,
+            onUpstreamSpaceClick = onUpstreamSpaceClick,
+            onCreateSpaceClick = onCreateSpaceClick,
+            onExploreSpaceClick = onExploreSpaceClick,
+            onMeasureSpaceBarHeight = onMeasureSpaceBarHeight,
+            // SC end
             hideInvitesAvatars = hideInvitesAvatars,
             eventSink = eventSink,
             onSetUpRecoveryClick = onSetUpRecoveryClick,
@@ -228,6 +267,15 @@ private fun RoomsView(
 @Composable
 private fun RoomsViewList(
     state: RoomListContentState.Rooms,
+    // SC start
+    spaceFiltersState: SpaceFiltersState,
+    filtersState: RoomListFiltersState,
+    homeState: HomeState,
+    onUpstreamSpaceClick: (RoomId) -> Unit,
+    onCreateSpaceClick: () -> Unit,
+    onExploreSpaceClick: () -> Unit,
+    onMeasureSpaceBarHeight: (Int) -> Unit,
+    // SC end
     hideInvitesAvatars: Boolean,
     eventSink: (RoomListEvent) -> Unit,
     onSetUpRecoveryClick: () -> Unit,
@@ -246,6 +294,23 @@ private fun RoomsViewList(
         val roomsRange = (visibleRange.first - 1).coerceAtLeast(0)..<visibleRange.last
         eventSink(RoomListEvent.UpdateVisibleRange(roomsRange))
     }
+    val coroutineScope = rememberCoroutineScope()
+    SpacesPager(
+        homeState = homeState,
+        lazyListState = lazyListState,
+        spacesList = state.spacesList,
+        totalUnreadCounts = state.totalUnreadCounts,
+        spaceSelectionHierarchy = state.spaceSelectionHierarchy,
+        onSpaceSelected = { selection ->
+            eventSink(RoomListEvent.UpdateSpaceFilter(selection))
+            coroutineScope.launch { lazyListState.scrollToItem(0) }
+        },
+        onUpstreamSpaceClick = onUpstreamSpaceClick,
+        onCreateSpaceClick = onCreateSpaceClick,
+        onExploreClick = onExploreSpaceClick,
+        onMeasureSpaceBarHeight = onMeasureSpaceBarHeight,
+        modifier = modifier,
+    ) { modifier ->
     LazyColumn(
         state = lazyListState,
         modifier = modifier,
@@ -293,6 +358,18 @@ private fun RoomsViewList(
             items = state.summaries,
             contentType = { _, room -> room.contentType() },
         ) { index, room ->
+            if (ScPrefs.SC_OVERVIEW_LAYOUT.value()) {
+                ScRoomSummaryRow(
+                    room = room,
+                    hideInviteAvatars = hideInvitesAvatars,
+                    isInviteSeen = room.displayType == RoomSummaryDisplayType.INVITE &&
+                        state.seenRoomInvites.contains(room.roomId),
+                    onClick = onRoomClick,
+                    eventSink = eventSink,
+                    isLastIndex = index == state.summaries.lastIndex,
+                )
+                return@itemsIndexed
+            }
             RoomSummaryRow(
                 room = room,
                 hideInviteAvatars = hideInvitesAvatars,
@@ -306,6 +383,14 @@ private fun RoomsViewList(
             if (index != state.summaries.lastIndex) {
                 HorizontalDivider()
             }
+        }
+    }
+        // SC empty space view
+        if (state.summaries.isEmpty()) {
+            if (filtersState.hasAnyFilterSelected)
+                EmptyViewForFilterStates(filtersState.selectedFilters(), spaceFiltersState is SpaceFiltersState.Selected, Modifier.fillMaxSize())
+            else
+                ScSpaceEmptyView(state.spacesList.resolveSelection(state.spaceSelectionHierarchy))
         }
     }
 }
@@ -440,6 +525,10 @@ internal fun RoomListContentViewPreview(@PreviewParameter(RoomListContentStatePr
             }
         ),
         spaceFiltersState = anUnselectedSpaceFiltersState(),
+        homeState = aHomeState(), // SC
+        onUpstreamSpaceClick = {}, // SC
+        onCreateSpaceClick = {}, // SC
+        onExploreSpaceClick = {}, // SC
         hideInvitesAvatars = false,
         eventSink = {},
         onSetUpRecoveryClick = {},

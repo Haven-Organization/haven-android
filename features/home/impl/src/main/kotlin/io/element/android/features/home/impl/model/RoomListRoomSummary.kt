@@ -14,10 +14,14 @@ import io.element.android.libraries.designsystem.components.avatar.AvatarData
 import io.element.android.libraries.matrix.api.core.RoomAlias
 import io.element.android.libraries.matrix.api.core.RoomId
 import io.element.android.libraries.matrix.api.notification.CallIntent
+import io.element.android.libraries.matrix.api.room.BridgeState
+import io.element.android.libraries.matrix.api.room.MatrixSpaceChildInfo
 import io.element.android.libraries.matrix.api.room.RoomNotificationMode
 import io.element.android.libraries.matrix.api.user.DisplayedStatus
+import io.element.android.libraries.matrix.api.room.SpaceCatchAllInfo
 import io.element.android.libraries.matrix.ui.model.InviteSender
 import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.persistentListOf
 
 @Immutable
 data class RoomListRoomSummary(
@@ -29,6 +33,23 @@ data class RoomListRoomSummary(
     val numberOfUnreadMessages: Long,
     val numberOfUnreadMentions: Long,
     val numberOfUnreadNotifications: Long,
+    // SC start
+    val privateRoomName: String? = null,
+    val rawRoomName: String? = null,
+    // SC: spaces
+    val spaceChildren: ImmutableList<MatrixSpaceChildInfo> = persistentListOf(),
+    val spaceCatchAll: SpaceCatchAllInfo? = null,
+    val canUserManageSpaces: Boolean = false,
+    // SC: server-reported values compared to client-generated above
+    val notificationCount: Long = 0,
+    val highlightCount: Long = 0,
+    val unreadCount: Long = 0,
+    val unreadCountUnderestimate: Boolean = false,
+    // SC client-side sorting
+    val lastMessageTimestamp: Long? = null,
+    val isLowPriority: Boolean = false,
+    val bridgeState: ImmutableList<BridgeState> = persistentListOf(),
+    // SC end
     val isMarkedUnread: Boolean,
     val timestamp: String?,
     val latestEvent: LatestEvent,
@@ -49,10 +70,12 @@ data class RoomListRoomSummary(
         (numberOfUnreadNotifications > 0 || numberOfUnreadMentions > 0) ||
         isMarkedUnread
 
+    /* SC: moved to extension to acknowledge user setting for rendering unread, and for unread source
     val hasNewContent = numberOfUnreadMessages > 0 ||
         numberOfUnreadMentions > 0 ||
         numberOfUnreadNotifications > 0 ||
         isMarkedUnread
+     */
 
     fun toInviteData() = InviteData(
         roomId = roomId,

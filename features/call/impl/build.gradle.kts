@@ -89,6 +89,9 @@ dependencies {
     implementation(projects.features.callnative.api)
     api(projects.features.call.api)
 
+    implementation(projects.schildi.lib)
+    implementation(projects.schildi.theme)
+
     testCommonDependencies(libs, true)
     testImplementation(projects.libraries.featureflag.test)
     testImplementation(projects.libraries.preferences.test)

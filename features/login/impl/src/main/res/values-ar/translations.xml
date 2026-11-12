@@ -37,8 +37,8 @@
   <string name="screen_login_form_header">"أدخِل تفاصيلك"</string>
   <string name="screen_login_subtitle">"Matrix عبارة عن شبكة مفتوحة للاتصالات الآمنة واللا مركزية."</string>
   <string name="screen_login_title_with_homeserver">"تسجيل الدخول إلى %1$s"</string>
-  <string name="screen_missing_key_backup_open_element_classic">"فتح Element Classic"</string>
-  <string name="screen_missing_key_backup_step_1">"افتح Element Classic على جهازك"</string>
+  <string name="screen_missing_key_backup_open_element_classic">"فتح SchildiChat Legacy"</string>
+  <string name="screen_missing_key_backup_step_1">"افتح SchildiChat Legacy على جهازك"</string>
   <string name="screen_missing_key_backup_step_2_android">"انتقل إلى الإعدادات &gt; الأمان والخصوصية"</string>
   <string name="screen_missing_key_backup_step_3_android">"في إدارة مفاتيح التشفير، اختر استرداد الرسائل المشفّرة"</string>
   <string name="screen_missing_key_backup_step_4">"اتبع التعليمات لتفعيل تخزين مفاتيحك"</string>

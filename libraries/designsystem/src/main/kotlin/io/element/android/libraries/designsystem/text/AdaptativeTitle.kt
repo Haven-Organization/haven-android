@@ -19,7 +19,9 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import chat.schildi.theme.ScTheme
 import io.element.android.compound.theme.ElementTheme
 import io.element.android.libraries.designsystem.preview.ElementPreview
 import io.element.android.libraries.designsystem.preview.PreviewsDayNight
@@ -50,6 +52,7 @@ fun AdaptativeTitle(
             },
             style = style,
             maxLines = 2,
+            overflow = TextOverflow.Ellipsis, // SC
             text = title,
         )
     } else {
@@ -67,6 +70,7 @@ fun AdaptativeTitle(
                 },
                 style = if (fitsOnASingleLine) style else twoLinesStyle,
                 maxLines = 2,
+                overflow = TextOverflow.Ellipsis, // SC
                 text = title,
             )
         }

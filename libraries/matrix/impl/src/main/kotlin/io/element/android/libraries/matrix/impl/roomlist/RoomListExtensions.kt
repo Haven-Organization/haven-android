@@ -10,6 +10,7 @@ package io.element.android.libraries.matrix.impl.roomlist
 
 import io.element.android.libraries.core.data.tryOrNull
 import io.element.android.libraries.matrix.api.core.RoomId
+import io.element.android.libraries.matrix.api.roomlist.ScSdkInboxSettings
 import io.element.android.libraries.matrix.impl.util.cancelAndDestroy
 import io.element.android.libraries.matrix.impl.util.mxCallbackFlow
 import kotlinx.coroutines.NonCancellable
@@ -60,6 +61,7 @@ fun RoomListInterface.loadingStateFlow(): Flow<RoomListLoadingState> =
 internal fun RoomListInterface.entriesFlow(
     pageSize: Int,
     initialFilterKind: RoomListEntriesDynamicFilterKind,
+    initialInboxSettings: ScSdkInboxSettings? = null,
     onControllerCreated: suspend (RoomListDynamicEntriesController) -> Unit,
     onControllerDestroyed: suspend (RoomListDynamicEntriesController) -> Unit,
 ): Flow<List<RoomListEntriesUpdate>> =
@@ -77,7 +79,11 @@ internal fun RoomListInterface.entriesFlow(
         // Use try/finally rather than awaitClose's block, so that the resources are released even if
         // onControllerCreated is cancelled or throws before awaitClose is reached
         try {
-            controller.setFilter(initialFilterKind)
+            if (initialInboxSettings == null) {
+                controller.setFilter(initialFilterKind)
+            } else {
+                controller.setScInboxSettings(initialFilterKind, initialInboxSettings.toSdkSettings())
+            }
             onControllerCreated(controller)
             awaitClose()
         } finally {

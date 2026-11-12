@@ -1036,6 +1036,7 @@ class DefaultNotifiableEventResolverTest : RobolectricTest() {
         testNoResults(NotificationContent.StateEvent.RoomTopic(""))
         testNoResults(NotificationContent.StateEvent.SpaceChild)
         testNoResults(NotificationContent.StateEvent.SpaceParent)
+        testNoResults(NotificationContent.StateEvent.SpaceCatchAll)
     }
 
     private fun testNoResults(content: NotificationContent) = runTest {

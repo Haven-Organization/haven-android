@@ -8,6 +8,7 @@
 
 package io.element.android.features.messages.impl.di
 
+import chat.schildi.lib.preferences.ScPreferencesStore
 import dev.zacsweers.metro.BindingContainer
 import dev.zacsweers.metro.ContributesTo
 import dev.zacsweers.metro.Provides
@@ -35,5 +36,12 @@ object MessagesProvidesBindingContainer {
         @LiveTimeline liveTimeline: Timeline,
         @RoomCoroutineScope roomCoroutineScope: CoroutineScope,
         dispatchers: CoroutineDispatchers,
-    ): TimelineController = TimelineController(joinedRoom, liveTimeline, roomCoroutineScope, dispatchers)
+        scPreferencesStore: ScPreferencesStore, // SC
+    ): TimelineController = TimelineController(
+        room = joinedRoom,
+        liveTimeline = liveTimeline,
+        roomCoroutineScope = roomCoroutineScope,
+        scPreferencesStore = scPreferencesStore,
+        dispatchers = dispatchers,
+    )
 }

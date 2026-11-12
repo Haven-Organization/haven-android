@@ -29,8 +29,8 @@
   <string name="screen_login_form_header">"Εισήγαγε τα στοιχεία σου"</string>
   <string name="screen_login_subtitle">"Το Matrix είναι ένα ανοιχτό δίκτυο για ασφαλή, αποκεντρωμένη επικοινωνία."</string>
   <string name="screen_login_title_with_homeserver">"Συνδέσου στο %1$s"</string>
-  <string name="screen_missing_key_backup_open_element_classic">"Άνοιγμα του Element Classic"</string>
-  <string name="screen_missing_key_backup_step_1">"Ανοίξτε το Element Classic στη συσκευή σας."</string>
+  <string name="screen_missing_key_backup_open_element_classic">"Άνοιγμα του SchildiChat Legacy"</string>
+  <string name="screen_missing_key_backup_step_1">"Ανοίξτε το SchildiChat Legacy στη συσκευή σας."</string>
   <string name="screen_missing_key_backup_step_2_android">"Μεταβείτε στις Ρυθμίσεις &gt; Ασφάλεια και Απόρρητο"</string>
   <string name="screen_missing_key_backup_step_3_android">"Στη Διαχείριση κλειδιών κρυπτογράφησης, επιλέξτε Ανάκτηση κρυπτογραφημένων μηνυμάτων"</string>
   <string name="screen_missing_key_backup_step_4">"Ακολουθήστε τις οδηγίες για να ενεργοποιήσετε την αποθήκευση κλειδιών"</string>

@@ -8,9 +8,11 @@
 
 package io.element.android.features.home.impl.search
 
+import chat.schildi.lib.preferences.ScPreferencesStore
 import dev.zacsweers.metro.Assisted
 import dev.zacsweers.metro.AssistedFactory
 import dev.zacsweers.metro.AssistedInject
+import io.element.android.features.home.impl.datasource.applyInviteFilterSetting
 import io.element.android.features.home.impl.datasource.RoomListRoomSummaryFactory
 import io.element.android.features.home.impl.model.RoomListRoomSummary
 import io.element.android.libraries.core.coroutine.CoroutineDispatchers
@@ -33,6 +35,7 @@ class RoomListSearchDataSource(
     @Assisted coroutineScope: CoroutineScope,
     roomListService: RoomListService,
     coroutineDispatchers: CoroutineDispatchers,
+    scPreferencesStore: ScPreferencesStore,
     private val roomSummaryFactory: RoomListRoomSummaryFactory,
 ) {
     @AssistedFactory
@@ -48,12 +51,13 @@ class RoomListSearchDataSource(
 
     val loadingState = roomList.loadingState
 
-    val roomSummaries: Flow<ImmutableList<RoomListRoomSummary>> = roomList.summaries
+    val roomSummaries/*: Flow<ImmutableList<RoomListRoomSummary>>*/ = roomList.summaries
         .map { roomSummaries ->
             roomSummaries
                 .map(roomSummaryFactory::create)
                 .toImmutableList()
         }
+        .applyInviteFilterSetting(scPreferencesStore)
         .flowOn(coroutineDispatchers.computation)
 
     suspend fun updateVisibleRange(visibleRange: IntRange) {

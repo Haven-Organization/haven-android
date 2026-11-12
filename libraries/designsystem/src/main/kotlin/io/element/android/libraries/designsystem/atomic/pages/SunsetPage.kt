@@ -29,6 +29,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import chat.schildi.theme.ForcedDarkScTheme
+import chat.schildi.theme.ScTheme
 import io.element.android.compound.annotations.CoreColorToken
 import io.element.android.compound.theme.ElementTheme
 import io.element.android.compound.theme.Theme
@@ -49,11 +51,13 @@ fun SunsetPage(
     modifier: Modifier = Modifier,
     overallContent: @Composable () -> Unit,
 ) {
+    /*
     ElementTheme(
         // Always use the opposite value of the current theme
         theme = if (ElementTheme.isLightTheme) Theme.Dark else Theme.Light,
         applySystemBarsUpdate = false,
-    ) {
+    ) { */
+    ForcedDarkScTheme {
         Box(
             modifier = modifier.fillMaxSize()
         ) {
@@ -109,6 +113,10 @@ fun SunsetPage(
 @OptIn(CoreColorToken::class)
 @Composable
 private fun SunsetBackground() {
+    if (ScTheme.yes) {
+        ScSunsetBackground()
+        return
+    }
     Column(modifier = Modifier.fillMaxSize()) {
         // The top background colors are the opposite of the current theme ones
         val topBackgroundColor = if (ElementTheme.isLightTheme) {

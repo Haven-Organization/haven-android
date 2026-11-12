@@ -24,6 +24,8 @@ import io.element.android.features.rageshake.impl.crash.CrashDataStore
 import io.element.android.features.rageshake.impl.screenshot.ScreenshotHolder
 import io.element.android.libraries.architecture.AsyncAction
 import io.element.android.libraries.architecture.Presenter
+import io.element.android.libraries.core.meta.BuildMeta
+import io.element.android.libraries.core.meta.minBugReportLength
 import io.element.android.libraries.di.annotations.AppCoroutineScope
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -35,6 +37,7 @@ class BugReportPresenter(
     private val screenshotHolder: ScreenshotHolder,
     @AppCoroutineScope
     private val appCoroutineScope: CoroutineScope,
+    private val buildMeta: BuildMeta,
 ) : Presenter<BugReportState> {
     private class BugReporterUploadListener(
         private val sendingProgress: MutableFloatState,
@@ -86,7 +89,7 @@ class BugReportPresenter(
         fun handleEvent(event: BugReportEvent) {
             when (event) {
                 BugReportEvent.SendBugReport -> {
-                    if (formState.value.description.length < 10 && formState.value.ghIssueNumber == null) {
+                    if (formState.value.description.length < buildMeta.minBugReportLength && formState.value.ghIssueNumber == null) {
                         sendingAction.value = AsyncAction.Failure(BugReportFormError.DescriptionTooShort)
                     } else {
                         sendingAction.value = AsyncAction.Loading

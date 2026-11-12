@@ -14,10 +14,12 @@ import dev.zacsweers.metro.Inject
 import io.element.android.appconfig.NotificationConfig
 import io.element.android.features.enterprise.api.EnterpriseService
 import io.element.android.libraries.core.log.logger.LoggerTag
+import io.element.android.libraries.core.meta.BuildMeta
 import io.element.android.libraries.matrix.api.user.MatrixUser
 import io.element.android.libraries.push.api.notifications.NotificationIdProvider
 import io.element.android.libraries.push.impl.notifications.factories.NotificationAccountParams
 import io.element.android.libraries.push.impl.notifications.factories.NotificationCreator
+import io.element.android.libraries.push.impl.notifications.factories.scNotificationColor
 import io.element.android.libraries.push.impl.notifications.model.FallbackNotifiableEvent
 import io.element.android.libraries.push.impl.notifications.model.InviteNotifiableEvent
 import io.element.android.libraries.push.impl.notifications.model.NotifiableEvent
@@ -38,6 +40,7 @@ class NotificationRenderer(
     private val notificationDisplayer: NotificationDisplayer,
     private val notificationDataFactory: NotificationDataFactory,
     private val enterpriseService: EnterpriseService,
+    private val buildMeta: BuildMeta, // SC
     private val sessionStore: SessionStore,
     private val analyticsService: AnalyticsService,
 ) {
@@ -48,6 +51,7 @@ class NotificationRenderer(
         imageLoader: ImageLoader,
     ) {
         val color = enterpriseService.brandColorsFlow(currentUser.userId).first()?.toArgb()
+            ?: buildMeta.scNotificationColor
             ?: NotificationConfig.NOTIFICATION_ACCENT_COLOR
         val numberOfAccounts = sessionStore.numberOfSessions()
         val notificationAccountParams = NotificationAccountParams(

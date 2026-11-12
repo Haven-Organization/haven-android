@@ -12,6 +12,7 @@ import io.element.android.libraries.matrix.api.roomlist.DynamicRoomList
 import io.element.android.libraries.matrix.api.roomlist.RoomList
 import io.element.android.libraries.matrix.api.roomlist.RoomListFilter
 import io.element.android.libraries.matrix.api.roomlist.RoomSummary
+import io.element.android.libraries.matrix.api.roomlist.ScSdkInboxSettings
 import kotlinx.coroutines.flow.MutableStateFlow
 
 class FakeDynamicRoomList(
@@ -35,6 +36,8 @@ class FakeDynamicRoomList(
     override suspend fun updateFilter(filter: RoomListFilter) {
         updateFilterLambda(filter)
     }
+
+    override suspend fun updateSettings(filter: RoomListFilter, settings: ScSdkInboxSettings) = updateFilter(filter)
 
     override suspend fun rebuildSummaries() {
         rebuildSummariesLambda()

@@ -45,6 +45,10 @@ fun OnBoardingPage(
     footer: @Composable () -> Unit = {},
     content: @Composable () -> Unit = {},
 ) {
+    if (true) {
+        ScOnBoardingPage(modifier = modifier, contentAlignment = contentAlignment, footer = footer, content = content)
+        return
+    }
     Box(
         modifier = modifier
             .fillMaxSize()

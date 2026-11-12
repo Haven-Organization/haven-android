@@ -11,6 +11,7 @@ import io.element.android.libraries.matrix.api.roomlist.DynamicRoomList
 import io.element.android.libraries.matrix.api.roomlist.RoomList
 import io.element.android.libraries.matrix.api.roomlist.RoomListFilter
 import io.element.android.libraries.matrix.api.roomlist.RoomSummary
+import io.element.android.libraries.matrix.api.roomlist.ScSdkInboxSettings
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.sync.Mutex
@@ -24,6 +25,7 @@ internal class RustDynamicRoomList(
     override val loadingState: MutableStateFlow<RoomList.LoadingState>,
     private val processor: RoomSummaryListProcessor,
     override val pageSize: Int,
+    private val isSpaceList: Boolean = false, // SC
     initialFilter: RoomListFilter,
     private val addPagesCount: Int = DEFAULT_ADD_PAGES_COUNT
 ) : DynamicRoomList {
@@ -70,10 +72,25 @@ internal class RustDynamicRoomList(
         }
     }
 
+    override suspend fun updateSettings(filter: RoomListFilter, settings: ScSdkInboxSettings) {
+        mutex.withLock {
+            dynamicController?.run {
+                currentFilter = filter
+                // Copy what applyFilter() does, but use SC inbox settings call.
+                // Reset pagination when filter changes
+                resetToOnePage()
+                val rustFilter = RoomListFilterMapper.toRustFilter(filter, isSpaceList)
+                setScInboxSettings(rustFilter, settings.toSdkSettings())
+                // Then preload some pages
+                addPages(addPagesCount)
+            }
+        }
+    }
+
     private fun RoomListDynamicEntriesController.applyFilter(filter: RoomListFilter) {
         // Reset pagination when filter changes
         resetToOnePage()
-        setFilter(RoomListFilterMapper.toRustFilter(filter))
+        setFilter(RoomListFilterMapper.toRustFilter(filter, isSpaceList))
         // Then preload some pages
         addPages(addPagesCount)
     }

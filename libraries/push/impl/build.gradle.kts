@@ -24,7 +24,7 @@ android {
     }
 
     buildTypes {
-        val defaultPusherAppId = "im.vector.app.android"
+        val defaultPusherAppId = "de.spiritcroc.riotx"
         getByName("release") {
             buildConfigFieldStr(
                 name = "PUSHER_APP_ID",
@@ -56,12 +56,15 @@ android {
 setupDependencyInjection()
 
 dependencies {
+    implementation(projects.schildi.lib)
     implementation(libs.androidx.corektx)
     implementation(libs.androidx.datastore.preferences)
     implementation(platform(libs.network.retrofit.bom))
     implementation(libs.network.retrofit)
     implementation(libs.serialization.json)
     implementation(libs.coil)
+
+    implementation(projects.schildi.lib)
 
     implementation(libs.sqldelight.driver.android)
     implementation(libs.sqlcipher)
@@ -121,6 +124,17 @@ dependencies {
     testImplementation(projects.services.toolbox.test)
     testImplementation(projects.libraries.featureflag.test)
     testImplementation(libs.kotlinx.collections.immutable)
+}
+
+// SC resource override
+android {
+    // Use a flavor for common things that the upstream config will not override by the build type
+    flavorDimensions += "package"
+    productFlavors {
+        create("sc") {
+            dimension = "package"
+        }
+    }
 }
 
 sqldelight {

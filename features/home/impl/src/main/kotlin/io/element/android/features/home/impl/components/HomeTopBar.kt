@@ -8,6 +8,8 @@
 
 package io.element.android.features.home.impl.components
 
+import androidx.compose.animation.Crossfade
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.indication
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -27,6 +29,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.BugReport
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
@@ -50,6 +54,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import chat.schildi.theme.ScTheme
 import io.element.android.appconfig.RoomListConfig
 import io.element.android.compound.theme.ElementTheme
 import io.element.android.compound.tokens.generated.CompoundIcons
@@ -72,6 +77,7 @@ import io.element.android.libraries.designsystem.preview.ElementPreview
 import io.element.android.libraries.designsystem.preview.PreviewsDayNight
 import io.element.android.libraries.designsystem.preview.USER_NAME_ALICE
 import io.element.android.libraries.designsystem.text.AdaptativeTitle
+import io.element.android.libraries.designsystem.theme.aliasScreenTitle
 import io.element.android.libraries.designsystem.theme.components.DropdownMenu
 import io.element.android.libraries.designsystem.theme.components.DropdownMenuItem
 import io.element.android.libraries.designsystem.theme.components.Icon
@@ -100,6 +106,11 @@ fun HomeTopBar(
     currentUserAndNeighbors: ImmutableList<MatrixUser>,
     showAvatarIndicator: Boolean,
     areSearchResultsDisplayed: Boolean,
+    // SC start
+    selectedSpaceName: String? = null,
+    onStartChatClick: () -> Unit = {},
+    onCreateSpaceClick: (() -> Unit)? = null,
+    // SC end
     onToggleSearch: () -> Unit,
     onMenuActionClick: (RoomListMenuAction) -> Unit,
     onOpenSettings: () -> Unit,
@@ -115,9 +126,12 @@ fun HomeTopBar(
     Column(modifier) {
         TopAppBar(
             modifier = Modifier
+                .let { ScTheme.exposures.appBarBg?.let { c -> it.background(c) } ?: it
+                // indention for merge start
                 .backgroundVerticalGradient(
                     isVisible = !areSearchResultsDisplayed,
                 )
+                } // indention for merge end
                 .statusBarsPadding()
                 .padding(contentPadding),
             colors = TopAppBarDefaults.topAppBarColors(
@@ -125,7 +139,7 @@ fun HomeTopBar(
                 scrolledContainerColor = Color.Transparent,
             ),
             title = {
-                val displayTitle = when (selectedNavigationItem) {
+                val displayTitle = selectedSpaceName ?: when (selectedNavigationItem) {
                     HomeNavigationBarItem.Chats -> {
                         when (spaceFiltersState) {
                             is SpaceFiltersState.Selected -> spaceFiltersState.selectedFilter.spaceRoom.displayName
@@ -134,8 +148,9 @@ fun HomeTopBar(
                     }
                     HomeNavigationBarItem.Spaces -> null
                 }
+                Crossfade(targetState = selectedSpaceName ?: displayTitle, label = "spaceText",) { displayTitle -> // SC purposedly bad indention
                 displayTitle?.let {
-                    val style = when (spaceFiltersState) {
+                    val style = if (ScTheme.yes) ElementTheme.typography.aliasScreenTitle else when (spaceFiltersState) {
                         // Space name
                         is SpaceFiltersState.Selected -> ElementTheme.typography.fontHeadingSmMedium
                         // "Chats"
@@ -147,6 +162,7 @@ fun HomeTopBar(
                         twoLinesStyle = ElementTheme.typography.fontHeadingSmMedium,
                     )
                 }
+                } // SC purposedly bad indention end
             },
             navigationIcon = {
                 NavigationIcon(
@@ -159,6 +175,8 @@ fun HomeTopBar(
             actions = {
                 if (selectedNavigationItem == HomeNavigationBarItem.Chats) {
                     RoomListMenuItems(
+                        onStartChatClick = onStartChatClick, // SC
+                        onCreateSpaceClick = onCreateSpaceClick, // SC
                         onToggleSearch = onToggleSearch,
                         onMenuActionClick = onMenuActionClick,
                         canReportBug = canReportBug,
@@ -187,6 +205,8 @@ fun HomeTopBar(
 
 @Composable
 private fun RowScope.RoomListMenuItems(
+    onStartChatClick: () -> Unit, // SC
+    onCreateSpaceClick: (() -> Unit)?, // SC
     onToggleSearch: () -> Unit,
     onMenuActionClick: (RoomListMenuAction) -> Unit,
     canReportBug: Boolean,
@@ -215,6 +235,7 @@ private fun RowScope.RoomListMenuItems(
             expanded = showMenu,
             onDismissRequest = { showMenu = false }
         ) {
+            ScRoomListDropdownEntriesTop(onClick = { showMenu = false }, onMenuActionClick = onMenuActionClick, onStartChatClick = onStartChatClick, onCreateSpaceClick = onCreateSpaceClick)
             if (RoomListConfig.SHOW_INVITE_MENU_ITEM) {
                 DropdownMenuItem(
                     onClick = {
@@ -240,13 +261,14 @@ private fun RowScope.RoomListMenuItems(
                     text = { Text(stringResource(id = CommonStrings.common_report_a_problem)) },
                     leadingIcon = {
                         Icon(
-                            imageVector = CompoundIcons.ChatProblem(),
+                            imageVector = Icons.Outlined.BugReport,
                             tint = ElementTheme.colors.iconSecondary,
                             contentDescription = null,
                         )
                     }
                 )
             }
+            ScRoomListDropdownEntriesBottom(onClick = { showMenu = false }, onMenuActionClick = onMenuActionClick)
         }
     }
 }
@@ -433,6 +455,7 @@ private fun StatusEmoji(
 @Composable
 internal fun HomeTopBarPreview() = ElementPreview {
     HomeTopBar(
+        selectedSpaceName = null, onStartChatClick = {}, onCreateSpaceClick = {}, // SC
         selectedNavigationItem = HomeNavigationBarItem.Chats,
         currentUserAndNeighbors = persistentListOf(aMatrixUser(id = "@id:domain", displayName = USER_NAME_ALICE)),
         showAvatarIndicator = false,
@@ -453,6 +476,7 @@ internal fun HomeTopBarPreview() = ElementPreview {
 @Composable
 internal fun HomeTopBarSpaceFiltersSelectedPreview() = ElementPreview {
     HomeTopBar(
+        selectedSpaceName = null, onStartChatClick = {}, onCreateSpaceClick = {}, // SC
         selectedNavigationItem = HomeNavigationBarItem.Chats,
         currentUserAndNeighbors = persistentListOf(aMatrixUser(id = "@id:domain", displayName = USER_NAME_ALICE)),
         showAvatarIndicator = false,
@@ -473,6 +497,7 @@ internal fun HomeTopBarSpaceFiltersSelectedPreview() = ElementPreview {
 @Composable
 internal fun HomeTopBarSpacesPreview() = ElementPreview {
     HomeTopBar(
+        selectedSpaceName = null, onStartChatClick = {}, onCreateSpaceClick = {}, // SC
         selectedNavigationItem = HomeNavigationBarItem.Spaces,
         currentUserAndNeighbors = persistentListOf(aMatrixUser(id = "@id:domain", displayName = USER_NAME_ALICE)),
         showAvatarIndicator = false,
@@ -493,6 +518,7 @@ internal fun HomeTopBarSpacesPreview() = ElementPreview {
 @Composable
 internal fun HomeTopBarWithIndicatorPreview() = ElementPreview {
     HomeTopBar(
+        selectedSpaceName = null, onStartChatClick = {}, onCreateSpaceClick = {}, // SC
         selectedNavigationItem = HomeNavigationBarItem.Chats,
         currentUserAndNeighbors = persistentListOf(aMatrixUser(id = "@id:domain", displayName = USER_NAME_ALICE)),
         showAvatarIndicator = true,
@@ -539,6 +565,7 @@ internal fun HomeTopBarWithStatusPreview() = ElementPreview {
 @Composable
 internal fun HomeTopBarMultiAccountPreview() = ElementPreview {
     HomeTopBar(
+        selectedSpaceName = null, onStartChatClick = {}, onCreateSpaceClick = {}, // SC
         selectedNavigationItem = HomeNavigationBarItem.Chats,
         currentUserAndNeighbors = aMatrixUserList().take(3).toImmutableList(),
         showAvatarIndicator = false,

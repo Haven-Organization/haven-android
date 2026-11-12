@@ -43,6 +43,7 @@ import io.element.android.libraries.matrix.api.search.MessageSearchService
 import io.element.android.libraries.matrix.api.search.SearchBackfillService
 import io.element.android.libraries.matrix.api.spaces.SpaceService
 import io.element.android.libraries.matrix.api.sync.SyncService
+import io.element.android.libraries.matrix.api.timeline.ReceiptType
 import io.element.android.libraries.matrix.api.user.DisplayedStatus
 import io.element.android.libraries.matrix.api.user.MatrixSearchUserResults
 import io.element.android.libraries.matrix.api.user.MatrixUser
@@ -188,6 +189,13 @@ class FakeMatrixClient(
     override suspend fun getRoom(roomId: RoomId): BaseRoom? {
         return getRoomResults[roomId]
     }
+
+    // SC additions
+    override suspend fun getAccountData(eventType: String): String? = null
+    override suspend fun getRoomAccountData(roomId: RoomId, eventType: String): String? = null
+    override suspend fun setAccountData(eventType: String, content: String) {}
+    override suspend fun getUrlPreviewJson(url: String): String = "{}"
+    // SC additions end
 
     override suspend fun getJoinedRoom(roomId: RoomId): JoinedRoom? {
         return getRoomResults[roomId] as? JoinedRoom
@@ -440,7 +448,7 @@ class FakeMatrixClient(
         return setAccountDataLambda(eventType, content)
     }
 
-    override suspend fun markRoomAsFullyRead(roomId: RoomId, eventId: EventId): Result<Unit> {
+    override suspend fun markRoomAsFullyRead(roomId: RoomId, eventId: EventId, withReadReceipt: ReceiptType?): Result<Unit> {
         return markRoomAsFullyReadResult(roomId, eventId)
     }
 

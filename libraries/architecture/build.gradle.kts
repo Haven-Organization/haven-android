@@ -20,6 +20,8 @@ android {
 setupDependencyInjection()
 
 dependencies {
+    implementation(projects.schildi.lib)
+
     api(projects.libraries.di)
     api(projects.libraries.core)
     api(libs.metro.runtime)

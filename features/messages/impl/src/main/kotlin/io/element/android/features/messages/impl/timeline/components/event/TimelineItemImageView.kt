@@ -28,7 +28,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.PreviewParameter
-import androidx.compose.ui.unit.dp
+import chat.schildi.lib.preferences.ScPrefs
+import chat.schildi.lib.preferences.value
+import chat.schildi.theme.ScTheme
+import chat.schildi.theme.scBubbleFont
 import coil3.compose.AsyncImage
 import io.element.android.features.messages.impl.timeline.aTimelineItemEvent
 import io.element.android.features.messages.impl.timeline.components.ATimelineItemEventRow
@@ -65,7 +68,7 @@ fun TimelineItemImageView(
     val a11yLabel = stringResource(CommonStrings.common_image)
     val description = content.caption?.let { "$a11yLabel: $it" } ?: a11yLabel
     Column(modifier = modifier.wrapContentWidth(Alignment.CenterHorizontally)) {
-        val containerShape = if (content.showCaption) RoundedCornerShape(10.dp) else null
+        val containerShape = if (content.showCaption) RoundedCornerShape(ScTheme.exposures.commonLayoutRadius) /* SC */ else null
         val containerModifier = if (containerShape != null) {
             Modifier.clip(containerShape)
         } else {
@@ -91,7 +94,7 @@ fun TimelineItemImageView(
                     AsyncImage(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .then(if (isLoaded) Modifier.background(Color.White) else Modifier)
+                            //.then(if (isLoaded) Modifier.background(Color.White) else Modifier)
                             .then(
                                 if (!isTalkbackActive() && onContentClick != null) {
                                     Modifier

@@ -48,7 +48,8 @@ class EventMessageMapper {
             inReplyTo = inReplyToEvent,
             isEdited = it.content.isEdited,
             threadInfo = threadInfo,
-            type = type
+            type = type,
+            isRoomMention = it.content.mentions?.room,
         )
     }
 

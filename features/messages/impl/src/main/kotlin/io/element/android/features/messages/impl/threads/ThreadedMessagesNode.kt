@@ -20,6 +20,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import chat.schildi.lib.preferences.ScPreferencesStore
 import com.bumble.appyx.core.lifecycle.subscribe
 import com.bumble.appyx.core.modality.BuildContext
 import com.bumble.appyx.core.node.Node
@@ -97,6 +98,7 @@ class ThreadedMessagesNode(
     private val appNavigationStateService: AppNavigationStateService,
     private val roomMemberModerationRenderer: RoomMemberModerationRenderer,
     private val emojiPickerRenderer: EmojiPickerRenderer,
+    private val scPreferencesStore: ScPreferencesStore, // SC
     private val dispatchers: CoroutineDispatchers,
 ) : Node(buildContext, plugins = plugins), MessagesNavigator, TimelineSelectionOwner {
     data class Inputs(
@@ -123,6 +125,7 @@ class ThreadedMessagesNode(
             liveTimeline = threadedTimeline,
             roomCoroutineScope = room.roomCoroutineScope,
             dispatchers = dispatchers,
+            scPreferencesStore = scPreferencesStore,
         )
         this.timelineController = timelineController
         val timelinePresenter = timelinePresenterFactory.create(timelineController = timelineController, this)
@@ -348,6 +351,9 @@ class ThreadedMessagesNode(
                             state = state.customReactionState,
                             onSelectEmoji = { uniqueId, emoji ->
                                 state.eventSink(MessagesEvent.ToggleReaction(emoji.unicode, uniqueId))
+                            },
+                            onSelectCustomEmoji = { uniqueId, emoji ->
+                                state.eventSink(MessagesEvent.ToggleReaction(emoji, uniqueId))
                             },
                             emojiPickerRenderer = emojiPickerRenderer,
                         )

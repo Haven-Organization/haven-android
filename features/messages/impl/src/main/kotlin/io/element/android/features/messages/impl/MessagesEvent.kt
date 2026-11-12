@@ -9,6 +9,7 @@
 package io.element.android.features.messages.impl
 
 import io.element.android.features.messages.impl.actionlist.model.TimelineItemAction
+import io.element.android.features.messages.impl.timeline.ScReadState
 import io.element.android.features.messages.impl.timeline.model.TimelineItem
 import io.element.android.libraries.matrix.api.timeline.item.event.EventOrTransactionId
 import io.element.android.libraries.matrix.api.user.MatrixUser
@@ -22,7 +23,7 @@ sealed interface MessagesEvent {
     data object CancelRedact : MessagesEvent
     data object StopLiveLocationShare : MessagesEvent
     data object ShowLiveLocationShare : MessagesEvent
-    data object MarkAsFullyReadAndExit : MessagesEvent
+    data class MarkAsFullyReadAndExit(val scReadState: ScReadState) : MessagesEvent
     data object ConfirmSelectionAction : MessagesEvent
 }
 

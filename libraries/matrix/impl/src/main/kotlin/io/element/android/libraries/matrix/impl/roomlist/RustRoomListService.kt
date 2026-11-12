@@ -8,10 +8,15 @@
 
 package io.element.android.libraries.matrix.impl.roomlist
 
+import chat.schildi.lib.preferences.ScPreferencesStore
+import chat.schildi.lib.preferences.ScPrefs
 import io.element.android.libraries.matrix.api.core.RoomId
 import io.element.android.libraries.matrix.api.roomlist.DynamicRoomList
 import io.element.android.libraries.matrix.api.roomlist.RoomList
+import io.element.android.libraries.matrix.api.roomlist.RoomListFilter
 import io.element.android.libraries.matrix.api.roomlist.RoomListService
+import io.element.android.libraries.matrix.api.roomlist.ScSdkInboxSettings
+import io.element.android.libraries.matrix.api.roomlist.ScSdkRoomSortOrder
 import io.element.android.libraries.matrix.impl.room.RoomSyncSubscriber
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -32,6 +37,7 @@ internal class RustRoomListService(
     private val sessionDispatcher: CoroutineDispatcher,
     private val roomListFactory: RoomListFactory,
     private val roomSyncSubscriber: RoomSyncSubscriber,
+    private val scPreferencesStore: ScPreferencesStore,
     private val sessionCoroutineScope: CoroutineScope,
 ) : RoomListService {
     private val _isInitialSyncDone = AtomicBoolean(false)
@@ -59,6 +65,26 @@ internal class RustRoomListService(
 
     override val allRooms: RoomList = roomListFactory.createRoomList(
         pageSize = Int.MAX_VALUE,
+        coroutineContext = sessionDispatcher,
+        coroutineScope = sessionCoroutineScope,
+        initialInboxSettings = ScSdkInboxSettings(
+            sortOrder = ScSdkRoomSortOrder(
+                byUnread = scPreferencesStore.getCachedOrDefaultValue(ScPrefs.SORT_BY_UNREAD),
+                pinFavourites = scPreferencesStore.getCachedOrDefaultValue(ScPrefs.PIN_FAVORITES),
+                buryLowPriority = scPreferencesStore.getCachedOrDefaultValue(ScPrefs.BURY_LOW_PRIORITY),
+                clientSideUnreadCounts = scPreferencesStore.getCachedOrDefaultValue(ScPrefs.CLIENT_GENERATED_UNREAD_COUNTS),
+                withSilentUnread = scPreferencesStore.getCachedOrDefaultValue(ScPrefs.SORT_WITH_SILENT_UNREAD),
+                withInaccurateSilentUnread = scPreferencesStore.getCachedOrDefaultValue(ScPrefs.INDICATE_UNREAD_COUNT_UNDERESTIMATES),
+            )
+        ),
+    ) {
+        innerRoomListService.allRooms()
+    }
+
+    override val allSpaces: DynamicRoomList = roomListFactory.createRoomList(
+        pageSize = Integer.MAX_VALUE,
+        isSpaceList = true,
+        initialFilter = RoomListFilter.all(),
         coroutineContext = sessionDispatcher,
         coroutineScope = sessionCoroutineScope,
     ) {

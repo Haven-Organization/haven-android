@@ -8,6 +8,7 @@
 
 package io.element.android.libraries.pushproviders.unifiedpush
 
+import chat.schildi.lib.preferences.ScAppStateStore
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesBinding
 import io.element.android.libraries.core.extensions.flatMap
@@ -32,6 +33,7 @@ class DefaultUnifiedPushNewGatewayHandler(
     private val pusherSubscriber: PusherSubscriber,
     private val userPushStoreFactory: UserPushStoreFactory,
     private val pushClientSecret: PushClientSecret,
+    private val scAppStateStore: ScAppStateStore,
     private val matrixClientProvider: MatrixClientProvider,
 ) : UnifiedPushNewGatewayHandler {
     override suspend fun handle(endpoint: String, pushGateway: String, clientSecret: String): Result<Unit> {
@@ -42,6 +44,7 @@ class DefaultUnifiedPushNewGatewayHandler(
             Timber.tag(loggerTag.value).w("Unable to retrieve session")
         }
         val userDataStore = userPushStoreFactory.getOrCreate(userId)
+        scAppStateStore.setPushGateway(pushGateway)
         return if (userDataStore.getPushProviderName() == UnifiedPushConfig.NAME) {
             matrixClientProvider
                 .getOrRestore(userId)

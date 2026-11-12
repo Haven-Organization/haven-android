@@ -75,13 +75,14 @@ fun TimelineItemStateEventRow(
                 TimelineItemEventContentView(
                     eventId = event.eventId,
                     content = event.content,
+                    debugInfoProvider = event.timelineItemDebugInfoProvider, // SC
                     onLinkClick = {},
                     onLinkLongClick = {},
                     timelineProtectionState = timelineProtectionState,
                     eventSink = eventSink,
                     onContentClick = null,
                     onGalleryItemClick = {},
-                    onLongClick = null,
+                    onLongClick = onLongClick, // SC: non-null
                     modifier = Modifier.defaultTimelineContentPadding()
                 )
             }

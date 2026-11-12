@@ -46,7 +46,10 @@ import io.element.android.libraries.matrix.impl.timeline.postprocessor.LoadingIn
 import io.element.android.libraries.matrix.impl.timeline.postprocessor.RoomBeginningPostProcessor
 import io.element.android.libraries.matrix.impl.timeline.postprocessor.TypingNotificationPostProcessor
 import io.element.android.libraries.matrix.impl.timeline.reply.InReplyToMapper
+import io.element.android.libraries.matrix.impl.util.EmoteEventContent
 import io.element.android.libraries.matrix.impl.util.MessageEventContent
+import io.element.android.libraries.matrix.impl.util.NoticeEventContent
+import io.element.android.libraries.matrix.impl.util.ScMessageEventContent
 import io.element.android.services.toolbox.api.systemclock.SystemClock
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.coroutines.CoroutineDispatcher
@@ -72,6 +75,7 @@ import org.matrix.rustcomponents.sdk.EditedContent
 import org.matrix.rustcomponents.sdk.FormattedBody
 import org.matrix.rustcomponents.sdk.GalleryUploadParameters
 import org.matrix.rustcomponents.sdk.MessageFormat
+import org.matrix.rustcomponents.sdk.NoticeMessageContent
 import org.matrix.rustcomponents.sdk.PollData
 import org.matrix.rustcomponents.sdk.SendAttachmentJoinHandle
 import org.matrix.rustcomponents.sdk.UploadParameters
@@ -307,6 +311,42 @@ class RustTimeline(
         }
     }
 
+    override suspend fun sendNotice( // SC
+        body: String,
+        htmlBody: String?,
+        plaintext: Boolean,  // SC
+        intentionalMentions: List<IntentionalMention>,
+        inReplyToEventId: EventId?
+    ): Result<Unit> = withContext(dispatcher) {
+        NoticeEventContent.from(body, htmlBody, plaintext, intentionalMentions).use { content ->
+            runCatchingExceptions<Unit> {
+                if (inReplyToEventId == null) {
+                    inner.send(content)
+                } else {
+                    inner.sendReply(content, inReplyToEventId.value)
+                }
+            }
+        }
+    }
+
+    override suspend fun sendEmote( // SC
+        body: String,
+        htmlBody: String?,
+        plaintext: Boolean,
+        intentionalMentions: List<IntentionalMention>,
+        inReplyToEventId: EventId?
+    ): Result<Unit> = withContext(dispatcher) {
+        EmoteEventContent.from(body, htmlBody, plaintext, intentionalMentions).use { content ->
+            runCatchingExceptions<Unit> {
+                if (inReplyToEventId == null) {
+                    inner.send(content)
+                } else {
+                    inner.sendReply(content, inReplyToEventId.value)
+                }
+            }
+        }
+    }
+
     override suspend fun redactEvent(eventOrTransactionId: EventOrTransactionId, reason: String?): Result<Unit> = withContext(dispatcher) {
         runCatchingExceptions {
             inner.redactEvent(
@@ -321,12 +361,14 @@ class RustTimeline(
         body: String,
         htmlBody: String?,
         intentionalMentions: List<IntentionalMention>,
+        plaintext: Boolean,  // SC
     ): Result<Unit> = withContext(dispatcher) {
         runCatchingExceptions {
             val editedContent = EditedContent.RoomMessage(
-                content = MessageEventContent.from(
+                content = ScMessageEventContent.from(
                     body = body,
                     htmlBody = htmlBody,
+                    plaintext = plaintext, // SC
                     intentionalMentions = intentionalMentions
                 ),
             )
@@ -341,6 +383,7 @@ class RustTimeline(
         eventOrTransactionId: EventOrTransactionId,
         caption: String?,
         formattedCaption: String?,
+        plaintext: Boolean,  // SC
     ): Result<Unit> = withContext(dispatcher) {
         runCatchingExceptions<Unit> {
             val editedContent = createCaptionEdit(
@@ -348,6 +391,7 @@ class RustTimeline(
                 formattedCaption = formattedCaption?.let {
                     FormattedBody(body = it, format = MessageFormat.Html)
                 },
+                skipCaptionAutoformat = plaintext,
                 mentions = null,
             )
             withContext(Dispatchers.IO) {
@@ -363,6 +407,7 @@ class RustTimeline(
         repliedToEventId: EventId,
         body: String,
         htmlBody: String?,
+        plaintext: Boolean,  // SC
         intentionalMentions: List<IntentionalMention>,
         fromNotification: Boolean,
         msgType: MsgType,
@@ -373,6 +418,7 @@ class RustTimeline(
                 htmlBody = htmlBody,
                 intentionalMentions = intentionalMentions,
                 msgType = msgType,
+                asPlainText = plaintext, // SC
             )
             inner.sendReply(
                 msg = msg,
@@ -387,6 +433,7 @@ class RustTimeline(
         imageInfo: ImageInfo,
         caption: String?,
         formattedCaption: String?,
+        plaintext: Boolean,  // SC
         inReplyToEventId: EventId?,
     ): Result<MediaUploadHandler> {
         Timber.tag(loggerTag).d("Sending image ${file.path.hash()}")
@@ -398,6 +445,7 @@ class RustTimeline(
                     formattedCaption = formattedCaption?.let {
                         FormattedBody(body = it, format = MessageFormat.Html)
                     },
+                    skipCaptionAutoformat = plaintext, // SC
                     mentions = null,
                     inReplyTo = inReplyToEventId?.value,
                 ),
@@ -413,6 +461,7 @@ class RustTimeline(
         videoInfo: VideoInfo,
         caption: String?,
         formattedCaption: String?,
+        plaintext: Boolean,  // SC
         inReplyToEventId: EventId?,
     ): Result<MediaUploadHandler> {
         Timber.tag(loggerTag).d("Sending video ${file.path.hash()}")
@@ -424,6 +473,7 @@ class RustTimeline(
                     formattedCaption = formattedCaption?.let {
                         FormattedBody(body = it, format = MessageFormat.Html)
                     },
+                    skipCaptionAutoformat = plaintext, // SC
                     mentions = null,
                     inReplyTo = inReplyToEventId?.value,
                 ),
@@ -438,6 +488,7 @@ class RustTimeline(
         audioInfo: AudioInfo,
         caption: String?,
         formattedCaption: String?,
+        plaintext: Boolean,  // SC
         inReplyToEventId: EventId?,
     ): Result<MediaUploadHandler> {
         Timber.tag(loggerTag).d("Sending audio ${file.path.hash()}")
@@ -449,6 +500,7 @@ class RustTimeline(
                     formattedCaption = formattedCaption?.let {
                         FormattedBody(body = it, format = MessageFormat.Html)
                     },
+                    skipCaptionAutoformat = plaintext, // SC
                     mentions = null,
                     inReplyTo = inReplyToEventId?.value,
                 ),
@@ -462,6 +514,7 @@ class RustTimeline(
         fileInfo: FileInfo,
         caption: String?,
         formattedCaption: String?,
+        plaintext: Boolean,  // SC
         inReplyToEventId: EventId?,
     ): Result<MediaUploadHandler> {
         Timber.tag(loggerTag).d("Sending file ${file.path.hash()}")
@@ -473,6 +526,7 @@ class RustTimeline(
                     formattedCaption = formattedCaption?.let {
                         FormattedBody(body = it, format = MessageFormat.Html)
                     },
+                    skipCaptionAutoformat = plaintext, // SC
                     mentions = null,
                     inReplyTo = inReplyToEventId?.value,
                 ),
@@ -494,7 +548,7 @@ class RustTimeline(
         runCatchingExceptions {
             roomContentForwarder.forward(fromTimeline = inner, eventIds = eventIds, toRoomIds = roomIds)
         }.onFailure {
-            Timber.tag(loggerTag).e(it)
+            Timber.tag(loggerTag).e(it, "Failed to forward event")
         }
     }
 
@@ -531,6 +585,7 @@ class RustTimeline(
                     // Maybe allow a caption in the future?
                     caption = null,
                     formattedCaption = null,
+                    skipCaptionAutoformat = false, // SC
                     mentions = null,
                     inReplyTo = inReplyToEventId?.value,
                 ),
@@ -644,6 +699,26 @@ class RustTimeline(
             MediaUploadHandlerImpl(files, handle())
         }
     }
+
+    // SC start
+    override suspend fun forceSendReadReceipt(
+        eventId: EventId,
+        receiptType: ReceiptType,
+    ) = withContext(dispatcher) {
+        runCatching {
+            inner.forceSendReadReceipt(
+                receiptType = receiptType.toRustReceiptType(),
+                eventId = eventId.value,
+            )
+        }
+    }
+    override suspend fun fullyReadEventId(): String? {
+        return runCatching { inner.fullyReadEventId() }.getOrNull()
+    }
+    override suspend fun latestUserReceiptEventId(userId: String): String? {
+        return runCatching { inner.latestUserReadReceiptEventId(userId) }.getOrNull()
+    }
+    // SC end
 
     override suspend fun loadReplyDetails(eventId: EventId): InReplyTo = withContext(dispatcher) {
         val timelineItem = _timelineItems.first().firstOrNull { timelineItem ->

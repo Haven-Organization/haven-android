@@ -8,6 +8,7 @@
 
 package io.element.android.x.di
 
+import chat.schildi.lib.preferences.ScPreferencesStore
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesTo
 import dev.zacsweers.metro.Multibinds
@@ -25,6 +26,7 @@ import io.element.android.libraries.featureflag.api.FeatureFlagService
 import io.element.android.libraries.matrix.api.platform.InitPlatformService
 import io.element.android.libraries.matrix.api.tracing.TracingService
 import io.element.android.libraries.preferences.api.store.AppPreferencesStore
+import io.element.android.libraries.pushproviders.api.PushHandler
 import io.element.android.services.analytics.api.AnalyticsService
 
 @ContributesTo(AppScope::class)
@@ -40,6 +42,11 @@ interface AppBindings {
     fun lockScreenService(): LockScreenService
 
     fun preferencesStore(): AppPreferencesStore
+
+    // SC start
+    fun scPreferencesStore(): ScPreferencesStore
+    fun pushHandler(): PushHandler
+    // SC end
 
     fun migrationEntryPoint(): MigrationEntryPoint
 

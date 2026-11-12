@@ -30,6 +30,7 @@ fun aTimelineItemAudioContent(
     fileSize = 100 * 1024L,
     caption = caption,
     formattedCaption = null,
+    formattedCaptionSc = null,
     isEdited = false,
     mimeType = MimeTypes.Mp3,
     formattedFileSize = "100kB",

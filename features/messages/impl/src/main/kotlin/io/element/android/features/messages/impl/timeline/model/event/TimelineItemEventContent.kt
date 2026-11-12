@@ -9,6 +9,7 @@
 package io.element.android.features.messages.impl.timeline.model.event
 
 import androidx.compose.runtime.Immutable
+import com.beeper.android.messageformat.MatrixBodyParseResult
 import io.element.android.libraries.htmlrenderer.api.DocumentNode
 import io.element.android.libraries.matrix.api.media.MediaSource
 import kotlin.time.Duration
@@ -34,6 +35,7 @@ sealed interface TimelineItemEventContentWithAttachment :
     val fileSize: Long?
     val caption: String?
     val formattedCaption: CharSequence?
+    val formattedCaptionSc: MatrixBodyParseResult?
 
     /** The caption as it was written, in HTML, so that editing it can start from the formatted text. */
     val htmlCaption: String?

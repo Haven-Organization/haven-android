@@ -12,14 +12,14 @@ object RageshakeConfig {
     /**
      * The URL to submit bug reports to.
      */
-    const val BUG_REPORT_URL = BuildConfig.BUG_REPORT_URL
+    const val BUG_REPORT_URL = "https://rageshake.schildi.chat/api/submit"
 
     /**
      * As per https://github.com/matrix-org/rageshake:
      * Identifier for the application (eg 'riot-web').
      * Should correspond to a mapping configured in the configuration file for github issue reporting to work.
      */
-    const val BUG_REPORT_APP_NAME = BuildConfig.BUG_REPORT_APP_NAME
+    const val BUG_REPORT_APP_NAME = "schildichat-android-next"
 
     /**
      * The maximum size of the upload request. Default value is just below CloudFlare's max request size.

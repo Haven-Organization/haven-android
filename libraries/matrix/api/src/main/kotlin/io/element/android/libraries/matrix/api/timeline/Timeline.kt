@@ -129,6 +129,22 @@ interface Timeline : AutoCloseable {
         asPlainText: Boolean = false,
     ): Result<Unit>
 
+    suspend fun sendNotice( // SC
+        body: String,
+        htmlBody: String?,
+        plaintext: Boolean = false,
+        intentionalMentions: List<IntentionalMention>,
+        inReplyToEventId: EventId?,
+    ): Result<Unit>
+
+    suspend fun sendEmote( // SC
+        body: String,
+        htmlBody: String?,
+        plaintext: Boolean = false,
+        intentionalMentions: List<IntentionalMention>,
+        inReplyToEventId: EventId?,
+    ): Result<Unit>
+
     /**
      * Replaces the content of a message, whether it has already been sent or is still local in the send queue.
      *
@@ -142,6 +158,7 @@ interface Timeline : AutoCloseable {
         body: String,
         htmlBody: String?,
         intentionalMentions: List<IntentionalMention>,
+        plaintext: Boolean = false, // SC
     ): Result<Unit>
 
     /**
@@ -155,6 +172,7 @@ interface Timeline : AutoCloseable {
         eventOrTransactionId: EventOrTransactionId,
         caption: String?,
         formattedCaption: String?,
+        plaintext: Boolean = false,  // SC
     ): Result<Unit>
 
     /**
@@ -171,6 +189,7 @@ interface Timeline : AutoCloseable {
         repliedToEventId: EventId,
         body: String,
         htmlBody: String?,
+        plaintext: Boolean = false,  // SC
         intentionalMentions: List<IntentionalMention>,
         fromNotification: Boolean = false,
         msgType: MsgType = MsgType.MSG_TYPE_TEXT,
@@ -192,6 +211,7 @@ interface Timeline : AutoCloseable {
         imageInfo: ImageInfo,
         caption: String?,
         formattedCaption: String?,
+        plaintext: Boolean = false,  // SC
         inReplyToEventId: EventId?,
     ): Result<MediaUploadHandler>
 
@@ -211,6 +231,7 @@ interface Timeline : AutoCloseable {
         videoInfo: VideoInfo,
         caption: String?,
         formattedCaption: String?,
+        plaintext: Boolean = false,  // SC
         inReplyToEventId: EventId?,
     ): Result<MediaUploadHandler>
 
@@ -228,6 +249,7 @@ interface Timeline : AutoCloseable {
         audioInfo: AudioInfo,
         caption: String?,
         formattedCaption: String?,
+        plaintext: Boolean = false,  // SC
         inReplyToEventId: EventId?,
     ): Result<MediaUploadHandler>
 
@@ -245,6 +267,7 @@ interface Timeline : AutoCloseable {
         fileInfo: FileInfo,
         caption: String?,
         formattedCaption: String?,
+        plaintext: Boolean = false,  // SC
         inReplyToEventId: EventId?,
     ): Result<MediaUploadHandler>
 
@@ -380,6 +403,12 @@ interface Timeline : AutoCloseable {
      * @param text Fallback text of the poll end event.
      */
     suspend fun endPoll(pollStartId: EventId, text: String): Result<Unit>
+
+    // SC start
+    suspend fun forceSendReadReceipt(eventId: EventId, receiptType: ReceiptType): Result<Unit>
+    suspend fun fullyReadEventId(): String?
+    suspend fun latestUserReceiptEventId(userId: String): String?
+    // SC end
 
     /**
      * Resolves the content of a replied-to event so it can be rendered above the reply.

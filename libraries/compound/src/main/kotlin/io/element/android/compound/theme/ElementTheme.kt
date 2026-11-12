@@ -40,6 +40,8 @@ import io.element.android.compound.tokens.generated.TypographyTokens
 import io.element.android.compound.tokens.generated.compoundColorsDark
 import io.element.android.compound.tokens.generated.compoundColorsLight
 import io.element.android.compound.tokens.generated.internal.DarkColorTokens
+import io.element.android.compound.tokens.sc.ElTypographyTokens
+import io.element.android.compound.tokens.sc.ExposedTypographyTokens
 
 /**
  * Inspired from https://medium.com/@lucasyujideveloper/54cbcbde1ace
@@ -67,7 +69,10 @@ object ElementTheme {
     /**
      * Compound [Typography] tokens. In Figma, these have the `Android/font/` prefix.
      */
-    val typography: TypographyTokens = TypographyTokens
+    val typography: ExposedTypographyTokens
+        @Composable
+        @ReadOnlyComposable
+        get() = LocalTypography.current
 
     /**
      * Returns whether the theme version used is the light or the dark one.
@@ -80,6 +85,8 @@ object ElementTheme {
 
 // Global variables (application level)
 internal val LocalCompoundColors = staticCompositionLocalOf { compoundColorsLight }
+
+internal val LocalTypography = staticCompositionLocalOf { ElTypographyTokens }
 
 /**
  * Sets up the theme for the application, or a part of it.
@@ -109,6 +116,7 @@ fun ElementTheme(
     materialColorsLight: ColorScheme = compoundLight.toMaterialColorScheme(),
     materialColorsDark: ColorScheme = compoundDark.toMaterialColorScheme(),
     typography: Typography = compoundTypography,
+    typographyTokens: ExposedTypographyTokens = ElTypographyTokens,
     content: @Composable () -> Unit,
 ) {
     val darkTheme = theme.isDark()

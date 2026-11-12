@@ -90,6 +90,7 @@ class DefaultSyncPendingNotificationsRequestBuilder(
 
         val request = OneTimeWorkRequestBuilder<FetchPendingNotificationsWorker>()
             .setInputData(workDataOf(SESSION_ID to sessionId.value))
+            .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()) // SC
             .apply {
                 // Before Android 12 (API 31), WorkManager runs expedited work as a foreground service with a visible notification, which we
                 // don't want and don't support (no `getForegroundInfo` implementation). From API 31 on, expedited work is a native JobScheduler

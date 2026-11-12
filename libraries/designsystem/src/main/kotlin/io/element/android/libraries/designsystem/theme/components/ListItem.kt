@@ -108,7 +108,7 @@ fun ListItem(
 ) {
     // We cannot just pass the disabled colors, they must be set manually: https://issuetracker.google.com/issues/280480132
     val contentColor = if (enabled) colors.contentColor else colors.disabledContentColor
-    val supportingColor = if (enabled) colors.supportingContentColor else colors.disabledContentColor.copy(alpha = 0.80f)
+    val supportingColor = if (enabled) colors.supportingContentColor else colors.scDisabledSupportingTextColor() ?: colors.disabledContentColor.copy(alpha = 0.80f)
     val leadingContentColor = if (enabled) colors.leadingContentColor else colors.disabledLeadingContentColor
     val trailingContentColor = if (enabled) colors.trailingContentColor else colors.disabledTrailingContentColor
 

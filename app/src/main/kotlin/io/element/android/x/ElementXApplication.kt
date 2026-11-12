@@ -12,6 +12,8 @@ import android.app.Application
 import android.os.StrictMode
 import androidx.compose.material3.ComposeMaterial3Flags.isAnchoredDraggableComponentsStrictOffsetCheckEnabled
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.emoji2.bundled.BundledEmojiCompatConfig
+import androidx.emoji2.text.EmojiCompat
 import androidx.startup.AppInitializer
 import androidx.work.Configuration
 import dev.zacsweers.metro.Inject
@@ -34,7 +36,7 @@ import io.element.android.x.initializer.PlatformInitializer
 // the Application through the public no-arg one.
 class ElementXApplication private constructor(
     private val elementCallActivityHost: ElementCallActivityHostDelegate,
-) : Application(),
+) : ScApplication(),
     DependencyInjectionGraphOwner,
     Configuration.Provider,
     ElementCallActivity.Host by elementCallActivityHost {
@@ -58,7 +60,9 @@ class ElementXApplication private constructor(
             initializeComponent(CrashInitializer::class.java)
             initializeComponent(PlatformInitializer::class.java)
             initializeComponent(CacheCleanerInitializer::class.java)
+            initializeComponent(ScInitializer::class.java) // SC
         }
+        EmojiCompat.init(BundledEmojiCompatConfig(this)) // SC
 
         bindings<ApplicationBindings>().inject(this)
         elementCallActivityHost.bind { bindings<AppBindings>().nativeCallScreenHost() }

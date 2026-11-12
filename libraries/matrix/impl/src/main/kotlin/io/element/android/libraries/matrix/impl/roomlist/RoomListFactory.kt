@@ -13,6 +13,7 @@ import io.element.android.libraries.matrix.api.roomlist.RoomList
 import io.element.android.libraries.matrix.api.roomlist.RoomListFilter
 import io.element.android.libraries.matrix.api.roomlist.RoomListFilter.Companion.all
 import io.element.android.libraries.matrix.api.roomlist.RoomSummary
+import io.element.android.libraries.matrix.api.roomlist.ScSdkInboxSettings
 import io.element.android.services.analytics.api.AnalyticsLongRunningTransaction
 import io.element.android.services.analytics.api.AnalyticsService
 import io.element.android.services.analytics.api.finishLongRunningTransaction
@@ -42,6 +43,10 @@ internal class RoomListFactory(
         coroutineContext: CoroutineContext,
         coroutineScope: CoroutineScope,
         initialFilter: RoomListFilter = all(),
+        // SC start
+        isSpaceList: Boolean = false,
+        initialInboxSettings: ScSdkInboxSettings? = null,
+        // SC end
         innerProvider: suspend () -> InnerRoomList
     ): DynamicRoomList {
         val loadingStateFlow: MutableStateFlow<RoomList.LoadingState> = MutableStateFlow(RoomList.LoadingState.NotLoaded)
@@ -52,6 +57,7 @@ internal class RoomListFactory(
             summaries = summariesFlow,
             loadingState = loadingStateFlow,
             processor = processor,
+            isSpaceList = isSpaceList, // SC
             pageSize = pageSize,
             initialFilter = initialFilter,
         )
@@ -63,7 +69,8 @@ internal class RoomListFactory(
             innerRoomList.let { innerRoomList ->
                 innerRoomList.entriesFlow(
                     pageSize = pageSize,
-                    initialFilterKind = RoomListFilterMapper.toRustFilter(initialFilter),
+                    initialFilterKind = RoomListFilterMapper.toRustFilter(initialFilter, isSpaceList),
+                    initialInboxSettings = initialInboxSettings,
                     onControllerCreated = { controller ->
                         dynamicRoomList.onControllerCreated(controller, initialFilter)
                     },

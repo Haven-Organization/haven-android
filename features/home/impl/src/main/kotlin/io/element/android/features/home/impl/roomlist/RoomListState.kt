@@ -9,7 +9,10 @@
 package io.element.android.features.home.impl.roomlist
 
 import androidx.compose.runtime.Immutable
+import chat.schildi.features.home.spaces.SpaceListDataSource
+import chat.schildi.features.home.spaces.SpaceUnreadCountsDataSource
 import io.element.android.features.home.impl.filters.RoomListFiltersState
+import io.element.android.features.home.impl.isShowingUpstreamSpaceList
 import io.element.android.features.home.impl.model.RoomListRoomSummary
 import io.element.android.features.home.impl.search.GlobalSearchState
 import io.element.android.features.home.impl.search.RoomListSearchState
@@ -20,7 +23,10 @@ import io.element.android.libraries.fullscreenintent.api.FullScreenIntentPermiss
 import io.element.android.libraries.matrix.api.core.RoomId
 import io.element.android.libraries.push.api.battery.BatteryOptimizationState
 import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.ImmutableMap
 import kotlinx.collections.immutable.ImmutableSet
+import kotlinx.collections.immutable.persistentListOf
+import kotlinx.collections.immutable.persistentMapOf
 
 data class RoomListState(
     val contextMenu: ContextMenu,
@@ -36,7 +42,7 @@ data class RoomListState(
     val canReportRoom: Boolean,
     val eventSink: (RoomListEvent) -> Unit,
 ) {
-    val displayFilters = contentState is RoomListContentState.Rooms
+    val displayFilters = contentState is RoomListContentState.Rooms && !isShowingUpstreamSpaceList()
 
     sealed interface ContextMenu {
         data object Hidden : ContextMenu
@@ -45,6 +51,7 @@ data class RoomListState(
             val roomName: String?,
             val isDm: Boolean,
             val isFavorite: Boolean,
+            val isLowPriority: Boolean = false, // SC
             val hasNewContent: Boolean,
         ) : ContextMenu
     }
@@ -76,6 +83,11 @@ sealed interface RoomListContentState {
         val showSwipeAvatarBanner: Boolean,
         val showUnreadCount: Boolean,
         val summaries: ImmutableList<RoomListRoomSummary>,
+        // SC additions
+        val spacesList: ImmutableList<SpaceListDataSource.AbstractSpaceHierarchyItem> = persistentListOf(),
+        val spaceSelectionHierarchy: ImmutableList<String> = persistentListOf(),
+        val totalUnreadCounts: SpaceUnreadCountsDataSource.SpaceUnreadCounts? = null,
+        // SC additions end
         val seenRoomInvites: ImmutableSet<RoomId>,
         val showAllActivity: Boolean,
     ) : RoomListContentState

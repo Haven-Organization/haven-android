@@ -30,6 +30,8 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.LocalFocusManager
@@ -38,6 +40,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import chat.schildi.lib.preferences.ScPrefs
+import chat.schildi.lib.preferences.value
 import io.element.android.compound.theme.ElementTheme
 import io.element.android.compound.tokens.generated.CompoundIcons
 import io.element.android.libraries.architecture.coverage.ExcludeFromCoverage
@@ -59,6 +63,7 @@ fun <T> SearchBar(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     showBackButton: Boolean = true,
+    focusRequester: FocusRequester = remember { FocusRequester() }, // SC
     resultState: SearchBarResultState<T> = SearchBarResultState.Initial,
     shape: Shape = SearchBarDefaults.inputFieldShape,
     tonalElevation: Dp = SearchBarDefaults.TonalElevation,
@@ -85,6 +90,7 @@ fun <T> SearchBar(
     SearchBar(
         inputField = {
             SearchBarDefaults.InputField(
+                modifier = Modifier.focusRequester(focusRequester), // SC
                 state = queryState,
                 onSearch = { focusManager.clearFocus() },
                 expanded = active,

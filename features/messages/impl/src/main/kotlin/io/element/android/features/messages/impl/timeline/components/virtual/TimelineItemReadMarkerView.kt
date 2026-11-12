@@ -17,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import chat.schildi.theme.ScTheme
 import io.element.android.compound.theme.ElementTheme
 import io.element.android.features.messages.impl.R
 import io.element.android.libraries.designsystem.preview.ElementPreview
@@ -38,13 +39,14 @@ internal fun TimelineItemReadMarkerView(
         Text(
             text = stringResource(id = R.string.screen_room_timeline_read_marker_title).uppercase(),
             style = ElementTheme.typography.fontBodySmMedium,
-            color = ElementTheme.colors.textActionAccent,
+            color = ScTheme.exposures.unreadIndicatorLine ?: ElementTheme.colors.textActionAccent,
         )
         HorizontalDivider(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 2.dp),
-            color = ElementTheme.colors.textActionAccent,
+            color = ScTheme.exposures.unreadIndicatorLine ?: ElementTheme.colors.textActionAccent,
+            thickness = ScTheme.exposures.unreadIndicatorThickness,
         )
     }
 }

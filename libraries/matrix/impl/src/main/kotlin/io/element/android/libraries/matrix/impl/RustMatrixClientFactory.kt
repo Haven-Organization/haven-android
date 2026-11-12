@@ -198,7 +198,7 @@ class RustMatrixClientFactory(
                     this
                 }
             }
-            .dmRoomDefinition(DmRoomDefinition.TWO_MEMBERS)
+            .dmRoomDefinition(DmRoomDefinition.MATRIX_SPEC) // SC; upstream uses TWO_MEMBERS
             .requestConfig(
                 RequestConfig(
                     timeout = 30_000uL,

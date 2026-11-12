@@ -303,6 +303,10 @@ fun RoomDetailsView(
                         state.eventSink(RoomDetailsEvent.SetFavorite(it))
                     }
                 )
+
+                // SC: low priority item, if sorting by low priority is enabled
+                LowPriorityItem(state.isLowPriority) { state.eventSink(RoomDetailsEvent.SetLowPriority(it)) }
+
                 if (state.canShowSecurityAndPrivacy && state.roomType is RoomDetailsType.Room) {
                     SecurityAndPrivacyItem(
                         onClick = onSecurityAndPrivacyClick
@@ -364,7 +368,7 @@ private fun RoomDetailsTopBar(
     var showMenu by remember { mutableStateOf(false) }
 
     TopAppBar(
-        title = { },
+        //title = { },
         navigationIcon = { BackButton(onClick = goBack) },
         actions = {
             if (showEdit) {

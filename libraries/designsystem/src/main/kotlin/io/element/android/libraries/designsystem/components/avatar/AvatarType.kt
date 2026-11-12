@@ -9,6 +9,7 @@
 package io.element.android.libraries.designsystem.components.avatar
 
 import androidx.compose.runtime.Immutable
+import androidx.compose.ui.graphics.Shape
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 
@@ -24,4 +25,6 @@ sealed interface AvatarType {
     data class Space(
         val isTombstoned: Boolean = false,
     ) : AvatarType
+
+    data class Sc(val shape: Shape) : AvatarType
 }

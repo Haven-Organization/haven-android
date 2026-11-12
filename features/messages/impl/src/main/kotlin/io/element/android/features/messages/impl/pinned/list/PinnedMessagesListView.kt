@@ -304,6 +304,9 @@ private fun PinnedMessagesListLoaded(
         onSelectEmoji = { eventOrTransactionId, emoji ->
             state.eventSink(PinnedMessagesListEvent.ToggleReaction(emoji.unicode, eventOrTransactionId))
         },
+        onSelectCustomEmoji = { eventOrTransactionId, emoji ->
+            state.eventSink(PinnedMessagesListEvent.ToggleReaction(emoji, eventOrTransactionId))
+        },
         emojiPickerRenderer = emojiPickerRenderer,
     )
     ReactionSummaryView(state = state.reactionSummaryState)
@@ -317,7 +320,7 @@ private fun TimelineItemEventContentViewWrapper(
     onGalleryItemClick: (index: Int) -> Unit,
     onLinkClick: (Link) -> Unit,
     onLinkLongClick: (Link) -> Unit,
-    onLongClick: (() -> Unit)?,
+    onLongClick: () -> Unit, // SC: non-null
     onContentLayoutChange: (ContentAvoidingLayoutData) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -331,6 +334,7 @@ private fun TimelineItemEventContentViewWrapper(
         TimelineItemEventContentView(
             eventId = event.eventId,
             content = event.content,
+            debugInfoProvider = event.timelineItemDebugInfoProvider, // SC
             timelineProtectionState = timelineProtectionState,
             onGalleryItemClick = onGalleryItemClick,
             onLinkClick = onLinkClick,

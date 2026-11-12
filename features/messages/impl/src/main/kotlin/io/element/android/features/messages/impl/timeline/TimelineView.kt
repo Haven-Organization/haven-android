@@ -79,6 +79,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
+import chat.schildi.lib.preferences.ScPrefs.FLOATING_DATE
+import chat.schildi.lib.preferences.value
+import chat.schildi.timeline.FloatingDateHeader
 import io.element.android.compound.theme.ElementTheme
 import io.element.android.compound.tokens.generated.CompoundIcons
 import io.element.android.features.messages.impl.crypto.sendfailure.resolve.ResolveVerifiedUserSendFailureView
@@ -122,6 +125,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.transform
 import kotlinx.coroutines.launch
 import timber.log.Timber
+import kotlin.math.min
 import kotlin.time.Duration.Companion.milliseconds
 
 @Composable
@@ -150,8 +154,15 @@ fun TimelineView(
         state.eventSink(TimelineEvent.ClearFocusRequestState)
     }
 
-    fun onScrollFinishAt(firstVisibleIndex: Int) {
+    fun onScrollFinishAt(firstVisibleIndex: Int, visibleItemCount: Int) {
         state.eventSink(TimelineEvent.OnScrollFinished(firstVisibleIndex))
+        val timeline = state.timelineItems
+        val firstVisibleTimelineIndex = effectiveVisibleTimelineItemIndex(firstVisibleIndex)
+        if (firstVisibleTimelineIndex < timeline.size &&
+            timeline.subList(firstVisibleTimelineIndex, min(timeline.size-1, firstVisibleTimelineIndex+visibleItemCount))
+                .any { it.contentType() == "TimelineItemReadMarkerModel" }) {
+            state.eventSink(TimelineEvent.OnUnreadLineVisible)
+        }
     }
 
     fun onFocusEventRender() {
@@ -288,6 +299,10 @@ fun TimelineView(
                     onFocusOnEvent = ::onFocusOnEvent,
                 )
 
+            if (FLOATING_DATE.value()) {
+                // The SC variant - upstream added theirs later
+                FloatingDateHeader(lazyListState, state.timelineItems)
+            } else { // SC wrong indention start
                 FloatingDateBadgeOverlay(
                     lazyListState = lazyListState,
                     timelineItems = state.timelineItems,
@@ -295,6 +310,7 @@ fun TimelineView(
                     topOffset = floatingDateTopOffset,
                 )
             }
+            } // SC wrong indention end
         }
     }
 
@@ -372,7 +388,7 @@ private fun BoxScope.TimelineScrollHelper(
     focusRequestState: FocusRequestState,
     displayJumpToUnread: Boolean,
     jumpToUnread: JumpToUnreadState,
-    onScrollFinishAt: (Int) -> Unit,
+    onScrollFinishAt: (Int, Int) -> Unit,
     onJumpToLive: () -> Unit,
     onFocusEventRender: () -> Unit,
     onMarkAllAsRead: () -> Unit,
@@ -463,11 +479,12 @@ private fun BoxScope.TimelineScrollHelper(
         }
     }
 
-    val latestOnScrollFinishAt by rememberUpdatedState(onScrollFinishAt)
+    //val latestOnScrollFinishAt by rememberUpdatedState(onScrollFinishAt)
     LaunchedEffect(isScrollFinished, hasAnyEvent) {
         if (isScrollFinished && hasAnyEvent) {
             // Notify the parent composable about the first visible item index when scrolling finishes
-            latestOnScrollFinishAt(lazyListState.firstVisibleItemIndex)
+            //latestOnScrollFinishAt(lazyListState.firstVisibleItemIndex)
+            onScrollFinishAt(lazyListState.firstVisibleItemIndex, lazyListState.layoutInfo.visibleItemsInfo.size)
         }
     }
 

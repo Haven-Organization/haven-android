@@ -72,6 +72,7 @@ class DefaultElementClassicConnection(
     private val coroutineScope: CoroutineScope,
     private val matrixAuthenticationService: MatrixAuthenticationService,
     private val homeServerLoginCompatibilityChecker: HomeServerLoginCompatibilityChecker,
+    private val scLegacyPackageProvider: ScLegacyPackageProvider,
     private val dispatchers: CoroutineDispatchers,
 ) : ElementClassicConnection {
     // Messenger for communicating with the service.
@@ -87,7 +88,7 @@ class DefaultElementClassicConnection(
     override val stateFlow = mutableStateFlow.asStateFlow()
 
     private val elementClassicComponent = ComponentName(
-        BuildConfig.elementClassicPackage,
+        scLegacyPackageProvider.get(),
         ELEMENT_CLASSIC_SERVICE_FULL_CLASS_NAME,
     )
 

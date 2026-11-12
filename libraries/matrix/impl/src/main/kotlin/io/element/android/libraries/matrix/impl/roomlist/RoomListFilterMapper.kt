@@ -47,12 +47,18 @@ internal object RoomListFilterMapper {
         DeduplicateVersions
     )
 
+    private val SC_SPACE_RUST_BASE_FILTERS = listOf(
+        NonLeft,
+        Space,
+        DeduplicateVersions,
+    )
+
     /**
      * Converts a RoomListFilter to a Rust SDK RoomListEntriesDynamicFilterKind.
      * Applies base filters along with the provided filter.
      */
-    fun toRustFilter(filter: RoomListFilter): RoomListEntriesDynamicFilterKind {
-        return All(RUST_BASE_FILTERS + mapFilter(filter))
+    fun toRustFilter(filter: RoomListFilter, isSpaceList: Boolean): RoomListEntriesDynamicFilterKind {
+        return All((if (isSpaceList) SC_SPACE_RUST_BASE_FILTERS else RUST_BASE_FILTERS) + mapFilter(filter))
     }
 
     /**

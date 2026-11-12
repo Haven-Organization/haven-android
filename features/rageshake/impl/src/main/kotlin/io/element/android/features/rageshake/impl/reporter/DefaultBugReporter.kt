@@ -12,6 +12,10 @@ import android.content.Context
 import android.os.Build
 import androidx.core.net.toFile
 import androidx.core.net.toUri
+import chat.schildi.lib.preferences.ScAppStateStore
+import chat.schildi.lib.preferences.ScPreferencesStore
+import chat.schildi.lib.preferences.ScPrefs
+import chat.schildi.lib.preferences.collectScPrefs
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.SingleIn
@@ -51,10 +55,13 @@ import java.io.File
 import java.io.IOException
 import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
+import java.net.URL
+import java.text.SimpleDateFormat
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
+import java.util.Date
 import java.util.Locale
 
 /**
@@ -74,6 +81,8 @@ class DefaultBugReporter(
     private val sessionStore: SessionStore,
     private val buildMeta: BuildMeta,
     private val bugReporterUrlProvider: BugReporterUrlProvider,
+    private val scAppStateStore: ScAppStateStore,
+    private val scPreferencesStore: ScPreferencesStore,
     private val sdkMetadata: SdkMetadata,
     private val matrixClientProvider: MatrixClientProvider,
 ) : BugReporter {
@@ -133,7 +142,7 @@ class DefaultBugReporter(
                     }
                     if (crashCallStack.isNotEmpty() && withCrashLogs) {
                         append("\n\n\n\n--------------------------------- crash call stack ---------------------------------\n")
-                        append(crashCallStack)
+                        append(crashCallStack.take(5000))
                     }
                 }.truncateDescription()
                 val gzippedFiles = mutableListOf<File>()
@@ -175,7 +184,7 @@ class DefaultBugReporter(
                     // Nightly versions have a custom version name suffix that we should remove for the bug report
                     .addFormDataPart("Version", buildMeta.versionName.replace("-nightly", ""))
                     .addFormDataPart("label", buildMeta.versionName)
-                    .addFormDataPart("label", buildMeta.flavorDescription)
+                    //.addFormDataPart("label", buildMeta.flavorDescription)
                     .addFormDataPart("branch_name", buildMeta.gitBranchName)
 
                 userId?.let {
@@ -203,6 +212,48 @@ class DefaultBugReporter(
                         }
                     }
                 }
+
+                // SC additions
+                val reportTime = SimpleDateFormat("yyyy-MM-dd HH:mm:ss ZZZ", Locale.US).format(Date())
+                /*
+                val enabledDebugSettings = DbgUtil.ALL_PREFS.filter { DbgUtil.isDbgEnabled(it) }
+                builder.addFormDataPart("enabledDebugSettings", enabledDebugSettings.joinToString().ensureNonEmpty())
+                    .addFormDataPart("experimentalSettingsEnabled", vectorPreferences.getEnabledExperimentalSettings().joinToString().ensureNonEmpty())
+                    .addFormDataPart("experimentalSettingsDisabled", vectorPreferences.getDisabledExperimentalSettings().joinToString().ensureNonEmpty())
+                 */
+                builder
+                    .addFormDataPart("reportTime", reportTime)
+                    .addFormDataPart("packageName", buildMeta.applicationId)
+                    .addFormDataPart("is_debug_build", buildMeta.isDebuggable.toString())
+                if (buildMeta.isDebuggable) {
+                    builder.addFormDataPart("label", "debug_build")
+                }
+                if (canContact) {
+                    builder.addFormDataPart("label", "can contact")
+                }
+                builder.addFormDataPart("label", "hs:${userId?.value?.substringAfter(":")}")
+                builder.addFormDataPart("label", "mxid:${userId?.value}")
+                builder.addFormDataPart("up_last_push", scAppStateStore.formatLastPushTs())
+                builder.addFormDataPart("up_provider", scAppStateStore.lastPushProvider())
+                builder.addFormDataPart("up_gateway", scAppStateStore.lastPushGateway())
+                builder.addFormDataPart("up_distributor", scAppStateStore.lastPushDistributor().toString())
+                val gatewayHost = tryOrNull { URL(scAppStateStore.lastPushGateway()).host }
+                builder.addFormDataPart("label", "up:gateway:$gatewayHost")
+                builder.addFormDataPart("label", "up:distributor:${scAppStateStore.lastPushDistributorName()}")
+                // Device characteristics
+                context.resources.displayMetrics.apply {
+                    builder.addFormDataPart("device_density", density.toString())
+                        .addFormDataPart("device_width_px", widthPixels.toString())
+                        .addFormDataPart("device_height_px", heightPixels.toString())
+                        .addFormDataPart("device_width_dp", (widthPixels/density).toString())
+                        .addFormDataPart("device_height_dp", (heightPixels/density).toString())
+                }
+                // Non-default SC settings
+                val changedScSettings = ScPrefs.scTweaks.prefs.collectScPrefs {
+                    scPreferencesStore.getCachedOrDefaultValue(it) != it.defaultValue
+                }
+                val scPrefsString = changedScSettings.joinToString(separator = ",") { "${it.sKey}=${scPreferencesStore.getCachedOrDefaultValue(it)}" }
+                builder.addFormDataPart("sc_preferences", scPrefsString)
 
                 if (withDevicesLogs) {
                     val files = getLogFiles().sortedByDescending { it.lastModified() }
@@ -477,5 +528,14 @@ class DefaultBugReporter(
             take(RageshakeConfig.MAX_DESCRIPTION_SIZE) +
                 "\n\n--------------------------------- truncated, see the attached logs ---------------------------------"
         }
+    }
+}
+
+fun String?.ensureNonEmpty(fallback: String = "∅"): String {
+    return if (isNullOrEmpty()) {
+        // GitHub markdown format doesn't like empty code blocks
+        fallback
+    } else {
+        this
     }
 }

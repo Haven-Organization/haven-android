@@ -21,10 +21,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import chat.schildi.lib.compose.thenIf
 import io.element.android.compound.theme.ElementTheme
 import io.element.android.features.messages.impl.timeline.LocalTimelineEventRendererConfig
 import io.element.android.features.messages.impl.timeline.TimelineEvent
@@ -39,6 +41,7 @@ import io.element.android.features.messages.impl.timeline.model.event.TimelineIt
 import io.element.android.features.messages.impl.timeline.model.event.TimelineItemImageContent
 import io.element.android.features.messages.impl.timeline.model.event.TimelineItemLegacyCallInviteContent
 import io.element.android.features.messages.impl.timeline.model.event.TimelineItemLocationContent
+import io.element.android.features.messages.impl.timeline.model.event.TimelineItemNoticeContent
 import io.element.android.features.messages.impl.timeline.model.event.TimelineItemPollContent
 import io.element.android.features.messages.impl.timeline.model.event.TimelineItemRedactedContent
 import io.element.android.features.messages.impl.timeline.model.event.TimelineItemRtcNotificationContent
@@ -59,6 +62,7 @@ import io.element.android.libraries.designsystem.components.EqualWidthColumn
 import io.element.android.libraries.htmlrenderer.api.DocumentNode
 import io.element.android.libraries.htmlrenderer.api.ui.HtmlMessageContent
 import io.element.android.libraries.matrix.api.core.EventId
+import io.element.android.libraries.matrix.api.timeline.item.event.TimelineItemDebugInfoProvider
 import io.element.android.libraries.matrix.ui.media.contentvalidation.ContentValidationState
 import io.element.android.libraries.matrix.ui.media.contentvalidation.InvalidContentView
 import io.element.android.libraries.matrix.ui.media.contentvalidation.NotFoundContentView
@@ -75,10 +79,11 @@ import io.element.android.wysiwyg.link.Link
 fun TimelineItemEventContentView(
     eventId: EventId?,
     content: TimelineItemEventContent,
+    debugInfoProvider: TimelineItemDebugInfoProvider?, // SC
     onContentClick: (() -> Unit)?,
     onGalleryItemClick: ((Int) -> Unit),
     timelineProtectionState: TimelineProtectionState,
-    onLongClick: (() -> Unit)?,
+    onLongClick:(() -> Unit), // SC: non-null
     onLinkClick: (Link) -> Unit,
     onLinkLongClick: (Link) -> Unit,
     eventSink: (TimelineEvent.TimelineItemEvent) -> Unit,
@@ -151,8 +156,14 @@ fun TimelineItemEventContentView(
                     onLinkClick = onLinkClick,
                     onLinkLongClick = onLinkLongClick,
                     onContentLayoutChange = calculatedOnContentLayoutChange,
+                    modifier = Modifier.thenIf(content is TimelineItemNoticeContent) { alpha(0.65f) }, // SC
                 )
-                is TimelineItemUnknownContent -> TimelineItemUnknownView(
+                is TimelineItemUnknownContent -> ScTimelineItemUnknownView(
+                    content = content,
+                    debugInfoProvider = debugInfoProvider, // SC
+                    onContentLayoutChange = calculatedOnContentLayoutChange,
+                )
+                is TimelineItemLocationContent -> ScTimelineItemLocationView(
                     content = content,
                     onContentLayoutChange = calculatedOnContentLayoutChange,
                 )
@@ -252,6 +263,7 @@ fun TimelineItemEventContentView(
             }
             CaptionView(
                 modifier = Modifier.padding(padding),
+                content = content, // SC
                 caption = caption,
                 formattedCaption = content.formattedCaptionOrNull(),
                 captionTree = content.captionTreeOrNull(),
@@ -265,6 +277,7 @@ fun TimelineItemEventContentView(
 
 @Composable
 private fun CaptionView(
+    content: TimelineItemEventContent, // SC
     caption: String,
     formattedCaption: CharSequence?,
     captionTree: DocumentNode?,
@@ -273,6 +286,7 @@ private fun CaptionView(
     onContentLayoutChange: (ContentAvoidingLayoutData) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    if (scRenderTimelineItemCaption(content, onLinkLongClick, modifier, onContentLayoutChange)) return // SC
     // When the new timeline event renderer is enabled and the caption has a parsed tree, render it
     // natively with Compose. Otherwise fall back to the legacy rich text editor view below.
     if (LocalTimelineEventRendererConfig.current.isComposeRendererEnabled && captionTree != null) {

@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.material3.MaterialTheme
@@ -42,8 +43,11 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
+import chat.schildi.lib.preferences.ScPrefs
+import chat.schildi.lib.preferences.value
 import io.element.android.compound.tokens.generated.CompoundIcons
 import io.element.android.features.home.impl.components.RoomSummaryRow
+import io.element.android.features.home.impl.components.ScRoomSummaryRow
 import io.element.android.features.home.impl.contentType
 import io.element.android.features.home.impl.model.RoomListRoomSummary
 import io.element.android.features.home.impl.roomlist.RoomListEvent
@@ -174,10 +178,21 @@ private fun RoomListSearchContent(
                 modifier = Modifier.weight(1f),
                 contentPadding = WindowInsets.navigationBars.asPaddingValues(),
             ) {
-                items(
+                itemsIndexed(
                     items = state.results,
-                    contentType = { room -> room.contentType() },
-                ) { room ->
+                    contentType = { _, room -> room.contentType() },
+                ) { index, room ->
+                    if (ScPrefs.SC_OVERVIEW_LAYOUT.value()) {
+                        ScRoomSummaryRow(
+                            room = room,
+                            hideInviteAvatars = hideInvitesAvatars,
+                            isInviteSeen = false, // Same TODO as upstream
+                            onClick = ::onRoomClick,
+                            eventSink = eventSink,
+                            isLastIndex = index == state.results.lastIndex,
+                        )
+                        return@itemsIndexed
+                    }
                     RoomSummaryRow(
                         room = room,
                         hideInviteAvatars = hideInvitesAvatars,

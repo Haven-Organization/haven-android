@@ -12,6 +12,7 @@ import android.app.Activity
 import androidx.activity.compose.LocalActivity
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import chat.schildi.lib.preferences.ScPrefScreen
 import com.bumble.appyx.core.modality.BuildContext
 import com.bumble.appyx.core.node.Node
 import com.bumble.appyx.core.plugin.Plugin
@@ -41,6 +42,7 @@ class PreferencesRootNode(
         fun navigateToAbout()
         fun navigateToDeveloperSettings()
         fun navigateToLockScreenSettings()
+        fun navigateToScTweaks(scPrefScreen: ScPrefScreen?) // SC
         fun navigateToMediaSettings()
         fun navigateToLocationSettings()
         fun navigateToLabs()
@@ -81,6 +83,7 @@ class PreferencesRootNode(
             onOpenMediaSettings = callback::navigateToMediaSettings,
             onOpenLocationSettings = callback::navigateToLocationSettings,
             onOpenLabs = callback::navigateToLabs,
+            navigateToScTweaks = callback::navigateToScTweaks,
             onOpenLockScreenSettings = callback::navigateToLockScreenSettings,
             onOpenRageShake = callback::navigateToBugReport,
             onSecureBackupClick = callback::navigateToSecureBackup,

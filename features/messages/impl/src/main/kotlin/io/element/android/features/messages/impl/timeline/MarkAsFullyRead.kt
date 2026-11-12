@@ -14,11 +14,12 @@ import io.element.android.libraries.di.SessionScope
 import io.element.android.libraries.matrix.api.MatrixClient
 import io.element.android.libraries.matrix.api.core.EventId
 import io.element.android.libraries.matrix.api.core.RoomId
+import io.element.android.libraries.matrix.api.timeline.ReceiptType
 import kotlinx.coroutines.withContext
 import timber.log.Timber
 
 interface MarkAsFullyRead {
-    suspend operator fun invoke(roomId: RoomId, eventId: EventId): Result<Unit>
+    suspend operator fun invoke(roomId: RoomId, eventId: EventId, withReadReceipt: ReceiptType?): Result<Unit>
 }
 
 @ContributesBinding(SessionScope::class)
@@ -26,8 +27,8 @@ class DefaultMarkAsFullyRead(
     private val matrixClient: MatrixClient,
     private val coroutineDispatchers: CoroutineDispatchers,
 ) : MarkAsFullyRead {
-    override suspend fun invoke(roomId: RoomId, eventId: EventId): Result<Unit> = withContext(coroutineDispatchers.io) {
-        matrixClient.markRoomAsFullyRead(roomId, eventId).onFailure {
+    override suspend fun invoke(roomId: RoomId, eventId: EventId, withReadReceipt: ReceiptType?): Result<Unit> = withContext(coroutineDispatchers.io) {
+        matrixClient.markRoomAsFullyRead(roomId, eventId, withReadReceipt).onFailure {
             Timber.e(it, "Failed to mark room $roomId as fully read for event $eventId")
         }
     }

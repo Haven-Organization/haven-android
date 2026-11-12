@@ -12,12 +12,15 @@ import io.element.android.libraries.matrix.api.core.EventId
 import io.element.android.libraries.matrix.api.core.RoomAlias
 import io.element.android.libraries.matrix.api.core.RoomId
 import io.element.android.libraries.matrix.api.core.UserId
+import io.element.android.libraries.matrix.api.room.BridgeState
 import io.element.android.libraries.matrix.api.room.CurrentUserMembership
 import io.element.android.libraries.matrix.api.room.RoomInfo
 import io.element.android.libraries.matrix.api.room.RoomNotificationMode
 import io.element.android.libraries.matrix.api.room.powerlevels.RoomPowerLevels
 import io.element.android.libraries.matrix.api.user.DisplayedStatus
 import io.element.android.libraries.matrix.api.user.MatrixUser
+import io.element.android.libraries.matrix.impl.mapRustBridgeState
+import io.element.android.libraries.matrix.impl.mapRustSpaceCatchAll
 import io.element.android.libraries.matrix.impl.room.history.map
 import io.element.android.libraries.matrix.impl.room.join.map
 import io.element.android.libraries.matrix.impl.room.member.RoomMemberMapper
@@ -74,6 +77,15 @@ class RoomInfoMapper {
             numUnreadMessages = it.numUnreadMessages.toLong(),
             numUnreadMentions = it.numUnreadMentions.toLong(),
             numUnreadNotifications = it.numUnreadNotifications.toLong(),
+            // SC start
+            privateRoomName = it.privateRoomName,
+            spaceChildren = it.spaceChildren.map(MatrixSpaceChildInfoMapper::map),
+            spaceCatchAll = it.spaceCatchAll?.let(::mapRustSpaceCatchAll),
+            canUserManageSpaces = it.canUserManageSpaces,
+            unreadCount = it.unreadCount.toLong(),
+            bridgeState = it.bridgeStates.map(::mapRustBridgeState),
+            unreadCountUnderestimate = it.hasIncompleteUnreadCount,
+            // SC end
             historyVisibility = it.historyVisibility.map(),
             successorRoom = it.successorRoom?.map(),
             roomVersion = it.roomVersion,

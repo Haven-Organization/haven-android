@@ -8,6 +8,7 @@
 
 package io.element.android.libraries.matrix.api.room
 
+import chat.schildi.matrixsdk.ScTimelineFilterSettings
 import io.element.android.libraries.matrix.api.core.DeviceId
 import io.element.android.libraries.matrix.api.core.EventId
 import io.element.android.libraries.matrix.api.core.RoomAlias
@@ -71,6 +72,7 @@ interface JoinedRoom : BaseRoom {
      */
     suspend fun createTimeline(
         createTimelineParams: CreateTimelineParams,
+        scTimelineFilterSettings: ScTimelineFilterSettings = ScTimelineFilterSettings(),
     ): Result<Timeline>
 
     /**
@@ -106,6 +108,8 @@ interface JoinedRoom : BaseRoom {
 
     /** Removes the avatar of the room. */
     suspend fun removeAvatar(): Result<Unit>
+
+    suspend fun setAvatarUrl(url: String): Result<Unit> // SC
 
     /**
      * Refreshes [roomNotificationSettingsStateFlow], which moves to a pending state and then to a ready or error state.

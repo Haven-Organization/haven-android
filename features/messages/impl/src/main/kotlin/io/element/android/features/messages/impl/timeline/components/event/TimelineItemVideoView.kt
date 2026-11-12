@@ -35,6 +35,10 @@ import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
+import chat.schildi.lib.compose.thenIf
+import chat.schildi.lib.preferences.ScPrefs
+import chat.schildi.lib.preferences.value
+import chat.schildi.theme.scBubbleFont
 import coil3.compose.AsyncImage
 import io.element.android.compound.tokens.generated.CompoundIcons
 import io.element.android.features.messages.impl.timeline.model.event.TimelineItemVideoContent

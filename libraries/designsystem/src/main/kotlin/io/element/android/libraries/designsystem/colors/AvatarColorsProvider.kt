@@ -15,6 +15,7 @@ import io.element.android.compound.theme.avatarColors
 object AvatarColorsProvider {
     @Composable
     fun provide(id: String): AvatarColors {
+        scAvatarColors(id)?.let { return it }
         return avatarColors().let { colors ->
             colors[id.toHash(colors.size)]
         }

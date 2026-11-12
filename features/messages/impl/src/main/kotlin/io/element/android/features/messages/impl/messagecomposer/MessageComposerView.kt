@@ -36,9 +36,13 @@ internal fun MessageComposerView(
     state: MessageComposerState,
     voiceMessageState: VoiceMessageComposerState,
     modifier: Modifier = Modifier,
+    scBeforeSend: (() -> Unit)? = null,
 ) {
     val view = LocalView.current
     fun sendMessage() {
+        if (scBeforeSend != null) {
+            scBeforeSend()
+        }
         state.eventSink(MessageComposerEvent.SendMessage)
     }
 

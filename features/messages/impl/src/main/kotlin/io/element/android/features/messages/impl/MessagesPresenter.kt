@@ -21,6 +21,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.LifecycleResumeEffect
+import chat.schildi.lib.preferences.ScPreferencesStore
+import chat.schildi.lib.preferences.ScPrefs
 import dev.zacsweers.metro.Assisted
 import dev.zacsweers.metro.AssistedFactory
 import dev.zacsweers.metro.AssistedInject
@@ -85,6 +87,7 @@ import io.element.android.libraries.matrix.api.room.RoomInfo
 import io.element.android.libraries.matrix.api.room.RoomMembersState
 import io.element.android.libraries.matrix.api.room.history.RoomHistoryVisibility
 import io.element.android.libraries.matrix.api.room.powerlevels.permissionsAsState
+import io.element.android.libraries.matrix.api.timeline.ReceiptType
 import io.element.android.libraries.matrix.api.timeline.Timeline
 import io.element.android.libraries.matrix.api.timeline.item.SendTarget
 import io.element.android.libraries.matrix.api.timeline.item.event.EventOrTransactionId
@@ -93,6 +96,7 @@ import io.element.android.libraries.matrix.ui.messages.reply.map
 import io.element.android.libraries.matrix.ui.model.dmUserStatus
 import io.element.android.libraries.matrix.ui.model.getAvatarData
 import io.element.android.libraries.matrix.ui.room.getDirectRoomMember
+import io.element.android.libraries.preferences.api.store.SessionPreferencesStore
 import io.element.android.libraries.textcomposer.model.MessageComposerMode
 import io.element.android.libraries.ui.strings.CommonStrings
 import io.element.android.services.analytics.api.AnalyticsService
@@ -100,6 +104,7 @@ import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -135,6 +140,8 @@ class MessagesPresenter(
     private val featureFlagService: FeatureFlagService,
     private val addRecentEmoji: AddRecentEmoji,
     private val markAsFullyRead: MarkAsFullyRead,
+    private val sessionPreferencesStore: SessionPreferencesStore, // SC
+    private val scPreferencesStore: ScPreferencesStore, // SC
     private val liveLocationShareManager: ActiveLiveLocationShareManager,
     @SessionCoroutineScope private val sessionCoroutineScope: CoroutineScope,
 ) : Presenter<MessagesState> {
@@ -310,13 +317,34 @@ class MessagesPresenter(
                 }
                 is MessagesEvent.MarkAsFullyReadAndExit -> if (!markingAsReadAndExiting.getAndSet(true)) {
                     coroutineScope.launch {
-                        val latestEventId = room.liveTimeline.getLatestEventId().getOrElse {
+                        val syncMarkers = scPreferencesStore.getSetting(ScPrefs.SYNC_READ_RECEIPT_AND_MARKER)
+                        val requireFullyRead = scPreferencesStore.getSetting(ScPrefs.MARK_READ_REQUIRES_SEEN_UNREAD_LINE)
+                        if (requireFullyRead && !event.scReadState.sawUnreadLine.value) {
+                            navigator.close()
+                            return@launch
+                        }
+                        val latestEventId = event.scReadState.readMarkerToSet.value ?: if (syncMarkers) null else room.liveTimeline.getLatestEventId().getOrElse {
                             Timber.w(it, "Failed to get latest event id to mark as fully read")
                             null
                         }
                         latestEventId?.let { eventId ->
                             sessionCoroutineScope.launch {
-                                markAsFullyRead(room.roomId, eventId)
+                                // SC start
+                                if (syncMarkers) {
+                                    val isSendPublicReadReceiptsEnabled =
+                                        sessionPreferencesStore.isSendPublicReadReceiptsEnabled().first()
+                                    markAsFullyRead(
+                                        room.roomId,
+                                        eventId,
+                                        if (isSendPublicReadReceiptsEnabled)
+                                            ReceiptType.READ
+                                        else
+                                            ReceiptType.READ_PRIVATE,
+                                    )
+                                    return@launch
+                                }
+                                // SC end
+                                markAsFullyRead(room.roomId, eventId, null)
                             }
                         }
                         navigator.close()
@@ -329,7 +357,7 @@ class MessagesPresenter(
 
         return MessagesState(
             roomId = room.roomId,
-            roomName = roomInfo.name,
+            roomName = roomInfo.scRoomDisplayNameOverride() ?: roomInfo.name,
             roomAvatar = roomAvatar,
             heroes = heroes,
             userEventPermissions = userEventPermissions,
@@ -351,6 +379,8 @@ class MessagesPresenter(
             appName = buildMeta.applicationName,
             pinnedMessagesBannerState = pinnedMessagesBannerState,
             dmUserVerificationState = dmUserVerificationState,
+            isRoomEncrypted = roomInfo.isEncrypted, // SC
+            bridgeState = roomInfo.bridgeState.toImmutableList(), // SC
             dmUserStatus = roomInfo.dmUserStatus(),
             roomMemberModerationState = roomMemberModerationState,
             topBarSharedHistoryIcon = topBarSharedHistoryIcon,

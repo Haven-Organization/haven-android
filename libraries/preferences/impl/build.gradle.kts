@@ -20,6 +20,7 @@ android {
 setupDependencyInjection()
 
 dependencies {
+    implementation(projects.schildi.lib)
     api(projects.libraries.preferences.api)
     implementation(libs.androidx.datastore.preferences)
     implementation(projects.libraries.androidutils)

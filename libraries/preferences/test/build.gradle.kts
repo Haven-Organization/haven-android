@@ -15,6 +15,7 @@ android {
 }
 
 dependencies {
+    implementation(projects.schildi.lib)
     api(projects.libraries.preferences.api)
     implementation(projects.libraries.matrix.api)
     implementation(projects.tests.testutils)

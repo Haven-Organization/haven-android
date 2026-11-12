@@ -10,6 +10,8 @@ package io.element.android.libraries.push.impl.notifications
 
 import android.app.Notification
 import android.graphics.Bitmap
+import chat.schildi.lib.preferences.ScPreferencesStore
+import chat.schildi.lib.preferences.ScPrefs
 import coil3.ImageLoader
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesBinding
@@ -24,6 +26,7 @@ import io.element.android.libraries.push.impl.notifications.factories.Notificati
 import io.element.android.libraries.push.impl.notifications.factories.isSmartReplyError
 import io.element.android.libraries.push.impl.notifications.model.NotifiableMessageEvent
 import io.element.android.services.toolbox.api.strings.StringProvider
+import kotlinx.coroutines.flow.first
 
 interface RoomGroupMessageCreator {
     suspend fun createRoomMessage(
@@ -38,6 +41,7 @@ interface RoomGroupMessageCreator {
 
 @ContributesBinding(AppScope::class)
 class DefaultRoomGroupMessageCreator(
+    private val scPreferencesStore: ScPreferencesStore,
     private val bitmapLoader: NotificationBitmapLoader,
     private val stringProvider: StringProvider,
     private val notificationCreator: NotificationCreator,
@@ -84,6 +88,7 @@ class DefaultRoomGroupMessageCreator(
             largeIcon = largeBitmap,
             lastMessageTimestamp = lastMessageTimestamp,
             tickerText = tickerText,
+            forceOnlyAlertOnce = scPreferencesStore.settingFlow(ScPrefs.NOTIFICATION_ONLY_ALERT_ONCE).first(),
             existingNotification = existingNotification,
             imageLoader = imageLoader,
             events = events,

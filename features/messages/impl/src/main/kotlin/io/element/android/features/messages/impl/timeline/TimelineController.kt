@@ -8,6 +8,10 @@
 
 package io.element.android.features.messages.impl.timeline
 
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import chat.schildi.lib.preferences.ScPreferencesStore
+import chat.schildi.lib.preferences.lookupScTimelineFilterSettings
 import io.element.android.features.messages.impl.timeline.di.LiveTimeline
 import io.element.android.libraries.core.coroutine.CoroutineDispatchers
 import io.element.android.libraries.core.coroutine.childScope
@@ -36,6 +40,7 @@ import kotlinx.coroutines.flow.getAndUpdate
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import java.io.Closeable
 import java.util.Optional
 
@@ -47,12 +52,26 @@ class TimelineController(
     private val room: JoinedRoom,
     @LiveTimeline private val liveTimeline: Timeline,
     @RoomCoroutineScope private val roomCoroutineScope: CoroutineScope,
+    private val scPreferencesStore: ScPreferencesStore,
     dispatchers: CoroutineDispatchers,
 ) : Closeable {
     private val coroutineScope = roomCoroutineScope.childScope(dispatchers.computation, "TimelineController")
 
     private val liveTimelineFlow = flowOf(liveTimeline)
     private val detachedTimelineFlow = MutableStateFlow<Optional<Timeline>>(Optional.empty())
+
+    // SC start
+    val scReadState = ScReadState(
+        mutableIntStateOf(Integer.MAX_VALUE),
+        mutableStateOf(null),
+        mutableStateOf(null),
+        mutableStateOf(false),
+        mutableStateOf(null),
+    )
+    init {
+        coroutineScope.launch { scReadState.fullyReadEventId.value = liveTimeline.fullyReadEventId() }
+    }
+    // SC end
 
     @OptIn(ExperimentalCoroutinesApi::class)
     fun timelineItems(): Flow<List<MatrixTimelineItem>> {
@@ -79,7 +98,7 @@ class TimelineController(
         return if (threadRootId != null) {
             Result.success(EventFocusResult.IsInThread(threadRootId))
         } else {
-            room.createTimeline(CreateTimelineParams.Focused(eventId))
+            room.createTimeline(CreateTimelineParams.Focused(eventId), lookupScTimelineFilterSettings { scPreferencesStore.getSetting(it) })
                 .onFailure {
                     if (it is CancellationException) {
                         throw it

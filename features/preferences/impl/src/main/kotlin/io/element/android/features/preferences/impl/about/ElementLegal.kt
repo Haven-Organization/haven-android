@@ -14,9 +14,14 @@ import io.element.android.libraries.ui.strings.CommonStrings
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 
+/*
 private const val COPYRIGHT_URL = BuildConfig.URL_COPYRIGHT
 private const val USE_POLICY_URL = BuildConfig.URL_ACCEPTABLE_USE
 private const val PRIVACY_URL = BuildConfig.URL_PRIVACY
+*/
+private const val COPYRIGHT_URL = "https://element.io/copyright"
+private const val USE_POLICY_URL = "https://element.io/acceptable-use-policy-terms"
+private const val PRIVACY_URL = "https://schildi.chat/next/privacy/"
 
 sealed class ElementLegal(
     @StringRes val titleRes: Int,

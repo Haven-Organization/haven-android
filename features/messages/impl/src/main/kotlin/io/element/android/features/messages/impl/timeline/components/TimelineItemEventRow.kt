@@ -70,8 +70,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.constraintlayout.compose.ConstrainScope
 import androidx.constraintlayout.compose.ConstraintLayout
+import chat.schildi.theme.ScTheme
+import chat.schildi.theme.extensions.scOrElse
 import io.element.android.compound.theme.ElementTheme
 import io.element.android.compound.tokens.generated.CompoundIcons
+import io.element.android.features.messages.impl.UrlPreviewView
 import io.element.android.features.messages.impl.timeline.TimelineEvent
 import io.element.android.features.messages.impl.timeline.TimelineRoomInfo
 import io.element.android.features.messages.impl.timeline.aTimelineItemEvent
@@ -152,7 +155,9 @@ import io.element.android.wysiwyg.link.Link
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.launch
 import kotlin.math.abs
+import kotlin.math.min
 import kotlin.math.roundToInt
+import kotlin.math.sign
 
 // The bubble has a negative margin to be placed a bit upper regarding the sender
 // information and overlap the avatar.
@@ -196,6 +201,7 @@ fun TimelineItemEventRow(
         TimelineItemEventContentView(
             eventId = event.eventId,
             content = event.content,
+            debugInfoProvider = event.timelineItemDebugInfoProvider, // SC
             timelineProtectionState = timelineProtectionState,
             onContentClick = onContentClick,
             onGalleryItemClick = onGalleryItemClick,
@@ -266,6 +272,9 @@ fun TimelineItemEventRow(
         }
         if (canReply) {
             val state: SwipeableActionsState = rememberSwipeableActionsState()
+            // SC: cap the swipe-to-reply offset. Read lazily (like upstream) so the drag doesn't recompose this scope.
+            val maxOffset = 90.dp.toPx()
+            val cappedOffset = { state.offset.floatValue.let { it.sign * min(abs(it), maxOffset) } }
             val swipeThresholdPx = 40.dp.toPx()
             SwipeSensitivity(3f) {
                 Box(
@@ -274,7 +283,7 @@ fun TimelineItemEventRow(
                         .offset(selectionContentOffset)
                 ) {
                     Row(modifier = Modifier.matchParentSize()) {
-                        ReplySwipeIndicator({ state.offset.floatValue / 120 })
+                        ReplySwipeIndicator({ cappedOffset() / 120 })
                     }
                     TimelineItemEventRowContent(
                         selectionData = selectionData,
@@ -292,13 +301,13 @@ fun TimelineItemEventRow(
                         onReactionLongClick = { emoji -> onReactionLongClick(emoji, event) },
                         onMoreReactionsClick = { onMoreReactionsClick(event) },
                         modifier = Modifier
-                            .absoluteOffset { IntOffset(x = state.offset.floatValue.roundToInt(), y = 0) }
+                            .absoluteOffset { IntOffset(x = cappedOffset().roundToInt(), y = 0) }
                             .draggable(
                                 orientation = Orientation.Horizontal,
                                 enabled = !state.isResettingOnRelease && !isSelectionToggle,
                                 onDragStopped = {
                                     coroutineScope.launch {
-                                        if (abs(state.offset.floatValue) > swipeThresholdPx) {
+                                        if (abs(cappedOffset()) > swipeThresholdPx) {
                                             onSwipeToReply()
                                         }
                                         state.resetOffset()
@@ -613,6 +622,7 @@ private fun TimelineItemEventRowContent(
         val bubbleState = BubbleState(
             groupPosition = event.groupPosition,
             isMine = event.isMine,
+            scIsBgLess = event.isSticker,
             timelineRoomInfo = timelineRoomInfo,
         )
         MessageEventBubble(
@@ -708,7 +718,7 @@ private fun MessageSenderInformation(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val avatarColors = AvatarColorsProvider.provide(senderAvatar.id)
+    val avatarColors = scAvatarColorsOverride(senderAvatar) ?: AvatarColorsProvider.provide(senderAvatar.id)
     Row(
         modifier = modifier
             // Add external clickable modifier with no indicator so the touch target is larger than just the display name.
@@ -810,9 +820,15 @@ private fun MessageEventBubbleContent(
                         event = event,
                         eventSink = eventSink,
                         modifier = Modifier
+                            .scOrElse(
+                                forSc = Modifier
+                                    .background(ScTheme.exposures.timestampOverlayBg,
+                                        RoundedCornerShape(ScTheme.exposures.timestampRadius, 0.dp, ScTheme.exposures.bubbleRadius, 0.dp))
+                            ) { this
                             // Outer padding
                             .padding(horizontal = 4.dp, vertical = 4.dp)
                             .background(ElementTheme.colors.bgSubtleSecondary, RoundedCornerShape(10.0.dp))
+                            }
                             .align(Alignment.BottomEnd)
                             // Inner padding
                             .padding(horizontal = 4.dp, vertical = 2.dp)
@@ -896,7 +912,7 @@ private fun MessageEventBubbleContent(
                 if (inReplyToDetails == null) {
                     Modifier
                 } else {
-                    Modifier.clip(RoundedCornerShape(10.dp))
+                    Modifier.clip(RoundedCornerShape(ScTheme.exposures.commonLayoutRadius))
                 }
             }
             ContentPadding.CaptionedMedia ->
@@ -972,11 +988,13 @@ private fun MessageEventBubbleContent(
             EqualWidthColumn(spacing = 8.dp) {
                 threadDecoration()
                 inReplyTo(inReplyToDetails)
+                UrlPreviewView(event.content, true, onMessageLongClick) // SC
                 contentWithTimestamp()
             }
         } else {
             Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 threadDecoration()
+                UrlPreviewView(event.content, showThreadDecoration, onMessageLongClick) // SC
                 contentWithTimestamp()
             }
         }
@@ -994,6 +1012,7 @@ private fun MessageEventBubbleContent(
         TimestampPosition.Aligned
     } else {
         when (val content = event.content) {
+            is TimelineItemLocationContent -> TimestampPosition.Aligned // SC location
             is TimelineItemImageContent -> if (content.showCaption) TimestampPosition.Aligned else TimestampPosition.Overlay
             is TimelineItemVideoContent -> if (content.showCaption) TimestampPosition.Aligned else TimestampPosition.Overlay
             is TimelineItemGalleryContent -> if (content.showCaption) TimestampPosition.Aligned else TimestampPosition.Below

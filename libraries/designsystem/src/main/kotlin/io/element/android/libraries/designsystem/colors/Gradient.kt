@@ -15,7 +15,7 @@ import io.element.android.compound.theme.ElementTheme
 
 @Composable
 @ReadOnlyComposable
-fun gradientActionColors(): List<Color> = listOf(
+fun gradientActionColors(): List<Color> = scGradientActionColors() ?: listOf(
     ElementTheme.colors.gradientActionStop1,
     ElementTheme.colors.gradientActionStop2,
     ElementTheme.colors.gradientActionStop3,
@@ -24,7 +24,7 @@ fun gradientActionColors(): List<Color> = listOf(
 
 @Composable
 @ReadOnlyComposable
-fun gradientSubtleColors(): List<Color> = listOf(
+fun gradientSubtleColors(): List<Color> = scGradientSubtleColors() ?: listOf(
     ElementTheme.colors.gradientSubtleStop1,
     ElementTheme.colors.gradientSubtleStop2,
     ElementTheme.colors.gradientSubtleStop3,
@@ -35,7 +35,7 @@ fun gradientSubtleColors(): List<Color> = listOf(
 
 @Composable
 @ReadOnlyComposable
-fun gradientInfoColors(): List<Color> = listOf(
+fun gradientInfoColors(): List<Color> = scGradientInfoColors() ?: listOf(
     ElementTheme.colors.gradientInfoStop1,
     ElementTheme.colors.gradientInfoStop2,
 )

@@ -8,6 +8,8 @@
 
 package io.element.android.features.home.impl.datasource
 
+import chat.schildi.features.home.ScInboxSettingsHandler
+import chat.schildi.lib.preferences.ScPreferencesStore
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import io.element.android.features.home.impl.model.RoomListRoomSummary
@@ -34,6 +36,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
@@ -45,17 +48,18 @@ import kotlinx.coroutines.withContext
 import kotlin.time.Duration.Companion.seconds
 
 private const val PAGE_SIZE = 20
-private const val EXTENDED_VISIBILITY_RANGE_SIZE = 40
-private const val SUBSCRIBE_TO_VISIBLE_ROOMS_DEBOUNCE_IN_MILLIS = 300L
-private const val PAGINATION_THRESHOLD = 3 * PAGE_SIZE
+/*private*/ const val EXTENDED_VISIBILITY_RANGE_SIZE = 40
+/*private*/ const val SUBSCRIBE_TO_VISIBLE_ROOMS_DEBOUNCE_IN_MILLIS = 300L
+/*private*/ const val PAGINATION_THRESHOLD = 3 * PAGE_SIZE
 
 @Inject
 @SingleIn(SessionScope::class)
 class RoomListDataSource(
-    private val roomListService: RoomListService,
+    /*private*/ val roomListService: RoomListService,
     private val roomListRoomSummaryFactory: RoomListRoomSummaryFactory,
     private val coroutineDispatchers: CoroutineDispatchers,
     private val notificationSettingsService: NotificationSettingsService,
+    scPreferencesStore: ScPreferencesStore,
     @SessionCoroutineScope
     private val sessionCoroutineScope: CoroutineScope,
     private val dateTimeObserver: DateTimeObserver,
@@ -66,12 +70,15 @@ class RoomListDataSource(
         observeDateTimeChanges()
     }
 
-    private val roomList = roomListService.createRoomList(
+    /*private*/ val roomList = roomListService.createRoomList(
         pageSize = PAGE_SIZE,
         source = RoomList.Source.All,
         coroutineScope = sessionCoroutineScope
     )
     private val _roomSummariesFlow = MutableSharedFlow<ImmutableList<RoomListRoomSummary>>(replay = 1)
+
+    private val scInboxSettingsHandler = ScInboxSettingsHandler(scPreferencesStore, roomList)
+    private val scInboxFilterFlow = MutableStateFlow(RoomListFilter.all())
 
     private val lock = Mutex()
     private val diffCache = MutableListDiffCache<RoomListRoomSummary>()
@@ -79,11 +86,12 @@ class RoomListDataSource(
         old?.roomId == new?.roomId
     }
 
-    val roomSummariesFlow: Flow<ImmutableList<RoomListRoomSummary>> = _roomSummariesFlow
+    val roomSummariesFlow: Flow<ImmutableList<RoomListRoomSummary>> = _roomSummariesFlow.applyInviteFilterSetting(scPreferencesStore)
 
     val loadingState = roomList.loadingState
 
     fun launchIn(coroutineScope: CoroutineScope): Job {
+        scInboxSettingsHandler.launchIn(coroutineScope, scInboxFilterFlow)
         return roomList
             .summaries
             .onEach { roomSummaries ->
@@ -93,7 +101,8 @@ class RoomListDataSource(
     }
 
     suspend fun updateFilter(filter: RoomListFilter) {
-        roomList.updateFilter(filter)
+        //roomList.updateFilter(filter)
+        scInboxFilterFlow.emit(filter)
     }
 
     suspend fun updateVisibleRange(visibleRange: IntRange) = coroutineScope {

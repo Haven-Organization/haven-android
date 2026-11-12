@@ -122,6 +122,8 @@ fun TimelineEventTimestampView(
                 tint = tint,
                 modifier = Modifier.size(15.dp, 18.dp),
             )
+        } else {
+            ScTimestampIcon(event.localSendState)
         }
 
         if (!isMessageRedacted) {

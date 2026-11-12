@@ -20,7 +20,11 @@ import kotlin.time.Duration
 
 sealed interface TimelineEvent {
     data class OnScrollFinished(val firstIndex: Int) : TimelineEvent
-    data class FocusOnEvent(val eventId: EventId, val debounce: Duration = Duration.ZERO) : TimelineEvent
+    // SC start
+    data object OnUnreadLineVisible : TimelineEvent
+    data object ForceMarkAsRead : TimelineEvent
+    // SC end
+    data class FocusOnEvent(val eventId: EventId, val debounce: Duration = Duration.ZERO, val forReadMarker: Boolean = false) : TimelineEvent
     data object ClearFocusRequestState : TimelineEvent
     data object OnFocusEventRender : TimelineEvent
     data object JumpToLive : TimelineEvent

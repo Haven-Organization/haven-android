@@ -26,6 +26,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.PreviewParameter
+import chat.schildi.theme.ScTheme
 import coil3.compose.AsyncImage
 import io.element.android.features.messages.impl.timeline.model.event.TimelineItemStickerContent
 import io.element.android.features.messages.impl.timeline.model.event.TimelineItemStickerContentPreviewParam
@@ -43,7 +44,7 @@ import io.element.android.libraries.matrix.ui.media.contentvalidation.collectOve
 import io.element.android.libraries.matrixmedia.api.MediaRequestData
 import io.element.android.libraries.ui.strings.CommonStrings
 
-private const val STICKER_SIZE_IN_DP = 128
+//private const val STICKER_SIZE_IN_DP = 128
 
 @Composable
 fun TimelineItemStickerView(
@@ -65,8 +66,8 @@ fun TimelineItemStickerView(
         TimelineItemAspectRatioBox(
             modifier = Modifier.blurHashBackground(content.blurhash, alpha = 0.9f),
             aspectRatio = coerceRatioWhenHidingContent(content.aspectRatio, hideMediaContent),
-            minHeight = STICKER_SIZE_IN_DP,
-            maxHeight = STICKER_SIZE_IN_DP,
+            minHeight = 128, // STICKER_SIZE_IN_DP,
+            maxHeight = 192, // STICKER_SIZE_IN_DP,
         ) {
             ProtectedView(
                 hideContent = hideMediaContent,
@@ -77,7 +78,7 @@ fun TimelineItemStickerView(
                 AsyncImage(
                     modifier = Modifier
                         .fillMaxSize()
-                        .then(if (isThumbnailLoaded) Modifier.background(Color.White) else Modifier)
+                        .then(if (isThumbnailLoaded && !ScTheme.yes) Modifier.background(Color.White) else Modifier)
                         .then(
                             if (onContentClick != null) {
                                 Modifier

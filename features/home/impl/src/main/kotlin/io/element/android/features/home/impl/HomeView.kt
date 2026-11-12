@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.plus
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -26,17 +27,27 @@ import androidx.compose.material3.FabPosition
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.toInt
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import chat.schildi.lib.compose.thenIf
+import chat.schildi.lib.preferences.ScPrefs
+import chat.schildi.lib.preferences.value
 import io.element.android.compound.theme.ElementTheme
 import io.element.android.compound.tokens.generated.CompoundIcons
 import io.element.android.features.home.impl.components.HomeTopBar
@@ -68,6 +79,7 @@ import io.element.android.libraries.designsystem.utils.lazyColumnContentPadding
 import io.element.android.libraries.designsystem.utils.scaffoldScrollableContentInsets
 import io.element.android.libraries.designsystem.utils.snackbar.SnackbarHost
 import io.element.android.libraries.designsystem.utils.snackbar.rememberSnackbarHostState
+import io.element.android.libraries.matrix.api.MatrixClient
 import io.element.android.libraries.matrix.api.core.EventId
 import io.element.android.libraries.matrix.api.core.RoomId
 import io.element.android.libraries.matrix.api.core.SessionId
@@ -77,6 +89,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun HomeView(
     homeState: HomeState,
+    matrixClient: MatrixClient?, // SC
     onRoomClick: (RoomId, EventId?) -> Unit,
     onSettingsClick: () -> Unit,
     onAddAccountClick: () -> Unit,
@@ -100,6 +113,8 @@ fun HomeView(
         if (state.contextMenu is RoomListState.ContextMenu.Shown) {
             RoomListContextMenu(
                 contextMenu = state.contextMenu,
+                roomListState = state, // SC
+                matrixClient = matrixClient, // SC
                 canReportRoom = state.canReportRoom,
                 eventSink = state.eventSink,
                 onRoomSettingsClick = onRoomSettingsClick,
@@ -179,7 +194,7 @@ private fun HomeScaffold(
     }
 
     val appBarState = rememberTopAppBarState()
-    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior(appBarState)
+    val scrollBehavior = scRoomListScrollBehavior() ?: TopAppBarDefaults.enterAlwaysScrollBehavior(appBarState)
     val snackbarHostState = rememberSnackbarHostState(snackbarMessage = state.snackbarMessage)
     val roomListState: RoomListState = state.roomListState
 
@@ -197,11 +212,14 @@ private fun HomeScaffold(
     val roomsLazyListState = rememberLazyListState()
     val spacesLazyListState = rememberLazyListState()
 
+    // SC
+    var spaceBarHeight by remember { mutableIntStateOf(0) }
+
     Scaffold(
         modifier = modifier,
         topBar = {
             HomeTopBar(
-                selectedNavigationItem = state.currentHomeNavigationBarItem,
+                selectedNavigationItem = state.scSelectedNavigationBarItem(), // state.currentHomeNavigationBarItem,
                 currentUserAndNeighbors = state.currentUserAndNeighbors,
                 showAvatarIndicator = state.showAvatarIndicator,
                 areSearchResultsDisplayed = if (roomListState.globalSearchState.isEnabled) {
@@ -209,6 +227,11 @@ private fun HomeScaffold(
                 } else {
                     roomListState.searchState.isSearchActive
                 },
+                // SC start
+                selectedSpaceName = state.roomListState.resolveSpaceName(),
+                onStartChatClick = onStartChatClick,
+                onCreateSpaceClick = onCreateSpaceClick,
+                // SC end
                 onToggleSearch = {
                     if (roomListState.globalSearchState.isEnabled) {
                         roomListState.globalSearchState.eventSink(GlobalSearchEvent.ToggleSearchVisibility)
@@ -224,13 +247,19 @@ private fun HomeScaffold(
                     onSwitchToAccount(sessionId)
                 },
                 scrollBehavior = scrollBehavior,
-                displayFilters = state.displayRoomListFilters,
+                displayFilters = state.displayRoomListFilters && ScPrefs.ELEMENT_ROOM_LIST_FILTERS.value(),
                 filtersState = roomListState.filtersState,
-                spaceFiltersState = roomListState.spaceFiltersState,
+                spaceFiltersState = if (ScPrefs.SPACE_NAV.value()) SpaceFiltersState.Disabled else roomListState.spaceFiltersState,
                 canReportBug = state.canReportBug,
             )
         },
         floatingActionButton = {
+            if (ScPrefs.SPACE_NAV.value()) {
+                if (ScPrefs.SNC_FAB.value()) {
+                    HomeFloatingActionButton(spaceBarHeight, onStartChatClick, CommonStrings.action_create_room, Modifier.navigationBarsPadding())
+                }
+                return@Scaffold
+            }
             val coroutineScope = rememberCoroutineScope()
             HomeBottomBar(
                 // The Scaffold uses top-only insets so the scrollable content can go edge-to-edge behind the
@@ -259,28 +288,28 @@ private fun HomeScaffold(
                 floatingActionButton = {
                     when (state.currentHomeNavigationBarItem) {
                         HomeNavigationBarItem.Chats -> {
-                            HomeFloatingActionButton(onStartChatClick, CommonStrings.action_create_room)
+                            HomeFloatingActionButton(spaceBarHeight, onStartChatClick, CommonStrings.action_create_room)
                         }
                         HomeNavigationBarItem.Spaces -> {
-                            HomeFloatingActionButton(onCreateSpaceClick, CommonStrings.action_create_space)
+                            HomeFloatingActionButton(spaceBarHeight, onCreateSpaceClick, CommonStrings.action_create_space)
                         }
                     }
                 },
                 totalUnreadCount = state.totalUnreadCount.toInt(),
             )
         },
-        floatingActionButtonPosition = FabPosition.Center,
+        floatingActionButtonPosition = if (ScPrefs.SPACE_NAV.value()) FabPosition.End else FabPosition.Center,
         contentWindowInsets = scaffoldScrollableContentInsets,
         content = { padding ->
             val outerPadding = PaddingValues(
                 start = padding.calculateStartPadding(LocalLayoutDirection.current),
                 end = padding.calculateEndPadding(LocalLayoutDirection.current),
                 // Remove these two lines once https://issuetracker.google.com/issues/436432313 has been fixed
-                bottom = padding.calculateBottomPadding(),
+                bottom = if (ScPrefs.SPACE_NAV.value()) lazyColumnContentPadding.calculateBottomPadding() else padding.calculateBottomPadding(),
                 top = padding.calculateTopPadding()
             )
             val contentPadding = PaddingValues(
-                bottom = 96.dp,
+                bottom = (if (ScPrefs.SNC_FAB.value()) 96.dp else 0.dp),
             )
             // The nested scroll connection is set on the content and not on the Scaffold, else the top bar would
             // consume the scroll events of its own content.
@@ -294,6 +323,13 @@ private fun HomeScaffold(
                         RoomListContentView(
                             contentState = roomListState.contentState,
                             filtersState = roomListState.filtersState,
+                            // SC start
+                            homeState = state,
+                            onUpstreamSpaceClick = onRoomClick,
+                            onCreateSpaceClick = onCreateSpaceClick,
+                            onExploreSpaceClick = {}, // TODO use once upstream implements this
+                            onMeasureSpaceBarHeight = { spaceBarHeight = it },
+                            // SC end
                             spaceFiltersState = roomListState.spaceFiltersState,
                             lazyListState = roomsLazyListState,
                             hideInvitesAvatars = roomListState.hideInvitesAvatars,
@@ -323,7 +359,7 @@ private fun HomeScaffold(
                             },
                             onCreateSpaceClick = onCreateSpaceClick,
                             // TODO use actual callbacks for this
-                            onExploreClick = {},
+                            onExploreClick = {}, // SC merge conflict canary: need to update for onExploreSpacesClick above too when this line changes
                         )
                     }
                 }
@@ -335,11 +371,12 @@ private fun HomeScaffold(
 
 @Composable
 private fun HomeFloatingActionButton(
+    spaceBarHeight: Int, // SC
     onClick: () -> Unit,
     contentDescription: Int,
     modifier: Modifier = Modifier,
 ) {
-    FloatingActionButton(onClick = onClick, modifier = modifier) {
+    FloatingActionButton(onClick = onClick, modifier = modifier.addSpaceNavPadding(spaceBarHeight)) {
         Icon(
             imageVector = CompoundIcons.Plus(),
             contentDescription = stringResource(id = contentDescription),
@@ -383,6 +420,7 @@ internal fun RoomListRoomSummary.contentType() = displayType.ordinal
 internal fun HomeViewPreview(@PreviewParameter(HomeStatePreviewParam::class) state: HomeState) = ElementPreview {
     HomeView(
         homeState = state,
+        matrixClient = null, // SC
         onRoomClick = { _, _ -> },
         onSettingsClick = {},
         onAddAccountClick = {},
@@ -405,6 +443,7 @@ internal fun HomeViewPreview(@PreviewParameter(HomeStatePreviewParam::class) sta
 internal fun HomeViewA11yPreview() = ElementPreview {
     HomeView(
         homeState = aHomeState(),
+        matrixClient = null, // SC
         onRoomClick = { _, _ -> },
         onSettingsClick = {},
         onAddAccountClick = {},

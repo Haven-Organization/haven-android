@@ -24,6 +24,8 @@ android {
 setupDependencyInjection()
 
 dependencies {
+    implementation(projects.schildi.theme)
+
     implementation(projects.libraries.architecture)
     implementation(projects.libraries.uiStrings)
     implementation(projects.libraries.androidutils)

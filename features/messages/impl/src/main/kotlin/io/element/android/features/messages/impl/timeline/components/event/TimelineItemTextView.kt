@@ -22,6 +22,9 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
+import chat.schildi.lib.preferences.ScPrefs
+import chat.schildi.lib.preferences.value
+import chat.schildi.theme.scBubbleFont
 import io.element.android.compound.theme.ElementTheme
 import io.element.android.features.messages.impl.timeline.LocalTimelineEventRendererConfig
 import io.element.android.features.messages.impl.timeline.model.event.AN_EMOJI_ONLY_TEXT
@@ -51,6 +54,16 @@ fun TimelineItemTextView(
     modifier: Modifier = Modifier,
     onContentLayoutChange: (ContentAvoidingLayoutData) -> Unit = {},
 ) {
+    if (!ScPrefs.LEGACY_MESSAGE_RENDERING.value()) {
+        ScTimelineItemTextView(
+            content = content,
+            onLinkLongClick = onLinkLongClick,
+            modifier = modifier,
+            onContentLayoutChange = onContentLayoutChange,
+        )
+        return
+    }
+
     // The View <-> Compose interop is not working well with Compose UI tests (it loops indefinitely), so we skip it in the UI test mode.
     if (LocalUiTestMode.current) return
 
@@ -95,11 +108,11 @@ fun TimelineItemTextView(
     }
     val textStyle = when {
         emojiOnly -> ElementTheme.typography.fontHeadingXlRegular
-        else -> ElementTheme.typography.fontBodyLgRegular
+        else -> ElementTheme.typography.scBubbleFont
     }
     CompositionLocalProvider(
         LocalContentColor provides ElementTheme.colors.textPrimary,
-        LocalTextStyle provides textStyle
+        LocalTextStyle provides textStyle,
     ) {
         val text = getTextWithResolvedMentions(content)
         Box(
@@ -122,9 +135,11 @@ fun TimelineItemTextView(
 @VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
 @Composable
 internal fun getTextWithResolvedMentions(content: TimelineItemTextBasedContent): CharSequence {
+    // SC merge conflict canary: duplicated code into extensions!
     val mentionSpanUpdater = LocalMentionSpanUpdater.current
     val bodyWithResolvedMentions = mentionSpanUpdater.rememberMentionSpans(content.formattedBody)
     return SpannedString.valueOf(bodyWithResolvedMentions)
+    // SC merge conflict canary: duplicated code into extensions!
 }
 
 @PreviewsDayNight

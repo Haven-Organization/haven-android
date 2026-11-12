@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.coroutineScope
+import chat.schildi.lib.preferences.scTimelineFilterSettings
 import com.bumble.appyx.core.lifecycle.subscribe
 import com.bumble.appyx.core.modality.BuildContext
 import com.bumble.appyx.core.node.Node
@@ -145,6 +146,9 @@ class HomeFlowNode(
 
     private fun onMenuActionClick(activity: Activity, roomListMenuAction: RoomListMenuAction) {
         when (roomListMenuAction) {
+            RoomListMenuAction.Settings -> {
+                callback.navigateToSettings()
+            }
             RoomListMenuAction.InviteFriends -> {
                 inviteFriendsUseCase.execute(activity)
             }
@@ -180,6 +184,8 @@ class HomeFlowNode(
                 }
             }
 
+            val scTimelineFilterSettings = scTimelineFilterSettings()
+
             fun navigateToRoom(
                 roomId: RoomId,
                 eventId: EventId?,
@@ -191,7 +197,7 @@ class HomeFlowNode(
 
                 val job = sessionCoroutineScope.launch {
                     runCatchingExceptions {
-                        matrixClient.getJoinedRoom(roomId)
+                        matrixClient.getJoinedRoom(roomId, scTimelineFilterSettings.value)
                     }.fold(
                         onSuccess = { joinedRoom ->
                             if (isActive) {
@@ -219,6 +225,7 @@ class HomeFlowNode(
 
             HomeView(
                 homeState = state,
+                matrixClient = matrixClient, // SC
                 onRoomClick = ::navigateToRoom,
                 onSettingsClick = callback::navigateToSettings,
                 onAddAccountClick = callback::navigateToAddAccount,

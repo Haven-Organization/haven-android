@@ -108,7 +108,10 @@ class DefaultFtueService(
             } else {
                 getNextStep(FtueStep.AnalyticsOptIn)
             }
-            FtueStep.AnalyticsOptIn -> null
+            FtueStep.AnalyticsOptIn -> {
+                ftueStepStateFlow.emit(InternalFtueState.Complete) // SC: fix login flow getting stuck, again...
+                null
+            }
         }
 
     private fun isSessionVerificationStateReady(): Boolean {

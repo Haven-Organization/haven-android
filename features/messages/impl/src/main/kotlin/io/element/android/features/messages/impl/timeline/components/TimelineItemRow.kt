@@ -88,6 +88,7 @@ internal fun TimelineItemRow(
             TimelineItemEventContentView(
                 eventId = event.eventId,
                 content = event.content,
+                debugInfoProvider = event.timelineItemDebugInfoProvider, // SC
                 timelineProtectionState = timelineProtectionState,
                 onContentClick = { onContentClick(event) },
                 onGalleryItemClick = { index -> onGalleryItemClick(event, index) },
@@ -333,7 +334,7 @@ private fun Modifier.focusedEvent(
     focusedEventOffset: Dp,
 ): Modifier {
     val highlightedLineColor = ElementTheme.colors.borderAccentSubtle
-    val gradientColors = gradientSubtleColors()
+    val gradientColors = scMessageHighlightColors() ?: gradientSubtleColors()
     val verticalOffset = focusedEventOffset.toPx()
     val verticalRatio = 0.7f
     return drawWithCache {

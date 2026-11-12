@@ -78,16 +78,16 @@ fun TopAppBar(
  */
 @Composable
 fun TopAppBar(
-    title: @Composable () -> Unit,
+    title: (@Composable () -> Unit)? = null, // SC: nullable; if null use non-app-bar bg color
     modifier: Modifier = Modifier,
     navigationIcon: @Composable () -> Unit = {},
     actions: @Composable RowScope.() -> Unit = {},
     windowInsets: WindowInsets = TopAppBarDefaults.windowInsets,
-    colors: TopAppBarColors = TopAppBarDefaults.topAppBarColors(),
+    colors: TopAppBarColors = TopAppBarDefaults.topAppBarColors().toScTopAppBarColors(title == null),
     scrollBehavior: TopAppBarScrollBehavior? = null
 ) {
     androidx.compose.material3.TopAppBar(
-        title = title,
+        title = title ?: {},
         modifier = modifier,
         navigationIcon = navigationIcon,
         actions = {

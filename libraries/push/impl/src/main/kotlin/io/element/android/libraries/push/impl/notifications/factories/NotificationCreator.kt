@@ -60,6 +60,7 @@ interface NotificationCreator {
         largeIcon: Bitmap?,
         lastMessageTimestamp: Long,
         tickerText: String,
+        forceOnlyAlertOnce: Boolean = false, // SC
         existingNotification: Notification?,
         imageLoader: ImageLoader,
         events: List<NotifiableMessageEvent>,
@@ -148,6 +149,7 @@ class DefaultNotificationCreator(
         largeIcon: Bitmap?,
         lastMessageTimestamp: Long,
         tickerText: String,
+        forceOnlyAlertOnce: Boolean, // SC
         existingNotification: Notification?,
         imageLoader: ImageLoader,
         events: List<NotifiableMessageEvent>,
@@ -187,6 +189,7 @@ class DefaultNotificationCreator(
                 .clearActions()
         } else {
             NotificationCompat.Builder(context, channelId)
+                .setOnlyAlertOnce(forceOnlyAlertOnce) // SC
                 .setGroupSummary(false)
                 // In order to avoid notification making sound twice (due to the summary notification)
                 .setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_CHILDREN)
@@ -202,13 +205,17 @@ class DefaultNotificationCreator(
             roomIsGroup = !roomInfo.isDm,
         )
         // Always set it, since the style may have been extracted from an existing notification
-        messagingStyle.conversationTitle = createConversationTitle(roomInfo, threadId)
+        messagingStyle.conversationTitle = createConversationTitle(
+            roomInfo = roomInfo,
+            threadId = threadId,
+            senderName = events.map { it.senderDisambiguatedDisplayName }.distinct().takeIf { it.size == 1 }?.firstOrNull(), // SC
+        )
         val newEvents = messagingStyle.filterOutAlreadyDisplayedEvents(events)
         messagingStyle.addMessagesFromEvents(newEvents, imageLoader)
         return builder
             .setCategory(category)
             .setNumber(events.size)
-            .setOnlyAlertOnce(roomInfo.isUpdated || newEvents.isEmpty())
+            .setOnlyAlertOnce(roomInfo.isUpdated || newEvents.isEmpty() || forceOnlyAlertOnce)
             .setWhen(lastMessageTimestamp)
             // MESSAGING_STYLE sets title and content for API 16 and above devices.
             .setStyle(messagingStyle)
@@ -459,12 +466,12 @@ class DefaultNotificationCreator(
             } else {
                 val senderName = event.senderDisambiguatedDisplayName.orEmpty()
                 // If the notification is for a mention or reply, we create a fake `Person` with a custom name and key
-                val displayName = if (event.hasMentionOrReply) {
+                val displayName = if (event.hasMentionOrReply && false) {
                     stringProvider.getString(R.string.notification_sender_mention_reply, senderName)
                 } else {
                     senderName
                 }
-                val key = if (event.hasMentionOrReply) {
+                val key = if (event.hasMentionOrReply && false) {
                     "mention-or-reply:${event.eventId.value}"
                 } else {
                     event.senderId.value
@@ -553,16 +560,23 @@ class DefaultNotificationCreator(
         }
     }
 
-    private fun createConversationTitle(roomInfo: RoomEventGroupInfo, threadId: ThreadId?): String {
+    private fun createConversationTitle(
+        roomInfo: RoomEventGroupInfo,
+        threadId: ThreadId?,
+        senderName: String?, // SC
+    ): String? {
         val title = if (threadId != null) {
             stringProvider.getString(R.string.notification_thread_in_room, roomInfo.roomDisplayName)
-        } else {
+        } else if (!roomInfo.isDm || roomInfo.roomDisplayName != senderName) { // SC
             roomInfo.roomDisplayName
+        } else {
+            // SC: no conversation title for a DM whose name is just the sender's name
+            null
         }
         // The system displays the conversation title instead of the subText in the header of the notification,
         // so add the account information to the conversation title when it has to be displayed.
         return if (roomInfo.showSessionId) {
-            "${roomInfo.sessionId.value} · $title"
+            listOfNotNull(roomInfo.sessionId.value, title).joinToString(" · ")
         } else {
             title
         }

@@ -372,7 +372,7 @@ class MessageComposerPresenter(
                                     richTextEditorState.insertAtRoomMentionAtSuggestion()
                                 }
                                 is ResolvedSuggestion.Member -> {
-                                    val text = suggestion.roomMember.userId.value
+                                    val text = mentionSpanProvider.userDisplayName(suggestion.roomMember.userId)
                                     val link = permalinkBuilder.permalinkForUser(suggestion.roomMember.userId).getOrNull() ?: return@launch
                                     richTextEditorState.insertMentionAtSuggestion(text = text, link = link)
                                 }
@@ -823,7 +823,7 @@ class MessageComposerPresenter(
                 .orEmpty()
             Message(html = html, markdown = markdown, intentionalMentions = mentions)
         } else {
-            val markdown = markdownTextEditorState.getMessageMarkdown(permalinkBuilder)
+            val markdown = markdownTextEditorState.getMessageMarkdown(permalinkBuilder, mentionSpanProvider::userDisplayName)
             val mentions = if (withMentions) {
                 markdownTextEditorState.getMentions()
             } else {
@@ -840,7 +840,7 @@ class MessageComposerPresenter(
     ) = launch {
         showTextFormatting = enabled
         if (showTextFormatting) {
-            val markdown = markdownTextEditorState.getMessageMarkdown(permalinkBuilder)
+            val markdown = markdownTextEditorState.getMessageMarkdown(permalinkBuilder, mentionSpanProvider::userDisplayName)
             richTextEditorState.setMarkdown(markdown)
             richTextEditorState.requestFocus()
             analyticsService.captureInteraction(Interaction.Name.MobileRoomComposerFormattingEnabled)

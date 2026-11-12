@@ -24,6 +24,7 @@ import io.element.android.features.preferences.impl.account.PreferencesAccountSt
 import io.element.android.features.preferences.impl.userstatus.UserStatusState
 import io.element.android.features.preferences.impl.utils.ShowDeveloperSettingsProvider
 import io.element.android.libraries.architecture.Presenter
+import io.element.android.libraries.core.meta.BuildMeta
 import io.element.android.libraries.designsystem.utils.snackbar.SnackbarDispatcher
 import io.element.android.libraries.designsystem.utils.snackbar.collectSnackbarMessageAsState
 import io.element.android.libraries.di.annotations.SessionCoroutineScope
@@ -54,6 +55,7 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalCoroutinesApi::class)
 @Inject
 class PreferencesRootPresenter(
+    private val buildMeta: BuildMeta, // SC
     private val matrixClient: MatrixClient,
     private val analyticsService: AnalyticsService,
     private val versionFormatter: VersionFormatter,
@@ -163,6 +165,7 @@ class PreferencesRootPresenter(
             theme = themeOption,
             availableThemeOptions = availableThemeOptions,
             version = remember { versionFormatter.get() },
+            buildMeta = buildMeta, // SC
             isMultiAccountEnabled = isMultiAccountEnabled,
             isOtherAccountsSectionExpanded = isOtherAccountsSectionExpanded,
             otherSessions = otherSessions,

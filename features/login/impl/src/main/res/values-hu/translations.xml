@@ -37,8 +37,8 @@
   <string name="screen_login_form_header">"Adja meg adatait"</string>
   <string name="screen_login_subtitle">"A Matrix egy nyitott hálózat a biztonságos, decentralizált kommunikációhoz."</string>
   <string name="screen_login_title_with_homeserver">"Bejelentkezés ide: %1$s"</string>
-  <string name="screen_missing_key_backup_open_element_classic">"Nyissa meg az Element Classic alkalmazást"</string>
-  <string name="screen_missing_key_backup_step_1">"Nyissa meg az Element Classic alkalmazást az eszközén"</string>
+  <string name="screen_missing_key_backup_open_element_classic">"Nyissa meg az SchildiChat Legacy alkalmazást"</string>
+  <string name="screen_missing_key_backup_step_1">"Nyissa meg az SchildiChat Legacy alkalmazást az eszközén"</string>
   <string name="screen_missing_key_backup_step_2_android">"Lépjen a Beállítások &gt; Biztonság és adatvédelem menüponthoz"</string>
   <string name="screen_missing_key_backup_step_3_android">"A Kriptográfiai kulcsok kezelése részben válassza a Titkosított üzenetek helyreállítása lehetőséget"</string>
   <string name="screen_missing_key_backup_step_4">"Kövesse az utasításokat a kulcstároló engedélyezéséhez"</string>

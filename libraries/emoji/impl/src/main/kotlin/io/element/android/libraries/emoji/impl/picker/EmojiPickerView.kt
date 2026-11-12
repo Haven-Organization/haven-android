@@ -33,6 +33,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
+import chat.schildi.lib.preferences.ScPrefs
+import chat.schildi.lib.preferences.value
 import io.element.android.emojibasebindings.Emoji
 import io.element.android.libraries.designsystem.preview.ElementPreview
 import io.element.android.libraries.designsystem.preview.PreviewsDayNight
@@ -50,16 +52,22 @@ import kotlinx.coroutines.launch
 internal fun EmojiPickerView(
     state: DefaultEmojiPickerState,
     onSelectEmoji: (Emoji) -> Unit,
+    onSelectCustomEmoji: (String) -> Unit, // SC
     selectedEmojis: ImmutableSet<String>,
     modifier: Modifier = Modifier,
     contentDescription: @Composable (emoji: Emoji, isSelected: Boolean) -> String = { emoji, _ -> emoji.unicode },
 ) {
     val coroutineScope = rememberCoroutineScope()
-    val pagerState = rememberPagerState(pageCount = { state.categories.size })
+
+    val pagerState = rememberPagerState(
+        pageCount = state.scEmojiPickerSize().let {{ it }},
+        initialPage = if (ScPrefs.PREFER_FREEFORM_REACTIONS.value()) state.pageFreeformReactionIndex() else 0,
+    )
+
     var skinPickerEmoji by remember { mutableStateOf<Emoji?>(null) }
 
     Column(modifier) {
-        SearchBar(
+        ScEmojiPickerSearchBar(
             modifier = Modifier.padding(bottom = if (state.isSearchActive) 0.dp else 10.dp),
             queryState = state.searchQuery,
             resultState = state.searchResults,
@@ -98,18 +106,32 @@ internal fun EmojiPickerView(
                                 )
                             }
                         },
-                        selected = pagerState.currentPage == index,
+                        selected = pagerState.currentPage.removeScPickerOffset() == index,
                         onClick = {
-                            coroutineScope.launch { pagerState.animateScrollToPage(index) }
+                            coroutineScope.launch { pagerState.animateScrollToPage(index.addScPickerOffset()) }
                         }
                     )
                 }
+                ScEmojiPickerTabsEnd(state, pagerState) { state.eventSink(EmojiPickerEvent.ToggleSearchActive(true)) }
             }
 
             HorizontalPager(
                 state = pagerState,
                 modifier = Modifier.fillMaxWidth(),
-            ) { index ->
+            ) { scIndex ->
+                val index = scIndex.removeScPickerOffset()
+                if (scEmojiPickerPage(
+                        state,
+                        scIndex,
+                        pagerState.currentPage,
+                        onSelectCustomEmoji
+                ) {
+                    state.eventSink(EmojiPickerEvent.ToggleSearchActive(true))
+                    pagerState.requestScrollToPage(0)
+                }) {
+                    return@HorizontalPager
+                }
+
                 val emojis = state.categories[index].emojis
                 EmojiResults(
                     emojis = emojis,
@@ -168,6 +190,7 @@ internal fun EmojiPickerViewPreview(@PreviewParameter(DefaultEmojiPickerStatePre
     EmojiPickerView(
         state = state,
         onSelectEmoji = {},
+        onSelectCustomEmoji = {}, // SC
         selectedEmojis = persistentSetOf("😀", "😄", "😃"),
         modifier = Modifier.fillMaxWidth(),
     )

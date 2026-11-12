@@ -16,5 +16,6 @@ fun BuildMeta.isElement(): Boolean {
         BuildType.RELEASE -> applicationId == "io.element.android.x"
         BuildType.NIGHTLY -> applicationId == "io.element.android.x.nightly"
         BuildType.DEBUG -> applicationId == "io.element.android.x.debug"
+        else -> false
     }
 }

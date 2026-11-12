@@ -45,6 +45,7 @@ import io.element.android.libraries.matrix.api.timeline.item.event.FileMessageTy
 import io.element.android.libraries.matrix.api.timeline.item.event.GalleryMessageType
 import io.element.android.libraries.matrix.api.timeline.item.event.ImageMessageType
 import io.element.android.libraries.matrix.api.timeline.item.event.LocationMessageType
+import io.element.android.libraries.matrix.api.timeline.item.event.MessageTypeWithAttachment
 import io.element.android.libraries.matrix.api.timeline.item.event.NoticeMessageType
 import io.element.android.libraries.matrix.api.timeline.item.event.OtherMessageType
 import io.element.android.libraries.matrix.api.timeline.item.event.StickerMessageType
@@ -197,6 +198,7 @@ class DefaultNotifiableEventResolver(
                     timestamp = this.timestamp,
                     senderDisambiguatedDisplayName = senderDisambiguatedDisplayName,
                     body = messageBody,
+                    caption = (content.messageType as? MessageTypeWithAttachment)?.caption,
                     imageUriString = imageUriString,
                     imageMimeType = imageMimeType.takeIf { imageUriString != null },
                     roomName = roomDisplayName,
@@ -385,6 +387,7 @@ class DefaultNotifiableEventResolver(
             NotificationContent.StateEvent.RoomTombstone,
             is NotificationContent.StateEvent.RoomTopic,
             NotificationContent.StateEvent.SpaceChild,
+            NotificationContent.StateEvent.SpaceCatchAll,
             NotificationContent.StateEvent.SpaceParent -> {
                 Timber.tag(loggerTag.value).d("Ignoring notification for state event ${content.javaClass.simpleName}")
                 throw NotificationResolverException.EventFilteredOut
@@ -500,6 +503,7 @@ internal fun buildNotifiableMessageEvent(
     timestamp: Long,
     senderDisambiguatedDisplayName: String?,
     body: String?,
+    caption: String? = null,
     // We cannot use Uri? type here, as that could trigger a
     // NotSerializableException when persisting this to storage
     imageUriString: String? = null,
@@ -528,6 +532,7 @@ internal fun buildNotifiableMessageEvent(
     timestamp = timestamp,
     senderDisambiguatedDisplayName = senderDisambiguatedDisplayName,
     body = body,
+    caption = caption,
     imageUriString = imageUriString,
     imageMimeType = imageMimeType,
     threadId = threadId,

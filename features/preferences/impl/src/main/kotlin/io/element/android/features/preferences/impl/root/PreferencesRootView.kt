@@ -16,6 +16,10 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.BugReport
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.PrecisionManufacturing
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -23,6 +27,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
+import chat.schildi.lib.preferences.ScPrefScreen
 import io.element.android.compound.theme.ElementTheme
 import io.element.android.compound.tokens.generated.CompoundIcons
 import io.element.android.features.preferences.impl.R
@@ -32,6 +37,7 @@ import io.element.android.features.preferences.impl.userstatus.UserStatusState
 import io.element.android.features.preferences.impl.userstatus.UserStatusView
 import io.element.android.libraries.architecture.AsyncAction
 import io.element.android.libraries.architecture.coverage.ExcludeFromCoverage
+import io.element.android.libraries.core.meta.BuildMeta
 import io.element.android.libraries.designsystem.components.async.AsyncActionIndicator
 import io.element.android.libraries.designsystem.components.async.AsyncIndicator
 import io.element.android.libraries.designsystem.components.list.ListItemContent
@@ -68,6 +74,7 @@ fun PreferencesRootView(
     onOpenLockScreenSettings: () -> Unit,
     onOpenAbout: () -> Unit,
     onOpenDeveloperSettings: () -> Unit,
+    navigateToScTweaks: (ScPrefScreen?) -> Unit,
     onOpenMediaSettings: () -> Unit,
     onOpenLocationSettings: () -> Unit,
     onOpenLabs: () -> Unit,
@@ -135,6 +142,14 @@ fun PreferencesRootView(
                 onOpenMediaSettings = onOpenMediaSettings,
                 onOpenLocationSettings = onOpenLocationSettings,
             )
+
+            // SC tweaks
+            ListItem(
+                content = { Text(stringResource(id = chat.schildi.lib.R.string.sc_pref_tweaks_title)) },
+                leadingContent = ListItemContent.Icon(IconSource.Vector(Icons.Outlined.PrecisionManufacturing)),
+                onClick = { navigateToScTweaks(null) },
+            )
+
             // General section
             GeneralSection(
                 state = state,
@@ -145,6 +160,7 @@ fun PreferencesRootView(
             )
             // Version
             Footer(
+                buildMeta = state.buildMeta, // SC
                 version = state.version,
                 onClick = if (!state.showDeveloperSettings) {
                     { state.eventSink(PreferencesRootEvent.OnVersionInfoClick) }
@@ -275,7 +291,7 @@ private fun ColumnScope.GeneralSection(
     }
     ListItem(
         content = { Text(stringResource(id = CommonStrings.common_about)) },
-        leadingContent = ListItemContent.Icon(IconSource.Vector(CompoundIcons.Info())),
+        leadingContent = ListItemContent.Icon(IconSource.Vector(Icons.Outlined.Info)),
         onClick = onOpenAbout,
     )
     // Put developer settings at the end, so nothing bad happens if the user clicks 8 times to enable the entry
@@ -288,6 +304,7 @@ private fun ColumnScope.GeneralSection(
 
 @Composable
 private fun ColumnScope.Footer(
+    buildMeta: BuildMeta?, // SC
     version: String,
     onClick: (() -> Unit)?,
 ) {
@@ -297,7 +314,7 @@ private fun ColumnScope.Footer(
             .clickable(enabled = onClick != null, onClick = onClick ?: {})
             .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 24.dp),
         textAlign = TextAlign.Center,
-        text = version,
+        text = buildScVersionString(buildMeta) ?: version,
         style = ElementTheme.typography.fontBodySmRegular,
         color = ElementTheme.colors.textSecondary,
     )
@@ -337,6 +354,7 @@ private fun ContentToPreview(state: PreferencesRootState) {
         onSwitchToSession = {},
         onOpenAnalytics = {},
         onOpenDeveloperSettings = {},
+        navigateToScTweaks = {},
         onOpenLocationSettings = {},
         onOpenMediaSettings = {},
         onOpenLabs = {},

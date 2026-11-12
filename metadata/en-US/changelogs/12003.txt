@@ -1,0 +1,2 @@
+- Update codebase to Element X v26.05.2
+- Send the mentioned user's display name in formatted mentions, instead of just their user ID

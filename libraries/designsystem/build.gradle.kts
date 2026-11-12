@@ -28,6 +28,10 @@ android {
 }
 
 dependencies {
+    // SC lib and theme required as API for compose previews using ElementPreview
+    api(projects.schildi.lib)
+    api(projects.schildi.theme)
+
     api(projects.libraries.compound)
 
     implementation(libs.androidx.compose.material3.windowsizeclass)
@@ -43,4 +47,15 @@ dependencies {
     implementation(projects.libraries.uiStrings)
 
     testCommonDependencies(libs, true)
+}
+
+// SC resource override
+android {
+    // Use a flavor for common things that the upstream config will not override by the build type
+    flavorDimensions += "package"
+    productFlavors {
+        create("sc") {
+            dimension = "package"
+        }
+    }
 }

@@ -71,7 +71,9 @@ class TimelineItemEventFactory(
             mode = DateFormatterMode.Day,
             useRelative = true,
         )
+        val senderMember = roomMembers.find { it.userId == currentSender } // SC
         val senderAvatarData = AvatarData(
+            powerLevel = senderMember?.powerLevel, // SC
             id = currentSender.value,
             name = senderProfile.getDisambiguatedDisplayName(currentSender),
             url = senderProfile.getAvatarUrl(),

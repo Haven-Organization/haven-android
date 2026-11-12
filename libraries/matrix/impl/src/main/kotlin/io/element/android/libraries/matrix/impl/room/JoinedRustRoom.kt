@@ -8,6 +8,7 @@
 
 package io.element.android.libraries.matrix.impl.room
 
+import chat.schildi.matrixsdk.ScTimelineFilterSettings
 import io.element.android.appconfig.TimelineConfig
 import io.element.android.libraries.core.coroutine.CoroutineDispatchers
 import io.element.android.libraries.core.coroutine.childScope
@@ -192,6 +193,7 @@ class JoinedRustRoom(
 
     override suspend fun createTimeline(
         createTimelineParams: CreateTimelineParams,
+        scTimelineFilterSettings: ScTimelineFilterSettings,
     ): Result<Timeline> = withContext(roomDispatcher) {
         val hideThreadedEvents = featureFlagService.isFeatureEnabled(FeatureFlags.Threads)
         val focus = when (createTimelineParams) {
@@ -228,6 +230,7 @@ class JoinedRustRoom(
             CreateTimelineParams.PinnedOnly,
             is CreateTimelineParams.Threaded -> {
                 RustTimelineEventFilterFactory().create(
+                    hideMembershipInPublicChats = !scTimelineFilterSettings.showMembershipEventsInPublicRooms,
                     joinRule = roomInfoFlow.value.joinRule,
                     isEncrypted = roomInfoFlow.value.isEncrypted,
                     excludedStateTypes = TimelineConfig.excludedEvents,
@@ -322,6 +325,12 @@ class JoinedRustRoom(
     override suspend fun updateAvatar(mimeType: String, data: ByteArray): Result<Unit> = withContext(roomDispatcher) {
         runCatchingExceptions {
             innerRoom.uploadAvatar(mimeType, data, null)
+        }
+    }
+
+    override suspend fun setAvatarUrl(url: String): Result<Unit> = withContext(roomDispatcher) { // SC
+        runCatchingExceptions {
+            innerRoom.setAvatarUrl(url, null)
         }
     }
 
