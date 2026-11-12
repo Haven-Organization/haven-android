@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.BugReport
 import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material.icons.outlined.PrecisionManufacturing
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -28,6 +27,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
 import chat.schildi.lib.preferences.ScPrefScreen
+import chat.schildi.preferences.HavenSettingsSection
 import io.element.android.compound.theme.ElementTheme
 import io.element.android.compound.tokens.generated.CompoundIcons
 import io.element.android.features.preferences.impl.R
@@ -143,12 +143,8 @@ fun PreferencesRootView(
                 onOpenLocationSettings = onOpenLocationSettings,
             )
 
-            // SC tweaks
-            ListItem(
-                content = { Text(stringResource(id = chat.schildi.lib.R.string.sc_pref_tweaks_title)) },
-                leadingContent = ListItemContent.Icon(IconSource.Vector(Icons.Outlined.PrecisionManufacturing)),
-                onClick = { navigateToScTweaks(null) },
-            )
+            // SC tweaks - Haven: sub-screens listed directly instead of a single "Turtle tweaks" entry
+            HavenSettingsSection(navigateToScTweaks = navigateToScTweaks)
 
             // General section
             GeneralSection(

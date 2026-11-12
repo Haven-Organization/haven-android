@@ -10,6 +10,9 @@
 
     <!-- SchildiChat settings -->
     <string name="sc_pref_tweaks_title">Turtle tweaks</string>
+    <!-- Haven -->
+    <string name="haven_pref_advanced_title">Advanced</string>
+    <string name="haven_pref_notification_alerts_title">Notification alerts</string>
     <string name="sc_pref_sc_themes_title">SC theme</string>
     <string name="sc_pref_sc_themes_summary">Disable to follow Element\'s theme.</string>
     <string name="sc_pref_el_theme_title">Element theme</string>

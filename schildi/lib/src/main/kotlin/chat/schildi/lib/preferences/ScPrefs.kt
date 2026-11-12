@@ -277,6 +277,11 @@ object ScPrefs {
         ), authorsChoice = true),
     ))
 
+    // Haven: show the Turtle tweaks sub-screens directly in the main settings list,
+    // and group the remaining entries (debug infos, developer options) under "Advanced".
+    val havenSettingsScreens: List<ScPrefScreen> = scTweaks.prefs.filterIsInstance<ScPrefScreen>()
+    val havenAdvancedScreen = ScPrefScreen(R.string.haven_pref_advanced_title, null, scTweaks.prefs.filterNot { it is ScPrefScreen })
+
     val prefsToExcludeFromBatchSet = listOf(
         SC_DEVELOPER_OPTIONS_CATEGORY_KEY,
     )
