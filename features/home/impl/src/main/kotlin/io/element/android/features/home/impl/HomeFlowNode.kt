@@ -21,6 +21,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.coroutineScope
 import chat.schildi.lib.preferences.scTimelineFilterSettings
+import chat.schildi.lib.preferences.value
 import com.bumble.appyx.core.lifecycle.subscribe
 import com.bumble.appyx.core.modality.BuildContext
 import com.bumble.appyx.core.node.Node
@@ -88,6 +89,7 @@ class HomeFlowNode(
     private val changeRoomMemberRolesEntryPoint: ChangeRoomMemberRolesEntryPoint,
     private val leaveRoomRenderer: LeaveRoomRenderer,
     @SessionCoroutineScope private val sessionCoroutineScope: CoroutineScope,
+    private val havenAppsService: io.element.android.features.social.api.HavenAppsService, // Haven
 ) : BaseFlowNode<HomeFlowNode.NavTarget>(
     backstack = BackStack(
         initialElement = NavTarget.Root,
@@ -223,38 +225,53 @@ class HomeFlowNode(
                 loadingJoinedRoomJob.value = AsyncData.Loading(job)
             }
 
-            HomeView(
-                homeState = state,
-                matrixClient = matrixClient, // SC
-                onRoomClick = ::navigateToRoom,
-                onSettingsClick = callback::navigateToSettings,
-                onAddAccountClick = callback::navigateToAddAccount,
-                onSwitchToAccount = callback::navigateToSession,
-                onStartChatClick = callback::navigateToCreateRoom,
-                onCreateSpaceClick = callback::navigateToCreateSpace,
-                onSetUpRecoveryClick = callback::navigateToSetUpRecovery,
-                onConfirmRecoveryKeyClick = callback::navigateToEnterRecoveryKey,
-                onRoomSettingsClick = callback::navigateToRoomSettings,
-                onMenuActionClick = { onMenuActionClick(activity, it) },
-                onReportRoomClick = ::navigateToReportRoom,
-                onDeclineInviteAndBlockUser = ::navigateToDeclineInviteAndBlockUser,
-                modifier = modifier,
-                acceptDeclineInviteView = {
-                    acceptDeclineInviteView.Render(
-                        state = state.roomListState.acceptDeclineInviteState,
-                        onAcceptInviteSuccess = { navigateToRoom(roomId = it, eventId = null) },
-                        onDeclineInviteSuccess = { },
-                        modifier = Modifier
-                    )
-                },
-                leaveRoomView = {
-                    leaveRoomRenderer.Render(
-                        state = state.roomListState.leaveRoomState,
-                        onSelectNewOwners = ::navigateToSelectNewOwnersWhenLeavingRoom,
-                        modifier = Modifier
-                    )
-                }
+            // Haven: Apps button and pinned apps on the home bars
+            val havenPinnedAppIds by havenAppsService.pinnedAppIds.collectAsState()
+            val havenWidgetApps by havenAppsService.widgetApps.collectAsState()
+            val havenAllApps = io.element.android.features.social.api.HavenApp.entries.map { io.element.android.features.social.api.HavenAppItem.Builtin(it) } + havenWidgetApps
+            val havenAppsBar = io.element.android.features.social.api.HavenAppsBarState(
+                allApps = havenAllApps,
+                pinnedApps = havenPinnedAppIds.mapNotNull { id -> havenAllApps.firstOrNull { it.id == id } },
+                onOpenApp = { app -> callback.navigateToHavenApp(app.id) },
+                onSetPinned = { app, pinned -> sessionCoroutineScope.launch { havenAppsService.setPinned(app.id, pinned) } },
+                onRemoveWidgetApp = { app -> sessionCoroutineScope.launch { havenAppsService.removeWidgetApp(app.id) } },
+                onGoToRoom = { roomId -> navigateToRoom(io.element.android.libraries.matrix.api.core.RoomId(roomId), null) },
             )
+            val havenAppsEnabled = chat.schildi.lib.preferences.ScPrefs.HAVEN_APPS_ENABLED.value()
+            androidx.compose.runtime.CompositionLocalProvider(io.element.android.features.social.api.LocalHavenAppsBar provides havenAppsBar.takeIf { havenAppsEnabled }) {
+                HomeView(
+                    homeState = state,
+                    matrixClient = matrixClient, // SC
+                    onRoomClick = ::navigateToRoom,
+                    onSettingsClick = callback::navigateToSettings,
+                    onAddAccountClick = callback::navigateToAddAccount,
+                    onSwitchToAccount = callback::navigateToSession,
+                    onStartChatClick = callback::navigateToCreateRoom,
+                    onCreateSpaceClick = callback::navigateToCreateSpace,
+                    onSetUpRecoveryClick = callback::navigateToSetUpRecovery,
+                    onConfirmRecoveryKeyClick = callback::navigateToEnterRecoveryKey,
+                    onRoomSettingsClick = callback::navigateToRoomSettings,
+                    onMenuActionClick = { onMenuActionClick(activity, it) },
+                    onReportRoomClick = ::navigateToReportRoom,
+                    onDeclineInviteAndBlockUser = ::navigateToDeclineInviteAndBlockUser,
+                    modifier = modifier,
+                    acceptDeclineInviteView = {
+                        acceptDeclineInviteView.Render(
+                            state = state.roomListState.acceptDeclineInviteState,
+                            onAcceptInviteSuccess = { navigateToRoom(roomId = it, eventId = null) },
+                            onDeclineInviteSuccess = { },
+                            modifier = Modifier
+                        )
+                    },
+                    leaveRoomView = {
+                        leaveRoomRenderer.Render(
+                            state = state.roomListState.leaveRoomState,
+                            onSelectNewOwners = ::navigateToSelectNewOwnersWhenLeavingRoom,
+                            modifier = Modifier
+                        )
+                    }
+                )
+            }
         }
     }
 

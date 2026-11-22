@@ -92,6 +92,7 @@ fun JoinRoomView(
     onDeclineInviteAndBlockUser: (InviteData) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    androidx.compose.runtime.CompositionLocalProvider(LocalHavenSocialKind provides state.havenSocialKind) {
     Box(
         modifier = modifier.fillMaxSize(),
     ) {
@@ -190,15 +191,16 @@ fun JoinRoomView(
         errorMessage = { stringResource(CommonStrings.error_network_or_server_issue) },
         confirmationDialog = {
             ConfirmationDialog(
-                content = stringResource(R.string.screen_join_room_cancel_knock_alert_description),
-                title = stringResource(R.string.screen_join_room_cancel_knock_alert_title),
-                submitText = stringResource(R.string.screen_join_room_cancel_knock_alert_confirmation),
+                content = havenJoinString(R.string.screen_join_room_cancel_knock_alert_description),
+                title = havenJoinString(R.string.screen_join_room_cancel_knock_alert_title),
+                submitText = havenJoinString(R.string.screen_join_room_cancel_knock_alert_confirmation),
                 cancelText = stringResource(CommonStrings.action_no),
                 onSubmitClick = { state.eventSink(JoinRoomEvent.CancelKnock(requiresConfirmation = false)) },
                 onDismiss = { state.eventSink(JoinRoomEvent.ClearActionStates) },
             )
         },
     )
+    }
 }
 
 @Composable
@@ -253,7 +255,7 @@ private fun JoinRoomFooter(
                     buttonSize = ButtonSize.Large,
                 ) {
                     Text(
-                        text = stringResource(R.string.screen_join_room_join_action),
+                        text = havenJoinString(R.string.screen_join_room_join_action),
                     )
                 }
             }
@@ -264,13 +266,13 @@ private fun JoinRoomFooter(
                     buttonSize = ButtonSize.Large,
                 ) {
                     Text(
-                        text = stringResource(R.string.screen_join_room_knock_action),
+                        text = havenJoinString(R.string.screen_join_room_knock_action),
                     )
                 }
             }
             JoinAuthorisationStatus.IsKnocked -> {
                 OutlinedButton(
-                    text = stringResource(R.string.screen_join_room_cancel_knock_action),
+                    text = havenJoinString(R.string.screen_join_room_cancel_knock_action),
                     onClick = onCancelKnock,
                     modifier = Modifier.fillMaxWidth(),
                     size = ButtonSize.Large,
@@ -278,7 +280,7 @@ private fun JoinRoomFooter(
             }
             JoinAuthorisationStatus.NeedInvite -> {
                 Announcement(
-                    title = stringResource(R.string.screen_join_room_invite_required_message),
+                    title = havenJoinString(R.string.screen_join_room_invite_required_message),
                     description = null,
                     type = AnnouncementType.Informative(isCritical = false),
                 )
@@ -360,7 +362,7 @@ private fun JoinRestrictedFooter(
             buttonSize = ButtonSize.Large,
         ) {
             Text(
-                text = stringResource(R.string.screen_join_room_join_action),
+                text = havenJoinString(R.string.screen_join_room_join_action),
             )
         }
     }
@@ -404,7 +406,7 @@ private fun JoinRoomContent(
                                     val supportingText = if (knockMessage.isNotEmpty()) {
                                         "${knockMessage.length}/$MAX_KNOCK_MESSAGE_LENGTH"
                                     } else {
-                                        stringResource(R.string.screen_join_room_knock_message_description)
+                                        havenJoinString(R.string.screen_join_room_knock_message_description)
                                     }
                                     TextField(
                                         value = knockMessage,
@@ -534,8 +536,8 @@ private fun IsKnockedLoadedContent(modifier: Modifier = Modifier) {
     IconTitleSubtitleMolecule(
         modifier = modifier.padding(horizontal = 8.dp),
         iconStyle = BigIcon.Style.SuccessSolid,
-        title = stringResource(R.string.screen_join_room_knock_sent_title),
-        subTitle = stringResource(R.string.screen_join_room_knock_sent_description),
+        title = havenJoinString(R.string.screen_join_room_knock_sent_title),
+        subTitle = havenJoinString(R.string.screen_join_room_knock_sent_description),
     )
 }
 
@@ -650,4 +652,27 @@ internal fun JoinRoomViewPreview(@PreviewParameter(JoinRoomStatePreviewParam::cl
         onCancelKnockSuccess = { },
         onDeclineInviteAndBlockUser = { },
     )
+}
+
+// Haven: "follow" wording for MSC4501 profile/group rooms, matching Haven Desktop
+internal val LocalHavenSocialKind = androidx.compose.runtime.staticCompositionLocalOf<HavenSocialKind?> { null }
+
+@Composable
+private fun havenJoinString(@androidx.annotation.StringRes res: Int): String {
+    val kind = LocalHavenSocialKind.current ?: return stringResource(res)
+    val profile = kind == HavenSocialKind.Profile
+    val override = when (res) {
+        R.string.screen_join_room_join_action -> if (profile) R.string.haven_join_follow else R.string.haven_join_join_group
+        R.string.screen_join_room_knock_action -> if (profile) R.string.haven_join_send_follow_request else R.string.haven_join_request_to_join
+        R.string.screen_join_room_cancel_knock_action -> if (profile) R.string.haven_join_cancel_follow_request else R.string.haven_join_cancel_join_request
+        R.string.screen_join_room_invite_required_message -> if (profile) R.string.haven_join_private_profile else R.string.haven_join_private_group
+        R.string.screen_join_room_knock_message_description -> R.string.haven_join_request_message_description
+        R.string.screen_join_room_knock_sent_title -> if (profile) R.string.haven_join_follow_request_sent else R.string.haven_join_join_request_sent
+        R.string.screen_join_room_knock_sent_description -> if (profile) R.string.haven_join_follow_request_sent_description else R.string.haven_join_join_request_sent_description
+        R.string.screen_join_room_cancel_knock_alert_title -> if (profile) R.string.haven_join_cancel_follow_request else R.string.haven_join_cancel_join_request
+        R.string.screen_join_room_cancel_knock_alert_description -> if (profile) R.string.haven_join_cancel_follow_request_description else R.string.haven_join_cancel_join_request_description
+        R.string.screen_join_room_cancel_knock_alert_confirmation -> if (profile) R.string.haven_join_cancel_follow_request else R.string.haven_join_cancel_join_request
+        else -> res
+    }
+    return stringResource(override)
 }

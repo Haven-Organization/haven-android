@@ -37,7 +37,9 @@ data class JoinRoomState(
     val knockMessage: String,
     val hideInviteAvatars: Boolean,
     val canReportRoom: Boolean,
-    val eventSink: (JoinRoomEvent) -> Unit
+    val eventSink: (JoinRoomEvent) -> Unit,
+    // Haven: an MSC4501 profile or group room gets "follow" wording
+    val havenSocialKind: HavenSocialKind? = null,
 ) {
     val isJoinActionUnauthorized = joinAction is AsyncAction.Failure && joinAction.error is JoinRoom.Failures.UnauthorizedJoin
     val joinAuthorisationStatus = when (contentState) {
@@ -119,4 +121,13 @@ sealed interface JoinAuthorisationStatus {
     data object Restricted : JoinAuthorisationStatus
     data object Unknown : JoinAuthorisationStatus
     data object Unauthorized : JoinAuthorisationStatus
+}
+
+/** Haven: MSC4501 room kinds, for "follow" wording on the join/knock screen. */
+enum class HavenSocialKind { Profile, Group }
+
+internal fun havenSocialKindOf(roomType: String?): HavenSocialKind? = when (roomType) {
+    "org.matrix.msc4501.social.profile", "org.matrix.msc3639.social.profile" -> HavenSocialKind.Profile
+    "org.matrix.msc4501.social.group", "org.matrix.msc3639.social.group" -> HavenSocialKind.Group
+    else -> null
 }

@@ -35,5 +35,8 @@ interface HomeEntryPoint : FeatureEntryPoint {
         fun navigateToBugReport()
         fun navigateToAddAccount()
         fun navigateToSession(sessionId: SessionId)
+
+        /** Haven: open an app from the Apps button or a pinned app (see HavenApp). */
+        fun navigateToHavenApp(appId: String) {}
     }
 }

@@ -28,6 +28,7 @@ setupDependencyInjection()
 dependencies {
     implementation(projects.appconfig)
     implementation(projects.libraries.core)
+    implementation(projects.features.widgets.api) // Haven
     implementation(projects.libraries.architecture)
     implementation(projects.libraries.matrix.api)
     implementation(projects.libraries.matrixui)

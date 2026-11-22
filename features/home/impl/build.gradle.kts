@@ -29,6 +29,7 @@ setupDependencyInjection()
 
 dependencies {
     implementation(projects.schildi.lib)
+    implementation(projects.features.social.api) // Haven
     implementation(projects.schildi.matrixsdk)
     implementation(projects.schildi.components)
     implementation(projects.schildi.theme)

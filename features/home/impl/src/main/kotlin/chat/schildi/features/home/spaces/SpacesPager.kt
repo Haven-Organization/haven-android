@@ -109,6 +109,14 @@ fun SpacesPager(
         LaunchedEffect(Unit) { onMeasureSpaceBarHeight(0) }
         return
     }
+    // Haven: "All chats" is off by default, so with no saved selection (e.g. a fresh install) nothing would be selected
+    // and the room list would be empty. Select the first space instead.
+    val allChatsEnabled = ScPrefs.PSEUDO_SPACE_ALL_ROOMS.value()
+    LaunchedEffect(allChatsEnabled, spaceSelectionHierarchy.isEmpty(), spacesList.firstOrNull()?.selectionId) {
+        if (!allChatsEnabled && spaceSelectionHierarchy.isEmpty()) {
+            spacesList.firstOrNull()?.let { onSpaceSelected(listOf(it.selectionId)) }
+        }
+    }
     Column(modifier) {
         SpacesPager(
             homeState = homeState,
@@ -305,15 +313,39 @@ private fun ColumnScope.SpacesPager(
         label = "tabIndicatorColor"
     ).value
     val selectedTabRendered = selectedTab.correctDownIfNot(allowAllRooms)
+    // Haven: Apps button and pinned apps on the root space bar, each on the left (default) or right
+    val havenApps = io.element.android.features.social.api.LocalHavenAppsBar.current.takeIf { parentSelection.isEmpty() }
+    val havenAppsButtonRight = ScPrefs.HAVEN_APPS_BUTTON_RIGHT.value()
+    val havenPinnedAppsRight = ScPrefs.HAVEN_PINNED_APPS_RIGHT.value()
+    // Laid out exactly like the space tabs next to them (compact icons, or icon + label tabs).
+    val havenStyle = if (compactTabs) {
+        io.element.android.features.social.api.HavenBarStyle.SpaceBarCompact
+    } else {
+        io.element.android.features.social.api.HavenBarStyle.SpaceBarTab
+    }
+    @Composable
+    fun HavenAppsSide(right: Boolean) {
+        havenApps ?: return
+        if (havenAppsButtonRight == right) io.element.android.features.social.api.HavenAppsButton(havenApps, havenStyle)
+        if (havenPinnedAppsRight == right) {
+            havenApps.pinnedApps.forEach { app ->
+                io.element.android.features.social.api.HavenPinnedAppButton(app, havenApps, havenStyle)
+            }
+        }
+    }
+    // Apps placed before the spaces shift the tab indices of the spaces (for the selection indicator).
+    val havenLeadingCount = if (havenApps == null) 0 else {
+        (if (!havenAppsButtonRight) 1 else 0) + (if (!havenPinnedAppsRight) havenApps.pinnedApps.size else 0)
+    }
     ScrollableTabRow(
-        selectedTabIndex = selectedTabRendered,
+        selectedTabIndex = selectedTabRendered + havenLeadingCount,
         edgePadding = 0.dp,
         minTabWidth = 0.dp,
         containerColor = ScTheme.exposures.spaceBarBg ?: TabRowDefaults.primaryContainerColor,
         indicator = { tabPositions ->
             Box(
                 Modifier
-                    .tabIndicatorOffset(tabPositions.getOrNull(selectedTabRendered) ?: tabPositions[0])
+                    .tabIndicatorOffset(tabPositions.getOrNull(selectedTabRendered + havenLeadingCount) ?: tabPositions[0])
                     .fillMaxWidth()
                     .padding(horizontal = 4.dp)
                     .height(3.dp)
@@ -325,6 +357,8 @@ private fun ColumnScope.SpacesPager(
             onSpaceBarHeightUpdate()
         },
     ) {
+        // Haven: these scroll with the spaces, like any other tab
+        HavenAppsSide(right = false)
         if (allowAllRooms) {
             if (defaultSpace != null) {
                 SpaceTab(defaultSpace, selectedTab == 0, expandSpaceChildren, false, compactTabs) {
@@ -367,6 +401,7 @@ private fun ColumnScope.SpacesPager(
                 }
             }
         }
+        HavenAppsSide(right = true)
     }
 }
 

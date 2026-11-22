@@ -114,6 +114,7 @@ fun RoomDetailsView(
     openAvatarPreview: (name: String, url: String) -> Unit,
     openPollHistory: () -> Unit,
     openMediaGallery: () -> Unit,
+    openExtensions: () -> Unit = {}, // Haven
     openAdminSettings: () -> Unit,
     onJoinCallClick: (CallIntent) -> Unit,
     onPinnedMessagesClick: () -> Unit,
@@ -241,6 +242,12 @@ fun RoomDetailsView(
             PreferenceCategory {
                 MediaGalleryItem(
                     onClick = openMediaGallery
+                )
+                // Haven: room widgets
+                ListItem(
+                    content = { Text(stringResource(io.element.android.features.widgets.api.R.string.haven_room_extensions)) },
+                    leadingContent = ListItemContent.Icon(IconSource.Vector(CompoundIcons.Extensions())),
+                    onClick = openExtensions,
                 )
                 PinnedMessagesItem(
                     pinnedMessagesCount = state.pinnedMessagesCount,

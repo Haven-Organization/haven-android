@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="haven_app_social_name">Social</string>
+    <string name="haven_apps_button">Apps</string>
+    <string name="haven_apps_pin">Pin to bar</string>
+    <string name="haven_apps_unpin">Unpin from bar</string>
+    <string name="haven_apps_picker_title">Apps</string>
+    <string name="haven_apps_remove">Remove from Apps</string>
+    <string name="haven_apps_add">Add to Apps</string>
+    <string name="haven_apps_go_to_room">Go to room</string>
+    <string name="haven_apps_go_to_named_room">Go to %1$s</string>
+</resources>

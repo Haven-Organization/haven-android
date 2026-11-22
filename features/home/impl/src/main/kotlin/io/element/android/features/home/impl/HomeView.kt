@@ -410,6 +410,16 @@ private fun HomeBottomBar(
                 counter = totalUnreadCount.takeIf { item == HomeNavigationBarItem.Chats && it > 0 }
             )
         }
+        // Haven: Apps button to the right of Spaces, then pinned apps
+        io.element.android.features.social.api.LocalHavenAppsBar.current?.let { havenApps ->
+            val style = io.element.android.features.social.api.HavenBarStyle.ElementToolbar
+            HorizontalFloatingToolbarSeparator()
+            io.element.android.features.social.api.HavenAppsButton(havenApps, style)
+            havenApps.pinnedApps.forEach { app ->
+                HorizontalFloatingToolbarSeparator()
+                io.element.android.features.social.api.HavenPinnedAppButton(app, havenApps, style)
+            }
+        }
     }
 }
 

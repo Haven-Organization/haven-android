@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Haven: MSC4501 "following" wording for profile and group rooms (matches Haven Desktop) -->
+<resources>
+    <string name="haven_join_follow">Follow</string>
+    <string name="haven_join_join_group">Join</string>
+    <string name="haven_join_send_follow_request">Send Follow Request</string>
+    <string name="haven_join_request_to_join">Request to Join</string>
+    <string name="haven_join_cancel_follow_request">Cancel Follow Request</string>
+    <string name="haven_join_cancel_join_request">Cancel Join Request</string>
+    <string name="haven_join_private_profile">This profile is private. You need an invite to follow it.</string>
+    <string name="haven_join_private_group">This group is private. You need an invite to join it.</string>
+    <string name="haven_join_request_message_description">Add a message to your request (optional)</string>
+    <string name="haven_join_follow_request_sent">Follow Request Sent</string>
+    <string name="haven_join_join_request_sent">Join Request Sent</string>
+    <string name="haven_join_follow_request_sent_description">You\'ll start following as soon as your request is accepted. Stay here and Haven will take you there automatically.</string>
+    <string name="haven_join_join_request_sent_description">You\'ll join as soon as your request is accepted. Stay here and Haven will take you there automatically.</string>
+    <string name="haven_join_cancel_follow_request_description">Are you sure you want to cancel your request to follow this profile?</string>
+    <string name="haven_join_cancel_join_request_description">Are you sure you want to cancel your request to join this group?</string>
+</resources>

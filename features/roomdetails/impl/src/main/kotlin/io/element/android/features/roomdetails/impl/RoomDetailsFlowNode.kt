@@ -81,6 +81,7 @@ class RoomDetailsFlowNode(
     private val knockRequestsListEntryPoint: KnockRequestsListEntryPoint,
     private val mediaViewerEntryPoint: MediaViewerEntryPoint,
     private val mediaGalleryEntryPoint: MediaGalleryEntryPoint,
+    private val widgetsEntryPoint: io.element.android.features.widgets.api.WidgetsEntryPoint, // Haven
     private val outgoingVerificationEntryPoint: OutgoingVerificationEntryPoint,
     private val reportRoomEntryPoint: ReportRoomEntryPoint,
     private val changeRoomMemberRolesEntryPoint: ChangeRoomMemberRolesEntryPoint,
@@ -128,6 +129,13 @@ class RoomDetailsFlowNode(
 
         @Parcelize
         data object MediaGallery : NavTarget
+
+        // Haven: room widgets
+        @Parcelize
+        data object Extensions : NavTarget
+
+        @Parcelize
+        data class Widget(val widgetId: String) : NavTarget
 
         @Parcelize
         data object AdminSettings : NavTarget
@@ -206,6 +214,10 @@ class RoomDetailsFlowNode(
 
                     override fun navigateToMediaGallery() {
                         backstack.push(NavTarget.MediaGallery)
+                    }
+
+                    override fun navigateToExtensions() {
+                        backstack.push(NavTarget.Extensions)
                     }
 
                     override fun navigateToAdminSettings() {
@@ -351,6 +363,26 @@ class RoomDetailsFlowNode(
             }
             is NavTarget.PollHistory -> {
                 pollHistoryEntryPoint.createNode(this, buildContext)
+            }
+            NavTarget.Extensions, is NavTarget.Widget -> {
+                val widgetsCallback = object : io.element.android.features.widgets.api.WidgetsEntryPoint.Callback {
+                    override fun onDone() {
+                        backstack.pop()
+                    }
+
+                    override fun navigateToRoom(roomId: RoomId) {
+                        callback.navigateToRoom(roomId, emptyList())
+                    }
+
+                    override fun openWidget(roomId: RoomId, widgetId: String) {
+                        backstack.push(NavTarget.Widget(widgetId))
+                    }
+                }
+                if (navTarget is NavTarget.Widget) {
+                    widgetsEntryPoint.createWidgetNode(this, buildContext, room.roomId, navTarget.widgetId, widgetsCallback)
+                } else {
+                    widgetsEntryPoint.createExtensionsNode(this, buildContext, room.roomId, widgetsCallback)
+                }
             }
             is NavTarget.MediaGallery -> {
                 val callback = object : MediaGalleryEntryPoint.Callback {

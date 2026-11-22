@@ -98,6 +98,15 @@ class JoinRoomPresenter(
         val cancelKnockAction: MutableState<AsyncAction<Unit>> = remember { mutableStateOf(AsyncAction.Uninitialized) }
         val forgetRoomAction: MutableState<AsyncAction<Unit>> = remember { mutableStateOf(AsyncAction.Uninitialized) }
         var knockMessage by rememberSaveable { mutableStateOf("") }
+        // Haven: profile/group wording, and auto-accepting the invite a follow request leads to (like Haven Desktop)
+        val havenSocialKind by produceState<HavenSocialKind?>(null) {
+            val type = matrixClient.getRoomPreview(roomIdOrAlias, serverNames).getOrNull()?.let { preview ->
+                (preview.previewInfo.roomType as? io.element.android.libraries.matrix.api.room.RoomType.Other)?.type
+                    .also { runCatching { preview.close() } }
+            }
+            value = havenSocialKindOf(type)
+        }
+        var havenKnockedHere by rememberSaveable { mutableStateOf(false) }
         var isDismissingContent by remember { mutableStateOf(false) }
         val hideInviteAvatars by matrixClient.rememberHideInvitesAvatar()
         val canReportRoom by produceState(false) { value = matrixClient.canReportRoom() }
@@ -185,9 +194,30 @@ class JoinRoomPresenter(
             }
         }
 
+        // Haven: a follow request (knock) sent from this screen is answered by an invite: accept it straight away, so the
+        // user lands in the room (and, from Social, on the post they were opening) without another tap.
+        if (knockAction.value.isSuccess()) havenKnockedHere = true
+        if ((contentState as? ContentState.Loaded)?.joinAuthorisationStatus is JoinAuthorisationStatus.IsKnocked) havenKnockedHere = true
+        val havenInvite = ((contentState as? ContentState.Loaded)?.joinAuthorisationStatus as? JoinAuthorisationStatus.IsInvited)?.inviteData
+        LaunchedEffect(havenKnockedHere, havenInvite) {
+            if (havenKnockedHere && havenInvite != null) {
+                handleEvent(JoinRoomEvent.AcceptInvite(havenInvite))
+            }
+        }
+
+        // Haven: after a follow request, keep showing "request sent" while the invite is accepted and the join completes,
+        // instead of briefly falling back to "Send request" / the invite screen.
+        val shownContentState = (contentState as? ContentState.Loaded)
+            ?.takeIf { havenKnockedHere }
+            ?.takeIf {
+                it.joinAuthorisationStatus !is JoinAuthorisationStatus.IsBanned &&
+                    it.joinAuthorisationStatus !is JoinAuthorisationStatus.Unauthorized
+            }
+            ?.copy(joinAuthorisationStatus = JoinAuthorisationStatus.IsKnocked)
+            ?: contentState
         return JoinRoomState(
             roomIdOrAlias = roomIdOrAlias,
-            contentState = contentState,
+            contentState = shownContentState,
             acceptDeclineInviteState = acceptDeclineInviteState,
             joinAction = joinAction.value,
             knockAction = knockAction.value,
@@ -198,6 +228,7 @@ class JoinRoomPresenter(
             hideInviteAvatars = hideInviteAvatars,
             canReportRoom = canReportRoom,
             eventSink = ::handleEvent,
+            havenSocialKind = havenSocialKind,
         )
     }
 

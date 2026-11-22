@@ -135,6 +135,8 @@ class LoggedInFlowNode(
     private val sessionCoroutineScope: CoroutineScope,
     private val ftueService: FtueService,
     private val roomDirectoryEntryPoint: RoomDirectoryEntryPoint,
+    private val socialEntryPoint: io.element.android.features.social.api.SocialEntryPoint, // Haven
+    private val widgetsEntryPoint: io.element.android.features.widgets.api.WidgetsEntryPoint, // Haven
     private val matrixClient: MatrixClient,
     private val sendingQueue: SendQueues,
     private val nativeCallHost: NativeCallHost,
@@ -292,6 +294,14 @@ class LoggedInFlowNode(
         @Parcelize
         data object RoomDirectory : NavTarget
 
+        // Haven: the Social app
+        @Parcelize
+        data object Social : NavTarget
+
+        // Haven: a room widget added to Apps
+        @Parcelize
+        data class WidgetApp(val roomId: RoomId, val widgetId: String) : NavTarget
+
         @Parcelize
         data class IncomingVerificationRequest(val data: VerificationRequest.Incoming) : NavTarget
     }
@@ -361,6 +371,16 @@ class LoggedInFlowNode(
 
                     override fun navigateToSession(sessionId: SessionId) {
                         callback.navigateToSession(sessionId)
+                    }
+
+                    // Haven
+                    override fun navigateToHavenApp(appId: String) {
+                        val widget = io.element.android.features.social.api.HavenAppItem.parseWidgetAppId(appId)
+                        when {
+                            widget != null -> backstack.push(NavTarget.WidgetApp(RoomId(widget.first), widget.second))
+                            io.element.android.features.social.api.HavenApp.fromId(appId) == io.element.android.features.social.api.HavenApp.Social ->
+                                backstack.push(NavTarget.Social)
+                        }
                     }
                 }
                 homeEntryPoint.createNode(
@@ -553,6 +573,45 @@ class LoggedInFlowNode(
                     }
                 }
                 linkNewDeviceEntryPoint.createNode(this, buildContext, callback)
+            }
+            is NavTarget.WidgetApp -> {
+                val widgetsCallback = object : io.element.android.features.widgets.api.WidgetsEntryPoint.Callback {
+                    override fun onDone() {
+                        backstack.pop()
+                    }
+
+                    override fun navigateToRoom(roomId: RoomId) {
+                        backstack.push(NavTarget.Room(roomId.toRoomIdOrAlias()))
+                    }
+
+                    override fun openWidget(roomId: RoomId, widgetId: String) {
+                        backstack.push(NavTarget.WidgetApp(roomId, widgetId))
+                    }
+                }
+                widgetsEntryPoint.createWidgetNode(this, buildContext, navTarget.roomId, navTarget.widgetId, widgetsCallback)
+            }
+            NavTarget.Social -> {
+                socialEntryPoint.createNode(
+                    parentNode = this,
+                    buildContext = buildContext,
+                    callback = object : io.element.android.features.social.api.SocialEntryPoint.Callback {
+                        override fun navigateToRoomDetails(roomId: RoomId) {
+                            backstack.push(NavTarget.Room(roomId.toRoomIdOrAlias(), initialElement = RoomNavigationTarget.Details))
+                        }
+
+                        override fun navigateToRoomMembers(roomId: RoomId) {
+                            backstack.push(NavTarget.Room(roomId.toRoomIdOrAlias(), initialElement = RoomNavigationTarget.Details))
+                        }
+
+                        override fun navigateToRoom(roomId: RoomId) {
+                            backstack.push(NavTarget.Room(roomId.toRoomIdOrAlias()))
+                        }
+
+                        override fun navigateToUser(userId: UserId) {
+                            backstack.push(NavTarget.UserProfile(userId))
+                        }
+                    },
+                )
             }
             NavTarget.RoomDirectory -> {
                 roomDirectoryEntryPoint.createNode(

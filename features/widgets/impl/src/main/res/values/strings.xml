@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Haven: room widgets -->
+<resources>
+    <string name="widgets_extensions">Extensions</string>
+    <string name="widgets_extensions_empty">This room has no widgets.</string>
+    <string name="widgets_widget">Widget</string>
+    <string name="widgets_add_to_apps">Add to Apps</string>
+    <string name="widgets_remove_from_apps">Remove from Apps</string>
+    <string name="widgets_go_to_room">Go to room</string>
+    <string name="widgets_more">More options</string>
+    <string name="widgets_fullscreen">Full screen</string>
+    <string name="widgets_exit_fullscreen">Exit full screen</string>
+    <string name="widgets_not_joined">You\'re not in this widget\'s room.</string>
+    <string name="widgets_removed">This widget was removed from its room.</string>
+    <string name="widgets_consent">This widget was added by %1$s and loads content from %2$s. Using it may share data with that site.</string>
+    <string name="widgets_continue">Continue</string>
+    <string name="widgets_capabilities_title">Approve widget permissions</string>
+    <string name="widgets_capabilities_content">This widget would like to:</string>
+    <string name="widgets_allow">Allow</string>
+    <string name="widgets_deny">Deny</string>
+</resources>
