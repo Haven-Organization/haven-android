@@ -45,8 +45,8 @@ android {
     defaultConfig {
         //applicationId = BuildTimeConfig.APPLICATION_ID
         applicationId = "software.haven.HavenAndroid"
-        versionCode = 10
-        versionName = "0.1.0-ex_26_11_0"
+        versionCode = 20
+        versionName = "0.2.0-ex_26_11_0"
         targetSdk = Versions.TARGET_SDK
 
         // Keep abiFilter for the universalApk
@@ -222,8 +222,8 @@ android {
         // Common upstream overrides across all sc variants - only one flavor for this dimension to ensure it's picked up!
         create("sc") {
             dimension = "package"
-            versionCode = 10
-            versionName = "0.1.0-ex_26_11_0"
+            versionCode = 20
+            versionName = "0.2.0-ex_26_11_0"
             isDefault = true
         }
         // SC variants for different release tracks. Cannot do actual release types for those since fdroid build tools always want `release` builds.

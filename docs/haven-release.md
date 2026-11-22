@@ -13,8 +13,9 @@ Releases are built, signed and published by GitHub Actions (`.github/workflows/r
    The tag must match the start of `versionName` (for example `v0.1.0` for `0.1.0-ex_26_11_0`).
 3. In the repository's **Actions** tab, open the "Release" run and **approve** the `release` environment deployment.
    Before approving, check that the tag points at a commit on `master` you expect.
-4. About 30–40 minutes later the release appears under **Releases** with the arm64-v8a, armeabi-v7a and x86_64 APKs and a
-   `SHA256SUMS` file. The workflow fails if any APK isn't signed with the Haven release key.
+4. About 30–40 minutes later a **draft** release appears under **Releases** with the arm64-v8a, armeabi-v7a and x86_64
+   APKs and a `SHA256SUMS` file. The workflow fails if any APK isn't signed with the Haven release key.
+5. Drafts are only visible to maintainers. Test the APK, then open the draft and click **Publish release**.
 
 ## How the signing key is protected
 
