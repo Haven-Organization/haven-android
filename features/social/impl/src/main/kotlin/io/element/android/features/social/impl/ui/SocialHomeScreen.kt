@@ -30,6 +30,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -56,6 +57,8 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 enum class SocialSection { Feed, Groups, Profile, Search }
@@ -164,7 +167,9 @@ private fun FeedPane(deps: SocialDeps, callbacks: PostCallbacks) {
     val listState = rememberLazyListState()
     // Extend the feed by loading more from the rooms holding it back (the ones loaded the least far back).
     val latestSnapshot by rememberUpdatedState(snapshot)
-    PaginateOnScroll(listState, key = roomIds) {
+    // Progress is the feed reaching further back (the cutoff moving), which can take several rounds of loading before
+    // any older post shows up.
+    PaginateOnScroll(listState, key = roomIds, progress = { latestSnapshot?.cutoff }) {
         val limiting = latestSnapshot?.limitingRooms.orEmpty().take(8)
         if (limiting.isEmpty()) {
             // Nothing holding the feed back (yet): only keep going while rooms are still loading.
@@ -213,19 +218,33 @@ private fun FeedPane(deps: SocialDeps, callbacks: PostCallbacks) {
  * whether there may be more; loading stops when it says there isn't, or after a few loads that add nothing.
  */
 @Composable
-fun PaginateOnScroll(listState: LazyListState, key: Any?, loadMore: suspend () -> Boolean) {
+fun PaginateOnScroll(
+    listState: LazyListState,
+    key: Any?,
+    /** What changes when loading made progress; by default, the number of items in the list. */
+    progress: (() -> Any?)? = null,
+    loadMore: suspend () -> Boolean,
+) {
+    val currentProgress by rememberUpdatedState(progress)
     LaunchedEffect(key) {
+        fun progressMark(): Any? = currentProgress?.invoke() ?: listState.layoutInfo.totalItemsCount
         var fruitless = 0
-        while (isActive && fruitless < 5) {
+        while (isActive) {
             val info = listState.layoutInfo
             val last = info.visibleItemsInfo.lastOrNull()?.index ?: 0
             val nearEnd = info.totalItemsCount == 0 || last >= info.totalItemsCount - 5
             if (nearEnd) {
-                val before = info.totalItemsCount
+                val before = progressMark()
                 val mayHaveMore = loadMore()
                 if (!mayHaveMore) break
                 delay(500)
-                if (listState.layoutInfo.totalItemsCount <= before) fruitless++ else fruitless = 0
+                if (progressMark() == before) fruitless++ else fruitless = 0
+                if (fruitless >= 5) {
+                    // Several loads added nothing: pause until the list changes (new posts, or the user scrolls), instead
+                    // of giving up for good and leaving the spinner up with nothing loading.
+                    snapshotFlow { listState.layoutInfo.totalItemsCount to listState.firstVisibleItemIndex }.drop(1).first()
+                    fruitless = 0
+                }
             } else {
                 fruitless = 0
                 delay(500)

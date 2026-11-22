@@ -40,6 +40,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import timber.log.Timber
 
@@ -225,9 +226,11 @@ class SocialTimelineStore(
         .flowOn(Dispatchers.Default)
 
     /** Loads older posts of [roomId]. Returns whether the room may have more (false at the start, or on failure). */
-    suspend fun paginate(roomId: RoomId): Boolean {
-        val timeline = timeline(roomId) ?: return false
-        return timeline.paginate(Timeline.PaginationDirection.BACKWARDS).map { reachedStart -> !reachedStart }.getOrDefault(false)
+    suspend fun paginate(roomId: RoomId): Boolean = withContext(Dispatchers.Default) {
+        // Off the main thread: opening a room's timeline and paginating call into the SDK, and the list's loading
+        // spinner has to keep animating meanwhile.
+        val timeline = timeline(roomId) ?: return@withContext false
+        timeline.paginate(Timeline.PaginationDirection.BACKWARDS).map { reachedStart -> !reachedStart }.getOrDefault(false)
     }
 
     private fun toFeedPost(roomId: RoomId, item: MatrixTimelineItem.Event): FeedPost? {
