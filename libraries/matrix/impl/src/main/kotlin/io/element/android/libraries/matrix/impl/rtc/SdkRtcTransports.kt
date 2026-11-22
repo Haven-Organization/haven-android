@@ -23,9 +23,9 @@ private fun RtcTransport.toJsonObject(): JsonObject = when (this) {
     is RtcTransport.LiveKit -> JsonObject(
         buildMap {
             put("type", JsonPrimitive("livekit"))
-            // Haven: SDK compat, the SchildiChat rustcomponents fork has no `url` (SFU WebSocket URL) yet and
-            // `serviceUrl` is still non-null. Upstream also emits `url` when present.
-            put("livekit_service_url", JsonPrimitive(serviceUrl))
+            // Mirror the MSC4195 wire format: absent fields are omitted rather than serialized as null.
+            url?.let { put("url", JsonPrimitive(it)) }
+            serviceUrl?.let { put("livekit_service_url", JsonPrimitive(it)) }
         }
     )
     is RtcTransport.Custom -> {

@@ -97,7 +97,6 @@ import io.element.android.libraries.matrix.impl.user.UserSearchResultMapper
 import io.element.android.libraries.matrix.impl.user.into
 import io.element.android.libraries.matrix.impl.user.map
 import io.element.android.libraries.matrix.impl.util.cancelAndDestroy
-import io.element.android.libraries.matrix.impl.compat.totalUnreadNotificationsFlow
 import io.element.android.libraries.matrix.impl.util.mxCallbackFlow
 import io.element.android.libraries.matrix.impl.verification.RustSessionVerificationService
 import io.element.android.libraries.matrix.impl.workmanager.PerformDatabaseVacuumRequestBuilder
@@ -144,6 +143,7 @@ import org.matrix.rustcomponents.sdk.ProfileListener
 import org.matrix.rustcomponents.sdk.RoomInfoListener
 import org.matrix.rustcomponents.sdk.SendQueueRoomErrorListener
 import org.matrix.rustcomponents.sdk.TaskHandle
+import org.matrix.rustcomponents.sdk.TotalUnreadNotificationsListener
 import org.matrix.rustcomponents.sdk.UserProfile
 import org.matrix.rustcomponents.sdk.use
 import timber.log.Timber
@@ -153,6 +153,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.io.encoding.Base64
 import kotlin.jvm.optionals.getOrNull
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.toJavaDuration
 import org.matrix.rustcomponents.sdk.CreateRoomParameters as RustCreateRoomParameters
@@ -352,8 +353,14 @@ class RustMatrixClient(
         get() = _isShuttingDown.get()
 
     override val totalUnreadCountFlow: StateFlow<Long> =
-        // Haven: SDK compat, the SchildiChat rustcomponents fork has no observeTotalUnreadNotifications() yet
-        innerClient.totalUnreadNotificationsFlow(pollInterval = 2.seconds).stateIn(
+        mxCallbackFlow {
+            val listener = object : TotalUnreadNotificationsListener {
+                override fun onUpdate(count: ULong) {
+                    trySend(count.toLong())
+                }
+            }
+            innerClient.observeTotalUnreadNotifications(listener, 100.milliseconds.toJavaDuration())
+        }.stateIn(
             scope = sessionCoroutineScope,
             started = SharingStarted.WhileSubscribed(),
             initialValue = runCatchingExceptions { innerClient.totalUnreadNotifications().toLong() }.getOrDefault(0L),

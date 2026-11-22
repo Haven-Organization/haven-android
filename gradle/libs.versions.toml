@@ -183,8 +183,8 @@ test_detekt_test = { module = "dev.detekt:detekt-test", version.ref = "detekt" }
 # All new features should not be implemented in the pull request that upgrades the version, developers should
 # only fix API breaks and may add some TODOs.
 # SC/Haven: SchildiChat's rustcomponents fork, required by the SchildiChat features. Upstream Element X
-# v26.11.1 pins org.matrix.rustcomponents:sdk-android:26.11.17; APIs missing from the fork are shimmed
-# in libraries/matrix/impl (search for "Haven: SDK compat").
+# v26.11.1 pins org.matrix.rustcomponents:sdk-android:26.11.17; use the fork version SchildiChat uses with
+# the same upstream release (if an API is missing, shim it in libraries/matrix/impl marked "Haven: SDK compat").
 # `strictly` so nothing silently drags in another SDK version.
 matrix_sdk = { module = "chat.schildi.rustcomponents:sdk-android", version = { strictly = "0.4.58" } }
 rustls_platform_verifier = "org.rustls:rustls-platform-verifier:0.2.0"
