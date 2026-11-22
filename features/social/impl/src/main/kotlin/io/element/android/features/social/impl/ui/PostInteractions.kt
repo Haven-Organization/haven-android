@@ -113,6 +113,7 @@ fun rememberPostCallbacks(deps: SocialDeps, navigator: SocialNavigator, state: P
             onToggleReaction = { post, key -> if (!requireFollow(post)) scope.runAction(onError) { deps.actions.toggleReaction(post, key) } },
             onDelete = { state.confirmDelete = it },
             onViewInRoom = { navigator.openRoomTimeline(it.roomId) },
+            onOpenEvent = { roomId, eventId -> navigator.openThread(roomId, eventId) },
             onOpenMedia = { post, media ->
                 // The stock viewer needs the room open; for peeked posts, following comes first.
                 if (!navigator.openMedia(post, media) && !requireFollow(post)) {

@@ -154,7 +154,12 @@ private fun FeedPane(deps: SocialDeps, callbacks: PostCallbacks) {
         deps.timelineStore.feed(roomIds).collect { value = it }
     }
     val posts = remember(snapshot, filter) {
-        snapshot?.posts.orEmpty().filter { !it.isThreadReply && it.sender.value !in filter.excludedUserIds }
+        // Thread replies are included, like Haven Desktop's feed.
+        snapshot?.posts.orEmpty().filter { it.sender.value !in filter.excludedUserIds }
+    }
+    // "↩ reply to X's post": the replied-to author, when that post is loaded.
+    val authorNames = remember(snapshot) {
+        snapshot?.posts.orEmpty().mapNotNull { p -> p.eventId?.let { it.value to nameOf(p) } }.toMap()
     }
     val listState = rememberLazyListState()
     // Extend the feed by loading more from the rooms holding it back (the ones loaded the least far back).
@@ -185,7 +190,13 @@ private fun FeedPane(deps: SocialDeps, callbacks: PostCallbacks) {
     }
     LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
         items(posts, key = { it.key }) { post ->
-            PostTile(post = post, deps = deps, callbacks = callbacks, roomName = roomNames[post.roomId])
+            PostTile(
+                post = post,
+                deps = deps,
+                callbacks = callbacks,
+                roomName = roomNames[post.roomId],
+                repliedToName = post.post.inReplyToId?.let { authorNames[it] },
+            )
         }
         if (snapshot?.hasMore == true || snapshot?.isLoading == true) {
             item(key = "loading-more") {

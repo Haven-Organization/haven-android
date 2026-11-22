@@ -213,6 +213,7 @@ class JoinedRustRoom(
             is CreateTimelineParams.Threaded -> TimelineFocus.Thread(
                 rootEventId = createTimelineParams.threadRootEventId.value,
             )
+            CreateTimelineParams.HavenLiveWithThreads -> TimelineFocus.Live(hideThreadedEvents = false)
         }
 
         val filter = when (createTimelineParams) {
@@ -228,6 +229,7 @@ class JoinedRustRoom(
             )
             is CreateTimelineParams.Focused,
             CreateTimelineParams.PinnedOnly,
+            CreateTimelineParams.HavenLiveWithThreads,
             is CreateTimelineParams.Threaded -> {
                 RustTimelineEventFilterFactory().create(
                     hideMembershipInPublicChats = !scTimelineFilterSettings.showMembershipEventsInPublicRooms,
@@ -244,6 +246,7 @@ class JoinedRustRoom(
             is CreateTimelineParams.MediaOnly -> "MediaGallery_"
             is CreateTimelineParams.MediaOnlyFocused -> "MediaGallery_${createTimelineParams.focusedEventId}"
             is CreateTimelineParams.Threaded -> "Thread_${createTimelineParams.threadRootEventId}"
+            CreateTimelineParams.HavenLiveWithThreads -> "haven_social_live"
         }
 
         // Note that for TimelineFilter.MediaOnlyFocused, the date separator will be filtered out,
@@ -253,13 +256,15 @@ class JoinedRustRoom(
             is CreateTimelineParams.MediaOnlyFocused -> DateDividerMode.MONTHLY
             is CreateTimelineParams.Focused,
             CreateTimelineParams.PinnedOnly,
+            CreateTimelineParams.HavenLiveWithThreads,
             is CreateTimelineParams.Threaded -> DateDividerMode.DAILY
         }
 
         // Track read receipts only for focused and threaded timelines for performance optimization
         val trackReadReceipts = when (createTimelineParams) {
             is CreateTimelineParams.Focused, is CreateTimelineParams.Threaded -> true
-            is CreateTimelineParams.MediaOnly, is CreateTimelineParams.MediaOnlyFocused, CreateTimelineParams.PinnedOnly -> false
+            is CreateTimelineParams.MediaOnly, is CreateTimelineParams.MediaOnlyFocused, CreateTimelineParams.PinnedOnly,
+            CreateTimelineParams.HavenLiveWithThreads -> false
         }
 
         runCatchingExceptions {
@@ -279,6 +284,7 @@ class JoinedRustRoom(
                     is CreateTimelineParams.MediaOnlyFocused -> Timeline.Mode.FocusedOnEvent(createTimelineParams.focusedEventId)
                     CreateTimelineParams.PinnedOnly -> Timeline.Mode.PinnedEvents
                     is CreateTimelineParams.Threaded -> Timeline.Mode.Thread(createTimelineParams.threadRootEventId)
+                    CreateTimelineParams.HavenLiveWithThreads -> Timeline.Mode.Live
                 }
                 innerTimeline.map(mode = mode)
             }
@@ -288,6 +294,7 @@ class JoinedRustRoom(
                 is CreateTimelineParams.MediaOnlyFocused,
                 is CreateTimelineParams.Threaded -> it.toFocusEventException()
                 CreateTimelineParams.MediaOnly,
+                CreateTimelineParams.HavenLiveWithThreads,
                 CreateTimelineParams.PinnedOnly -> it
             }
         }.onFailure {

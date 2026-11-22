@@ -17,4 +17,7 @@ sealed interface CreateTimelineParams {
     data class MediaOnlyFocused(val focusedEventId: EventId) : CreateTimelineParams
     data object PinnedOnly : CreateTimelineParams
     data class Threaded(val threadRootEventId: ThreadId) : CreateTimelineParams
+
+    /** Haven: the live timeline including thread replies (the stock live timeline hides them), for the Social feed. */
+    data object HavenLiveWithThreads : CreateTimelineParams
 }

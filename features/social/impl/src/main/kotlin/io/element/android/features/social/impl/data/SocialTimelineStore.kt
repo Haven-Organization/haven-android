@@ -17,6 +17,7 @@ import io.element.android.libraries.matrix.api.core.EventId
 import io.element.android.libraries.matrix.api.core.RoomId
 import io.element.android.libraries.matrix.api.core.TransactionId
 import io.element.android.libraries.matrix.api.core.UserId
+import io.element.android.libraries.matrix.api.room.CreateTimelineParams
 import io.element.android.libraries.matrix.api.room.JoinedRoom
 import io.element.android.libraries.matrix.api.timeline.MatrixTimelineItem
 import io.element.android.libraries.matrix.api.timeline.Timeline
@@ -122,13 +123,31 @@ class SocialTimelineStore(
         matrixClient.getJoinedRoom(roomId)?.also { rooms[roomId] = it }
     }
 
-    suspend fun timeline(roomId: RoomId): Timeline? = joinedRoom(roomId)?.liveTimeline
+    private val socialTimelines = mutableMapOf<RoomId, Timeline>()
+
+    /**
+     * The room's live timeline including thread replies (Element X's own live timeline hides them; Haven Desktop's feed
+     * shows them). Falls back to the stock live timeline if it can't be created.
+     */
+    suspend fun timeline(roomId: RoomId): Timeline? {
+        val room = joinedRoom(roomId) ?: return null
+        return mutex.withLock {
+            socialTimelines[roomId] ?: room.createTimeline(CreateTimelineParams.HavenLiveWithThreads)
+                .onFailure { Timber.tag(SocialRepository.LOG_TAG).w(it, "Couldn't create a timeline with threads for %s", roomId) }
+                .getOrNull()
+                ?.also { socialTimelines[roomId] = it }
+                ?: room.liveTimeline
+        }
+    }
 
     /** The room if its timeline is already open (no waiting). */
     fun cachedJoinedRoom(roomId: RoomId): JoinedRoom? = rooms[roomId]
 
     /** Drops a room's timeline, e.g. after leaving it. */
-    suspend fun forget(roomId: RoomId) = mutex.withLock { rooms.remove(roomId)?.destroy() }
+    suspend fun forget(roomId: RoomId) = mutex.withLock {
+        socialTimelines.remove(roomId)?.let { runCatching { it.close() } }
+        rooms.remove(roomId)?.destroy()
+    }
 
     /** Live posts of one room, newest first. */
     suspend fun posts(roomId: RoomId): Flow<List<FeedPost>> {

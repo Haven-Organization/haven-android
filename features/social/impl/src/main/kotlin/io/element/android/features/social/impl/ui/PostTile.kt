@@ -88,6 +88,8 @@ class PostCallbacks(
     val onDelete: (FeedPost) -> Unit,
     val onViewInRoom: (FeedPost) -> Unit,
     val onOpenMedia: (FeedPost, PostMedia) -> Unit = { _, _ -> },
+    /** Open a post by id in a room (e.g. the post a reply replies to). */
+    val onOpenEvent: (io.element.android.libraries.matrix.api.core.RoomId, String) -> Unit = { _, _ -> },
 )
 
 @Composable
@@ -98,6 +100,8 @@ fun PostTile(
     modifier: Modifier = Modifier,
     roomName: String? = null,
     focused: Boolean = false,
+    /** Display name of the post this one replies to (in-room thread reply), when known. */
+    repliedToName: String? = null,
 ) {
     val social = post.post
     Column(
@@ -123,7 +127,12 @@ fun PostTile(
             social.isCrossPostedReply && relation != null -> RelationLine("↩", stringResource(R.string.social_replied_to, relation.authorName())) {
                 callbacks.onOpenReference(relation)
             }
-            social.inReplyToId != null && !focused -> RelationLine("↩", stringResource(R.string.social_reply), onClick = null)
+            social.inReplyToId != null && !focused -> RelationLine(
+                "↩",
+                repliedToName?.let { stringResource(R.string.social_replied_to, it) } ?: stringResource(R.string.social_reply),
+            ) {
+                callbacks.onOpenEvent(post.roomId, social.inReplyToId)
+            }
         }
         Row {
             Box(Modifier.clickable { callbacks.onOpenUser(post.sender) }) {
