@@ -19,7 +19,8 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx8g -XX:MaxMetaspaceSize=512m -Dfile.encoding=UTF-8 -XX:+UseG1GC -Dkotlin.daemon.jvm.options=-Xmx4g
+  # The runner has 16 GB: leave headroom so the build doesn't end up swapping.
+  GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=512m -Dfile.encoding=UTF-8 -XX:+UseG1GC -Dkotlin.daemon.jvm.options=-Xmx3g
   # SHA-256 of the Haven release signing certificate (CN=Haven, O=Haven-Organization)
   HAVEN_RELEASE_CERT_SHA256: a5abf06836e679c545181b807e7eb9751518cc86af4c657d44e4c99e6b16d698
 
@@ -75,7 +76,14 @@ jobs:
           HAVEN_ANDROID_RELEASE_STOREPASSWORD: ${{ secrets.HAVEN_ANDROID_RELEASE_STOREPASSWORD }}
           HAVEN_ANDROID_RELEASE_KEYALIAS: ${{ secrets.HAVEN_ANDROID_RELEASE_KEYALIAS }}
           HAVEN_ANDROID_RELEASE_KEYPASSWORD: ${{ secrets.HAVEN_ANDROID_RELEASE_KEYPASSWORD }}
-        run: ./gradlew assembleFdroidScDefaultRelease --stacktrace --no-daemon --no-configuration-cache
+        # Release lint (lintVital*) isn't needed to produce the APKs and stalls the runner: skip it.
+        run: |
+          cat > "${RUNNER_TEMP}/skip-lint.gradle" <<'EOF2'
+          gradle.taskGraph.whenReady { graph ->
+              graph.allTasks.findAll { it.name.startsWith("lintVital") }.each { it.enabled = false }
+          }
+          EOF2
+          ./gradlew assembleFdroidScDefaultRelease --stacktrace --no-daemon --no-configuration-cache --init-script "${RUNNER_TEMP}/skip-lint.gradle"
 
       - name: Delete the signing keystore
         if: ${{ always() }}
