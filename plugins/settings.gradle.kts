@@ -11,6 +11,7 @@ rootProject.name = "Haven_plugins"
 dependencyResolutionManagement {
     repositories {
         mavenCentral()
+        google()
     }
     versionCatalogs {
         create("libs") {

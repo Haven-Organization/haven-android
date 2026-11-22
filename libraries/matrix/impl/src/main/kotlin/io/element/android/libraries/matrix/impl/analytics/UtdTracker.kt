@@ -33,7 +33,8 @@ class UtdTracker(
                 -> Error.Name.HistoricalMessage
             UtdCause.WITHHELD_FOR_UNVERIFIED_OR_INSECURE_DEVICE -> Error.Name.RoomKeysWithheldForUnverifiedDevice
             UtdCause.WITHHELD_BY_SENDER -> Error.Name.OlmKeysNotSentError
-            // Haven: SDK compat, UtdCause.MALFORMED (upstream: -> Error.Name.UnknownError) isn't in the SchildiChat rustcomponents fork yet
+            // We don't have a specific error name for this case yet
+            UtdCause.MALFORMED -> Error.Name.UnknownError
         }
         val event = Error(
             context = null,

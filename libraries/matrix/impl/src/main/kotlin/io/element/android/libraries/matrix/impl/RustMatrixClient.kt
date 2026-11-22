@@ -61,7 +61,6 @@ import io.element.android.libraries.matrix.api.timeline.ReceiptType
 import io.element.android.libraries.matrix.api.user.MatrixSearchUserResults
 import io.element.android.libraries.matrix.api.user.MatrixUser
 import io.element.android.libraries.matrix.api.user.UserStatus
-import io.element.android.libraries.matrix.impl.compat.totalUnreadNotificationsFlow
 import io.element.android.libraries.matrix.impl.encryption.RustEncryptionService
 import io.element.android.libraries.matrix.impl.exception.mapClientException
 import io.element.android.libraries.matrix.impl.linknewdevice.RustLinkDesktopHandler
@@ -98,6 +97,7 @@ import io.element.android.libraries.matrix.impl.user.UserSearchResultMapper
 import io.element.android.libraries.matrix.impl.user.into
 import io.element.android.libraries.matrix.impl.user.map
 import io.element.android.libraries.matrix.impl.util.cancelAndDestroy
+import io.element.android.libraries.matrix.impl.compat.totalUnreadNotificationsFlow
 import io.element.android.libraries.matrix.impl.util.mxCallbackFlow
 import io.element.android.libraries.matrix.impl.verification.RustSessionVerificationService
 import io.element.android.libraries.matrix.impl.workmanager.PerformDatabaseVacuumRequestBuilder
@@ -154,6 +154,7 @@ import kotlin.io.encoding.Base64
 import kotlin.jvm.optionals.getOrNull
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
+import kotlin.time.toJavaDuration
 import org.matrix.rustcomponents.sdk.CreateRoomParameters as RustCreateRoomParameters
 import org.matrix.rustcomponents.sdk.RoomPreset as RustRoomPreset
 import org.matrix.rustcomponents.sdk.SyncService as ClientSyncService
@@ -493,6 +494,14 @@ class RustMatrixClient(
         }
     }
 
+    override suspend fun hasEncryptedRooms(): Result<Boolean> = withContext(sessionDispatcher) {
+        runCatchingExceptions {
+            innerClient.hasEncryptedRooms(5.seconds.toJavaDuration())
+        }.onFailure {
+            Timber.e(it, "Failed to check whether the user has encrypted rooms")
+        }
+    }
+
     override suspend fun ignoreUser(userId: UserId): Result<Unit> = withContext(sessionDispatcher) {
         runCatchingExceptions {
             innerClient.ignoreUser(userId.value)
@@ -762,7 +771,7 @@ class RustMatrixClient(
         }.mapFailure { it.mapClientException() }
     }
 
-    internal suspend fun destroy() {
+    override suspend fun destroy() {
         innerNotificationClient.close()
 
         roomFactory.destroy()
