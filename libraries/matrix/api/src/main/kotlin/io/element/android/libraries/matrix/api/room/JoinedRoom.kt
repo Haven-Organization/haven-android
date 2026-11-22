@@ -264,6 +264,15 @@ interface JoinedRoom : BaseRoom {
     fun getWidgetDriver(widgetSettings: MatrixWidgetSettings): Result<MatrixWidgetDriver>
 
     /**
+     * Haven: a widget driver for an ordinary room widget. Unlike [getWidgetDriver] (Element Call), the capabilities the
+     * widget requests are only granted if [approveCapabilities] returns true; it gets a readable description of each.
+     */
+    fun havenGetWidgetDriver(
+        widgetSettings: MatrixWidgetSettings,
+        approveCapabilities: suspend (List<String>) -> Boolean,
+    ): Result<MatrixWidgetDriver> = getWidgetDriver(widgetSettings)
+
+    /**
      * Enables or disables the send queue of this room only; see [io.element.android.libraries.matrix.api.MatrixClient.setAllSendQueuesEnabled]
      * for the session-wide equivalent and for why a queue disables itself.
      *

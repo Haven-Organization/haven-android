@@ -955,6 +955,17 @@ class RustMatrixClient(
         }
     }
 
+    // Haven: see MatrixClient.havenRawCredentials
+    override suspend fun havenRawCredentials(): Result<io.element.android.libraries.matrix.api.HavenRawCredentials> = withContext(sessionDispatcher) {
+        runCatchingExceptions {
+            val session = innerClient.session()
+            io.element.android.libraries.matrix.api.HavenRawCredentials(
+                homeserverUrl = session.homeserverUrl,
+                accessToken = session.accessToken,
+            )
+        }
+    }
+
     override suspend fun setAccountData(eventType: String, content: String): Result<Unit> = withContext(sessionDispatcher) {
         runCatchingExceptions {
             innerClient.setAccountData(eventType, content)

@@ -496,6 +496,54 @@ class JoinedRustRoom(
         }
     }
 
+    // Haven: see JoinedRoom.havenGetWidgetDriver
+    override fun havenGetWidgetDriver(
+        widgetSettings: MatrixWidgetSettings,
+        approveCapabilities: suspend (List<String>) -> Boolean,
+    ): Result<MatrixWidgetDriver> {
+        return runCatchingExceptions {
+            RustWidgetDriver(
+                widgetSettings = widgetSettings,
+                room = innerRoom,
+                widgetCapabilitiesProvider = object : WidgetCapabilitiesProvider {
+                    override suspend fun acquireCapabilities(capabilities: WidgetCapabilities): WidgetCapabilities {
+                        val descriptions = havenDescribeCapabilities(capabilities)
+                        return if (descriptions.isEmpty() || approveCapabilities(descriptions)) {
+                            capabilities
+                        } else {
+                            WidgetCapabilities(
+                                read = emptyList(),
+                                send = emptyList(),
+                                requiresClient = false,
+                                updateDelayedEvent = false,
+                                sendDelayedEvent = false,
+                                downloadFiles = false,
+                                rtcTransports = false,
+                                rtcLivekitGetToken = false,
+                                rtcLivekitDelegateDelayedLeave = false,
+                            )
+                        }
+                    }
+                },
+            )
+        }
+    }
+
+    private fun havenDescribeCapabilities(capabilities: WidgetCapabilities): List<String> = buildList {
+        fun describe(filter: org.matrix.rustcomponents.sdk.WidgetEventFilter) = when (filter) {
+            is org.matrix.rustcomponents.sdk.WidgetEventFilter.MessageLikeWithType -> "${filter.eventType} events"
+            is org.matrix.rustcomponents.sdk.WidgetEventFilter.RoomMessageWithMsgtype -> "${filter.msgtype} messages"
+            is org.matrix.rustcomponents.sdk.WidgetEventFilter.StateWithType -> "${filter.eventType} state"
+            is org.matrix.rustcomponents.sdk.WidgetEventFilter.StateWithTypeAndStateKey -> "${filter.eventType} state (${filter.stateKey})"
+            else -> filter.toString()
+        }
+        capabilities.read.forEach { add("Read " + describe(it)) }
+        capabilities.send.forEach { add("Send " + describe(it)) }
+        if (capabilities.sendDelayedEvent || capabilities.updateDelayedEvent) add("Send and update delayed events")
+        if (capabilities.downloadFiles) add("Download files")
+        if (capabilities.rtcTransports || capabilities.rtcLivekitGetToken || capabilities.rtcLivekitDelegateDelayedLeave) add("Join calls")
+    }
+
     override suspend fun setSendQueueEnabled(enabled: Boolean) {
         withContext(roomDispatcher) {
             Timber.d("setSendQueuesEnabled: $enabled")

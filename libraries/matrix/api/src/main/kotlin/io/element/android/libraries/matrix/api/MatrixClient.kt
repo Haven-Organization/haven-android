@@ -472,6 +472,13 @@ interface MatrixClient : ClientUrlContentFetcher {
     suspend fun setAccountData(eventType: String, content: String): Result<Unit>
 
     /**
+     * Haven: the current homeserver URL and access token, for the few Client-Server API calls the SDK does not wrap
+     * (MSC4501 social rooms: typed room creation, custom profile fields, directory search by room type).
+     * Never log the returned value.
+     */
+    suspend fun havenRawCredentials(): Result<HavenRawCredentials> = Result.failure(UnsupportedOperationException())
+
+    /**
      * Marks the room with the provided [roomId] as read, sending a fully read receipt for [eventId].
      *
      * This method should be used with caution as providing the [eventId] ourselves can result in incorrect read receipts.
