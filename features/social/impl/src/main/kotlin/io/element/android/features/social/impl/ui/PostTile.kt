@@ -21,6 +21,8 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.unit.Dp
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -102,8 +104,14 @@ fun PostTile(
     focused: Boolean = false,
     /** Display name of the post this one replies to (in-room thread reply), when known. */
     repliedToName: String? = null,
+    /**
+     * Feed layout: the post's content and buttons span the whole tile under the author row, with larger buttons.
+     * Otherwise (rooms and threads) the content sits beside the avatar, leaving room for a thread line.
+     */
+    wide: Boolean = false,
 ) {
     val social = post.post
+    val indent = if (wide) 0.dp else 52.dp
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -115,45 +123,62 @@ fun PostTile(
                 text = roomName,
                 style = ElementTheme.typography.fontBodyXsMedium,
                 color = ElementTheme.colors.textSecondary,
-                modifier = Modifier.padding(start = 52.dp, bottom = 4.dp),
+                modifier = Modifier.padding(start = indent, bottom = 4.dp),
             )
         }
         // Relation header line (MSC4501: "Alice reposted Bob's post" / "Alice replied to Bob's post")
         val relation = social.relation
         when {
-            social.isPlainRepost && relation != null -> RelationLine("🔁", stringResource(R.string.social_reposted, nameOf(post), relation.authorName())) {
+            social.isPlainRepost && relation != null -> RelationLine("🔁", stringResource(R.string.social_reposted, nameOf(post), relation.authorName()), indent) {
                 callbacks.onOpenReference(relation)
             }
-            social.isCrossPostedReply && relation != null -> RelationLine("↩", stringResource(R.string.social_replied_to, relation.authorName())) {
+            social.isCrossPostedReply && relation != null -> RelationLine("↩", stringResource(R.string.social_replied_to, relation.authorName()), indent) {
                 callbacks.onOpenReference(relation)
             }
             social.inReplyToId != null && !focused -> RelationLine(
                 "↩",
                 repliedToName?.let { stringResource(R.string.social_replied_to, it) } ?: stringResource(R.string.social_reply),
+                indent,
             ) {
                 callbacks.onOpenEvent(post.roomId, social.inReplyToId)
             }
         }
-        Row {
-            Box(Modifier.clickable { callbacks.onOpenUser(post.sender) }) {
+        val avatar = @Composable {
+            Box(Modifier.clip(CircleShape).clickable { callbacks.onOpenUser(post.sender) }) {
                 Avatar(
                     avatarData = AvatarData(post.sender.value, post.senderName, post.senderAvatarUrl, AvatarSize.RoomListItem),
                     avatarType = AvatarType.User,
                     forcedAvatarSize = 40.dp,
                 )
             }
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
-                PostHeader(post, focused, callbacks)
-                if (social.isPlainRepost && relation != null) {
-                    // A plain repost shows only the original post.
-                    EmbeddedPost(relation, deps, callbacks)
-                } else {
-                    PostBody(social.content, deps, onOpenMedia = { media -> callbacks.onOpenMedia(post, media) })
-                    if (relation != null) EmbeddedPost(relation, deps, callbacks)
+        }
+        val content = @Composable {
+            if (social.isPlainRepost && relation != null) {
+                // A plain repost shows only the original post.
+                EmbeddedPost(relation, deps, callbacks)
+            } else {
+                PostBody(social.content, deps, onOpenMedia = { media -> callbacks.onOpenMedia(post, media) })
+                if (relation != null) EmbeddedPost(relation, deps, callbacks)
+            }
+            if (post.reactions.isNotEmpty()) ReactionsRow(post, callbacks)
+        }
+        if (wide) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                avatar()
+                Spacer(Modifier.width(12.dp))
+                Box(Modifier.weight(1f)) { PostHeader(post, focused, callbacks) }
+            }
+            Column(Modifier.padding(top = 4.dp)) { content() }
+            ActionBar(post, callbacks, large = true)
+        } else {
+            Row {
+                avatar()
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    PostHeader(post, focused, callbacks)
+                    content()
+                    ActionBar(post, callbacks)
                 }
-                if (post.reactions.isNotEmpty()) ReactionsRow(post, callbacks)
-                ActionBar(post, callbacks)
             }
         }
     }
@@ -164,12 +189,12 @@ fun PostTile(
 private fun PostHeader(post: FeedPost, focused: Boolean, callbacks: PostCallbacks) {
     var showMenu by remember { mutableStateOf(false) }
     Row(verticalAlignment = Alignment.Top) {
-        Column(
-            Modifier
-                .weight(1f)
-                .clickable { callbacks.onOpenUser(post.sender) },
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+        // Only the name and ID open the profile: the empty space beside them opens the post, like the rest of the tile.
+        Column(Modifier.weight(1f)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.clickable { callbacks.onOpenUser(post.sender) },
+            ) {
                 Text(
                     text = nameOf(post),
                     style = ElementTheme.typography.fontBodyMdMedium,
@@ -198,6 +223,7 @@ private fun PostHeader(post: FeedPost, focused: Boolean, callbacks: PostCallback
                 color = ElementTheme.colors.textSecondary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.clickable { callbacks.onOpenUser(post.sender) },
             )
         }
         Box {
@@ -227,7 +253,7 @@ private fun PostHeader(post: FeedPost, focused: Boolean, callbacks: PostCallback
 }
 
 @Composable
-private fun RelationLine(emoji: String, text: String, onClick: (() -> Unit)?) {
+private fun RelationLine(emoji: String, text: String, indent: Dp, onClick: (() -> Unit)?) {
     Text(
         text = "$emoji $text",
         style = ElementTheme.typography.fontBodySmMedium,
@@ -235,7 +261,7 @@ private fun RelationLine(emoji: String, text: String, onClick: (() -> Unit)?) {
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
         modifier = Modifier
-            .padding(start = 52.dp, bottom = 4.dp)
+            .padding(start = indent, bottom = 4.dp)
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
     )
 }
@@ -413,43 +439,45 @@ private fun ReactionsRow(post: FeedPost, callbacks: PostCallbacks) {
 }
 
 @Composable
-private fun ActionBar(post: FeedPost, callbacks: PostCallbacks) {
+private fun ActionBar(post: FeedPost, callbacks: PostCallbacks, large: Boolean = false) {
     Row(
         modifier = Modifier
             .padding(top = 4.dp)
             .fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
+        // Large (feed): spread evenly across the tile, so each button sits in the middle of its own share of the width.
+        horizontalArrangement = if (large) Arrangement.SpaceAround else Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        ActionButton(CompoundIcons.Reply(), stringResource(R.string.social_action_reply), post.replyCount, false) { callbacks.onReply(post) }
-        ActionButton(Icons.Outlined.Repeat, stringResource(R.string.social_action_repost), post.repostCount, post.repostedByMe) { callbacks.onRepost(post) }
-        ActionButton(Icons.Outlined.FormatQuote, stringResource(R.string.social_action_quote), 0, false) { callbacks.onQuote(post) }
+        ActionButton(CompoundIcons.Reply(), stringResource(R.string.social_action_reply), post.replyCount, false, large) { callbacks.onReply(post) }
+        ActionButton(Icons.Outlined.Repeat, stringResource(R.string.social_action_repost), post.repostCount, post.repostedByMe, large) { callbacks.onRepost(post) }
+        ActionButton(Icons.Outlined.FormatQuote, stringResource(R.string.social_action_quote), 0, false, large) { callbacks.onQuote(post) }
         ActionButton(
             if (post.likedByMe) Icons.Filled.ThumbUp else Icons.Outlined.ThumbUp,
             stringResource(R.string.social_action_like),
             post.likeCount,
             post.likedByMe,
+            large,
         ) { callbacks.onLike(post) }
         // No hover on mobile, so reacting gets its own button next to Like.
-        ActionButton(Icons.Outlined.AddReaction, stringResource(R.string.social_action_react), 0, false) { callbacks.onReact(post) }
+        ActionButton(Icons.Outlined.AddReaction, stringResource(R.string.social_action_react), 0, false, large) { callbacks.onReact(post) }
     }
 }
 
 @Composable
-private fun ActionButton(icon: ImageVector, label: String, count: Int, active: Boolean, onClick: () -> Unit) {
+private fun ActionButton(icon: ImageVector, label: String, count: Int, active: Boolean, large: Boolean, onClick: () -> Unit) {
     val color = if (active) ElementTheme.colors.iconAccentPrimary else ElementTheme.colors.iconSecondary
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(if (large) 24.dp else 16.dp))
             .clickable(onClick = onClick)
-            .padding(horizontal = 8.dp, vertical = 6.dp),
+            .then(if (large) Modifier.heightIn(min = 48.dp).padding(horizontal = 14.dp) else Modifier.padding(horizontal = 8.dp, vertical = 6.dp)),
     ) {
-        Icon(imageVector = icon, contentDescription = label, tint = color, modifier = Modifier.size(20.dp))
+        Icon(imageVector = icon, contentDescription = label, tint = color, modifier = Modifier.size(if (large) 24.dp else 20.dp))
         if (count > 0) {
             Text(
                 text = count.toString(),
-                style = ElementTheme.typography.fontBodySmRegular,
+                style = if (large) ElementTheme.typography.fontBodyMdRegular else ElementTheme.typography.fontBodySmRegular,
                 color = color,
                 modifier = Modifier.padding(start = 4.dp),
             )

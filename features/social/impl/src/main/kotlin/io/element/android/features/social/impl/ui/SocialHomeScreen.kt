@@ -201,6 +201,7 @@ private fun FeedPane(deps: SocialDeps, callbacks: PostCallbacks) {
                 callbacks = callbacks,
                 roomName = roomNames[post.roomId],
                 repliedToName = post.post.inReplyToId?.let { authorNames[it] },
+                wide = true,
             )
         }
         if (snapshot?.hasMore == true || snapshot?.isLoading == true) {
