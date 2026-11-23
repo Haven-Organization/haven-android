@@ -13,6 +13,7 @@ import io.element.android.libraries.matrix.api.roomlist.RoomListService
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,6 +21,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 
@@ -76,7 +78,11 @@ class SpaceUnreadCountsDataSource(
             }.toImmutableList()
             //visibleSpaces.forEach { result[it.selectionId] = getUnreadCountsForSpace(it, allRoomsValue, useClientGeneratedCounts) }
             Triple(totalUnreadCount, newEnrichedSpaces, visibleSpaceIds)
-        }.onEach { (totalUnreadCount, result, visibleSpaceIds) ->
+        }
+            // Haven: filtering every room into every space is heavy with hundreds of rooms, and reruns on each room update
+            // (e.g. while the Social feed loads its rooms): keep it off the main thread.
+            .flowOn(Dispatchers.Default)
+            .onEach { (totalUnreadCount, result, visibleSpaceIds) ->
             _totalUnreadCounts.emit(totalUnreadCount)
             _enrichedSpaces.emit(result)
             roomListService.subscribeToVisibleRooms(visibleSpaceIds)
