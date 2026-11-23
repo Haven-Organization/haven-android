@@ -18,6 +18,18 @@ data class PostContent(
     /** HTML, after applying MSC4501's `m.social.formatted_body` override, or null. */
     val formattedBody: String?,
     val media: PostMedia?,
+    /** MSC4144 per-message profile (`com.beeper.per_message_profile`), e.g. a bridged post's real author. */
+    val perMessageProfile: PerMessageProfile? = null,
+)
+
+/** MSC4144, read like Haven Desktop's PerMessageProfile.ts. */
+data class PerMessageProfile(
+    val id: String,
+    val displayname: String?,
+    /** An mxc:// URL, or null when not set (or not an mxc:// URL). */
+    val avatarUrl: String?,
+    /** `avatar_url` set to "": explicitly no avatar. */
+    val avatarRemoved: Boolean,
 )
 
 data class PostMedia(
@@ -99,7 +111,13 @@ object SocialPostParser {
             ?.let { parseRelation(it, outerContent = content) }
         val rawBody = content.optString("body")
         val isPlainRepost = relation?.relType == PostRelation.RelType.Repost &&
-            (relation.contentInline || isPermalinkTo(rawBody.trim(), relation.roomId, relation.eventId))
+            (
+                relation.contentInline ||
+                    isPermalinkTo(rawBody.trim(), relation.roomId, relation.eventId) ||
+                    // MSC4501's body fields present but empty: no commentary, whatever the stock body says (e.g. a
+                    // bridge's "🔁 X boosted Y's post" line for ordinary timelines).
+                    hasEmptyBodyOverride(content)
+                )
         val bundledReplyCount = event.optJSONObject("unsigned")
             ?.optJSONObject("m.relations")
             ?.optJSONObject("m.thread")
@@ -116,20 +134,48 @@ object SocialPostParser {
         )
     }
 
-    /** Applies MSC4501's rule: `m.social.body`/`formatted_body`, when present (even empty), replace `body`/`formatted_body`. */
-    fun parseContent(content: JSONObject, eventType: String? = null): PostContent {
-        val body = if (content.has(Msc4501.BODY)) content.optString(Msc4501.BODY) else content.optString("body")
-        val formattedBody = when {
+    /**
+     * Applies MSC4501's rule: `org.matrix.msc4501.social.body` / `social.formatted_body`, when present (even empty), are
+     * shown in place of `body` / `formatted_body`. Senders (e.g. bridges) use them to leave out what's only there for
+     * ordinary room timelines, like a "⤵️ Reply to X's post:" header line.
+     *
+     * With only `social.body`, the stock `formatted_body` isn't used either: it's the timeline version of the text
+     * (header included), which `social.body` replaces.
+     *
+     * Without either field, the older `software.haven.remove_header` flag (from before them, still honoured like Haven
+     * Desktop does) removes the stock fields' first line.
+     */
+    fun parseContent(content: JSONObject, eventType: String? = null, inlineRepost: Boolean = false): PostContent {
+        val hasOverride = content.has(Msc4501.BODY) || content.has(Msc4501.FORMATTED_BODY)
+        var body = if (content.has(Msc4501.BODY)) content.optString(Msc4501.BODY) else content.optString("body")
+        var formattedBody = when {
             content.has(Msc4501.FORMATTED_BODY) -> content.optString(Msc4501.FORMATTED_BODY)
+            content.has(Msc4501.BODY) -> null
             content.optString("format") == "org.matrix.custom.html" -> content.optStringOrNull("formatted_body")
             else -> null
         }
+        if (!hasOverride && content.optBoolean(Msc4501.REMOVE_HEADER, false)) {
+            formattedBody = formattedBody?.replace(LEADING_HTML_LINE, "")
+            // Not a bare permalink: that's a repost's fallback, not a header.
+            if (!isBarePermalink(body)) body = body.replace(LEADING_TEXT_LINE, "")
+        }
         val msgtype = content.optStringOrNull("msgtype")
+        val media = parseMedia(content, msgtype, eventType)
+        // Not post text: a bare event permalink in the stock body is only the fallback MSC4501 puts there for clients
+        // that don't know MSC4501 (e.g. a repost's body), and an inline repost of media has the outer event's own
+        // filler (permalink or filename) as its stock body/formatted_body, like Haven Desktop treats them. The
+        // m.social.* fields are always real text.
+        if (!hasOverride && ((inlineRepost && media != null) || isBarePermalink(body))) {
+            body = ""
+            formattedBody = null
+        }
         return PostContent(
             msgtype = msgtype,
             body = stripReplyFallback(body),
             formattedBody = formattedBody?.let(::stripHtmlReplyFallback),
-            media = parseMedia(content, msgtype, eventType),
+            media = media,
+            // An inline repost's outer content is the reposter's own event: its per-message profile is theirs.
+            perMessageProfile = if (inlineRepost) null else parsePerMessageProfile(content),
         )
     }
 
@@ -142,18 +188,22 @@ object SocialPostParser {
             msgtype == "m.file" -> PostMedia.Kind.File
             else -> return null
         }
+        // A `file` object is only encrypted media (EncryptedFile) when it carries the key: some senders put a plain
+        // {url, name, mimetype} there (Haven Desktop reads it that way too), which must load as ordinary media.
         val file = content.optJSONObject("file")
+        val encryptedFile = file?.takeIf { it.isEncryptedFile() }
         val info = content.optJSONObject("info")
+        val thumbnailFile = info?.optJSONObject("thumbnail_file")
         return PostMedia(
             kind = kind,
             url = file?.optStringOrNull("url") ?: content.optStringOrNull("url"),
-            encryptedFileJson = file?.toString(),
+            encryptedFileJson = encryptedFile?.toString(),
             mimetype = info?.optStringOrNull("mimetype"),
             width = info?.optInt("w", 0)?.takeIf { it > 0 },
             height = info?.optInt("h", 0)?.takeIf { it > 0 },
-            filename = content.optStringOrNull("filename") ?: content.optString("body"),
-            thumbnailUrl = info?.optStringOrNull("thumbnail_url"),
-            thumbnailFileJson = info?.optJSONObject("thumbnail_file")?.toString(),
+            filename = content.optStringOrNull("filename") ?: content.optString("body").takeIf { !isBarePermalink(it) },
+            thumbnailUrl = info?.optStringOrNull("thumbnail_url") ?: thumbnailFile?.optStringOrNull("url"),
+            thumbnailFileJson = thumbnailFile?.takeIf { it.isEncryptedFile() }?.toString(),
             blurhash = info?.optStringOrNull("xyz.amorgan.blurhash"),
             durationMs = info?.optLong("duration", 0)?.takeIf { it > 0 },
             size = info?.optLong("size", 0)?.takeIf { it > 0 },
@@ -171,7 +221,7 @@ object SocialPostParser {
         // content_inline is only meaningful for reposts (MSC4501 "Cross-room post references").
         val contentInline = relType == PostRelation.RelType.Repost && block.optBoolean("content_inline", false)
         val embedded = when {
-            contentInline -> parseContent(JSONObject(outerContent.toString()).apply { remove(Msc4501.RELATES_TO) })
+            contentInline -> parseContent(JSONObject(outerContent.toString()).apply { remove(Msc4501.RELATES_TO) }, inlineRepost = true)
             else -> block.optJSONObject("content")?.let { parseContent(it) }
         }
         return PostRelation(
@@ -191,6 +241,35 @@ object SocialPostParser {
         if (text.isEmpty() || text.any { it.isWhitespace() }) return false
         val (linkRoom, linkEvent) = parsePermalink(text) ?: return false
         return linkRoom == roomId && linkEvent == eventId
+    }
+
+    private fun parsePerMessageProfile(content: JSONObject): PerMessageProfile? {
+        val raw = content.optJSONObject("com.beeper.per_message_profile") ?: return null
+        val id = raw.optStringOrNull("id")?.takeIf { it.isNotEmpty() } ?: return null
+        val avatar = raw.optStringOrNull("avatar_url")
+        return PerMessageProfile(
+            id = id,
+            displayname = raw.optStringOrNull("displayname")?.takeIf { it.isNotEmpty() },
+            avatarUrl = avatar?.takeIf { it.startsWith("mxc://") },
+            avatarRemoved = avatar == "",
+        )
+    }
+
+    /** MSC4501's body fields present, and both empty: the sender says there's no text to show as a post. */
+    private fun hasEmptyBodyOverride(content: JSONObject): Boolean =
+        (content.has(Msc4501.BODY) || content.has(Msc4501.FORMATTED_BODY)) &&
+            content.optString(Msc4501.BODY).isBlank() &&
+            content.optString(Msc4501.FORMATTED_BODY).isBlank()
+
+    // software.haven.remove_header: the first line, as bridges send it (a top-level <p> and following <br>s in HTML; a
+    // line and following blank lines in plain text), like Haven Desktop's stripLeadingHeaderLine.
+    private val LEADING_HTML_LINE = Regex("""^\s*<p>.*?</p>\s*(<br\s*/?>\s*)*""", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
+    private val LEADING_TEXT_LINE = Regex("""^[^\n]*\n(?:[ \t]*\n)*""")
+
+    /** True when [text] is nothing but an event permalink (matrix.to or matrix: URI). */
+    fun isBarePermalink(text: String): Boolean {
+        val trimmed = text.trim()
+        return trimmed.isNotEmpty() && trimmed.none { it.isWhitespace() } && parsePermalink(trimmed) != null
     }
 
     /** Returns (room id or alias, event id) for an event permalink. */
@@ -239,3 +318,6 @@ internal fun JSONArray?.toStringList(): List<String> {
     if (this == null) return emptyList()
     return (0 until length()).mapNotNull { optString(it).takeIf { s -> s.isNotEmpty() } }
 }
+
+/** An EncryptedFile (Matrix spec): has the key and IV needed to decrypt the media. */
+internal fun JSONObject.isEncryptedFile() = has("key") && has("iv") && has("hashes")

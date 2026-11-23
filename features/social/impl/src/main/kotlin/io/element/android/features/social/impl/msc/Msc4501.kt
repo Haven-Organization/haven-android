@@ -25,6 +25,9 @@ object Msc4501 {
     const val BODY = "org.matrix.msc4501.social.body"
     const val FORMATTED_BODY = "org.matrix.msc4501.social.formatted_body"
 
+    /** Older Haven flag (before the two fields above): the stock body's first line is a header to leave out. */
+    const val REMOVE_HEADER = "software.haven.remove_header"
+
     /** Read-only: the flat room id string MSC4501 used before the `profile_room` block. */
     const val PROFILE_ROOM_ID_LEGACY = "org.matrix.msc4501.social.profile_room_id"
 
