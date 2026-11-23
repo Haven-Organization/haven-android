@@ -164,6 +164,12 @@ class MessageComposerPresenter(
     }
 
     private val isInThread = threadRoot != null
+
+    /**
+     * Haven: false for Social's post composer, which reuses this presenter for a room but mustn't load or overwrite
+     * that room's chat draft.
+     */
+    var havenDraftsEnabled: Boolean = true
     private val mediaSender = mediaSenderFactory.create(timelineMode = timelineController.mainTimelineMode())
 
     private val cameraPermissionPresenter = permissionsPresenterFactory.create(Manifest.permission.CAMERA)
@@ -269,6 +275,7 @@ class MessageComposerPresenter(
         val slashCommandAction = remember { mutableStateOf<AsyncAction<Unit>>(AsyncAction.Uninitialized) }
 
         LaunchedEffect(Unit) {
+            if (!havenDraftsEnabled) return@LaunchedEffect
             val draft = draftService.loadDraft(
                 roomId = room.roomId,
                 threadRoot = threadRoot,
@@ -753,6 +760,7 @@ class MessageComposerPresenter(
         draft: ComposerDraft?,
         isVolatile: Boolean,
     ) = launch {
+        if (!havenDraftsEnabled && !isVolatile) return@launch
         draftService.updateDraft(
             roomId = room.roomId,
             draft = draft,

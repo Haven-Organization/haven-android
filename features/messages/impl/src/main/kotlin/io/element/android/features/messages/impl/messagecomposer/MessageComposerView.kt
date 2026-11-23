@@ -8,6 +8,7 @@
 
 package io.element.android.features.messages.impl.messagecomposer
 
+import androidx.compose.ui.unit.Dp
 import android.net.Uri
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -59,6 +60,14 @@ internal fun MessageComposerView(
     voiceMessageState: VoiceMessageComposerState,
     modifier: Modifier = Modifier,
     scBeforeSend: (() -> Unit)? = null,
+    // Haven: Social's post composer (see TextComposer's parameters of the same names).
+    minInputHeight: Dp? = null,
+    showEndButton: Boolean = true,
+    placeholderOverride: String? = null,
+    showAttachmentButton: Boolean = true,
+    showReplyPreview: Boolean = true,
+    // Haven: false when the screen has its own emoji button (see rememberEmojiPickerKeyboardToggle).
+    showEmojiButton: Boolean = true,
 ) {
     val view = LocalView.current
     fun sendMessage() {
@@ -145,7 +154,12 @@ internal fun MessageComposerView(
         onError = ::onError,
         onTyping = ::onTyping,
         onSelectRichContent = ::sendUri,
-        onAddEmoji = onToggleEmojiPicker,
+        onAddEmoji = onToggleEmojiPicker.takeIf { showEmojiButton },
+        minInputHeight = minInputHeight,
+        showEndButton = showEndButton,
+        placeholderOverride = placeholderOverride,
+        showAttachmentButton = showAttachmentButton,
+        showReplyPreview = showReplyPreview,
     )
 
     AsyncActionView(
@@ -163,7 +177,7 @@ internal fun MessageComposerView(
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun rememberEmojiPickerKeyboardToggle(state: MessageComposerState): () -> Unit {
+internal fun rememberEmojiPickerKeyboardToggle(state: MessageComposerState): () -> Unit {
     val view = LocalView.current
     val coroutineScope = rememberCoroutineScope()
     val isEmojiPickerVisible = state.emojiPickerState != ComposerEmojiPickerState.Hidden

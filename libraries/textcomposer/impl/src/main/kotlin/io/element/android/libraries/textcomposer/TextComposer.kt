@@ -55,6 +55,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import chat.schildi.lib.preferences.ScPrefs
 import chat.schildi.lib.preferences.value
@@ -136,7 +137,20 @@ fun TextComposer(
     showTextFormatting: Boolean = false,
     isInThreadTimeline: Boolean = false,
     onAddEmoji: (() -> Unit)? = null,
+    // Haven: a tall, multi-line text box (Social's post composer): at least this high, text from the top.
+    minInputHeight: Dp? = null,
+    // Haven: false to leave out the send / voice message button (Social's post composer has its own Post button).
+    showEndButton: Boolean = true,
+    // Haven: the placeholder to show instead of the stock "Message…" one.
+    placeholderOverride: String? = null,
+    // Haven: false to leave out the "+" (attachments) button beside the text box, e.g. when the screen has its own.
+    showAttachmentButton: Boolean = true,
+    // Haven: false to not show the "replying to" chip in the text box (the screen shows the post already); the reply
+    // mode itself is kept, so the message is still sent as a reply.
+    showReplyPreview: Boolean = true,
 ) {
+    // Haven: how the text box looks (see showReplyPreview); [composerMode] still decides how the message is sent.
+    val boxMode = if (!showReplyPreview && composerMode is MessageComposerMode.Reply) MessageComposerMode.Normal else composerMode
     val markdown = when (state) {
         is TextEditorState.Markdown -> state.state.text.value()
         is TextEditorState.Rich -> state.richTextEditorState.messageMarkdown
@@ -158,7 +172,7 @@ fun TextComposer(
         .fillMaxSize()
         .height(IntrinsicSize.Min)
 
-    val placeholder = if (composerMode.inThread || composerMode is MessageComposerMode.Normal && isInThreadTimeline) {
+    val placeholder = placeholderOverride ?: if (composerMode.inThread || composerMode is MessageComposerMode.Normal && isInThreadTimeline) {
         stringResource(id = CommonStrings.action_reply_in_thread)
     } else if (composerMode is MessageComposerMode.Attachment || composerMode is MessageComposerMode.EditCaption) {
         stringResource(id = R.string.rich_text_editor_composer_caption_placeholder)
@@ -171,7 +185,7 @@ fun TextComposer(
         is TextEditorState.Rich -> {
             val coroutineScope = rememberCoroutineScope()
             val view = LocalView.current
-            remember(state.richTextEditorState, composerMode, onResetComposerMode, onError) {
+            remember(state.richTextEditorState, boxMode, onResetComposerMode, onError) {
                 @Composable {
                     TextInputBox(
                         modifier = Modifier
@@ -187,9 +201,10 @@ fun TextComposer(
                             .semantics {
                                 hideFromAccessibility()
                             },
-                        composerMode = composerMode,
+                        composerMode = boxMode,
                         onResetComposerMode = onResetComposerMode,
                         isTextEmpty = state.richTextEditorState.messageHtml.isEmpty(),
+                        minHeight = minInputHeight,
                     ) {
                         RichTextEditor(
                             state = state.richTextEditorState,
@@ -212,10 +227,25 @@ fun TextComposer(
         is TextEditorState.Markdown -> {
             @Composable {
                 val style = ElementRichTextEditorStyle.composerStyle(hasFocus = state.hasFocus())
+                val focusScope = rememberCoroutineScope()
+                val focusView = LocalView.current
                 TextInputBox(
-                    composerMode = composerMode,
+                    // Haven: in a tall box, tapping anywhere in it starts typing (focus and keyboard, like the rich text
+                    // editor's box does).
+                    modifier = if (minInputHeight != null) {
+                        Modifier.clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {
+                            focusScope.launch {
+                                state.requestFocus()
+                                focusView.showKeyboard()
+                            }
+                        }
+                    } else {
+                        Modifier
+                    },
+                    composerMode = boxMode,
                     onResetComposerMode = onResetComposerMode,
                     isTextEmpty = state.state.text.value().isEmpty(),
+                    minHeight = minInputHeight,
                     trailingContent = onAddEmoji?.let { onClick ->
                         @Composable { AddEmojiButton(onClick = onClick) }
                     },
@@ -410,7 +440,7 @@ fun TextComposer(
     } else {
         val endButtonParams = rememberEndButtonParams()
         StandardLayout(
-            composerMode = composerMode,
+            composerMode = boxMode,
             voiceMessageState = voiceMessageState,
             isRoomEncrypted = state.isRoomEncrypted,
             modifier = layoutModifier,
@@ -421,6 +451,8 @@ fun TextComposer(
             onDeleteVoiceMessage = onDeleteVoiceMessage,
             onVoiceRecorderEvent = onVoiceRecorderEvent,
             onResetComposerMode = onResetComposerMode,
+            showEndButton = showEndButton,
+            showAttachmentButton = showAttachmentButton,
         )
     }
 
@@ -472,6 +504,8 @@ private fun StandardLayout(
     onVoiceRecorderEvent: (VoiceMessageRecorderEvent) -> Unit,
     onResetComposerMode: () -> Unit,
     modifier: Modifier = Modifier,
+    showEndButton: Boolean = true,
+    showAttachmentButton: Boolean = true,
 ) {
     Column(modifier = modifier) {
         if (isRoomEncrypted == false && !ScPrefs.SC_TIMELINE_LAYOUT.value()) {
@@ -480,12 +514,16 @@ private fun StandardLayout(
             Spacer(Modifier.height(4.dp))
         }
         Row(verticalAlignment = Alignment.Bottom) {
-            when (composerMode) {
-                is MessageComposerMode.Attachment -> {
+            when {
+                composerMode is MessageComposerMode.Attachment -> {
                     Spacer(modifier = Modifier.width(12.dp))
                 }
-                is MessageComposerMode.EditCaption -> {
+                composerMode is MessageComposerMode.EditCaption -> {
                     Spacer(modifier = Modifier.width(19.dp))
+                }
+                // Haven: no "+" here (the screen has its own); still the voice message's delete button while recording.
+                !showAttachmentButton && voiceMessageState is VoiceMessageState.Idle -> {
+                    Spacer(modifier = Modifier.width(12.dp))
                 }
                 else -> {
                     val endPadding = if (voiceMessageState is VoiceMessageState.Idle) 0.dp else 3.dp
@@ -550,19 +588,23 @@ private fun StandardLayout(
                     movableVoiceRecording()
                 }
             }
-            // To avoid loosing keyboard focus, the IconButton has to be defined here and has to be always enabled.
-            val endButtonContentDescription = stringResource(endButtonParams.endButtonContentDescriptionResId)
-            IconButton(
-                modifier = Modifier
-                    .padding(bottom = 5.dp, top = 5.dp, end = 6.dp, start = 6.dp)
-                    .size(48.dp)
-                    .clearAndSetSemantics {
-                        contentDescription = endButtonContentDescription
-                        onClick(null, null)
-                    },
-                onClick = endButtonParams.endButtonClick,
-                content = endButtonParams.endButtonContent,
-            )
+            if (showEndButton) {
+                // To avoid loosing keyboard focus, the IconButton has to be defined here and has to be always enabled.
+                val endButtonContentDescription = stringResource(endButtonParams.endButtonContentDescriptionResId)
+                IconButton(
+                    modifier = Modifier
+                        .padding(bottom = 5.dp, top = 5.dp, end = 6.dp, start = 6.dp)
+                        .size(48.dp)
+                        .clearAndSetSemantics {
+                            contentDescription = endButtonContentDescription
+                            onClick(null, null)
+                        },
+                    onClick = endButtonParams.endButtonClick,
+                    content = endButtonParams.endButtonContent,
+                )
+            } else {
+                Spacer(Modifier.width(12.dp))
+            }
         }
     }
 }
@@ -653,6 +695,7 @@ private fun TextInputBox(
     isTextEmpty: Boolean,
     modifier: Modifier = Modifier,
     trailingContent: (@Composable () -> Unit)? = null,
+    minHeight: Dp? = null,
     textInput: @Composable () -> Unit,
 ) {
     val bgColor = ElementTheme.colors.bgSubtleSecondary
@@ -664,7 +707,7 @@ private fun TextInputBox(
             .clip(roundedCorners)
             .border(0.5.dp, borderColor, roundedCorners)
             .background(color = bgColor)
-            .requiredHeightIn(min = 42.dp)
+            .requiredHeightIn(min = minHeight ?: 42.dp)
             .fillMaxSize()
             .then(modifier),
     ) {
@@ -684,7 +727,7 @@ private fun TextInputBox(
                     .padding(top = 1.dp, bottom = 4.dp, start = 12.dp, end = if (trailingContent != null) 0.dp else 12.dp)
                     .weight(1f)
                     .then(Modifier.testTag(TestTags.textEditor)),
-                contentAlignment = Alignment.CenterStart,
+                contentAlignment = if (minHeight != null) Alignment.TopStart else Alignment.CenterStart,
             ) {
                 textInput()
                 if (isTextEmpty && composerMode.showCaptionCompatibilityWarning()) {

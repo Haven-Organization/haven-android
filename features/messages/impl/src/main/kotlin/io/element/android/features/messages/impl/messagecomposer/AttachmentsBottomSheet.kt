@@ -46,6 +46,11 @@ internal fun AttachmentsBottomSheet(
     onCreatePollClick: () -> Unit,
     enableTextFormatting: Boolean,
     modifier: Modifier = Modifier,
+    // Haven: entries the screen offers elsewhere (Social's post composer has its own gallery and poll buttons) or
+    // can't send (a quote post can't be a location or a poll).
+    showGallery: Boolean = true,
+    showLocation: Boolean = true,
+    showPoll: Boolean = true,
 ) {
     val localView = LocalView.current
     var isVisible by rememberSaveable { mutableStateOf(state.showAttachmentSourcePicker) }
@@ -85,6 +90,9 @@ internal fun AttachmentsBottomSheet(
                 enableTextFormatting = enableTextFormatting,
                 onSendLocationClick = onSendLocationClick,
                 onCreatePollClick = onCreatePollClick,
+                showGallery = showGallery,
+                showLocation = showLocation,
+                showPoll = showPoll,
             )
         }
     }
@@ -96,6 +104,9 @@ private fun AttachmentSourcePickerMenu(
     onSendLocationClick: () -> Unit,
     onCreatePollClick: () -> Unit,
     enableTextFormatting: Boolean,
+    showGallery: Boolean = true,
+    showLocation: Boolean = true,
+    showPoll: Boolean = true,
 ) {
     Column(
         modifier = Modifier
@@ -113,17 +124,19 @@ private fun AttachmentSourcePickerMenu(
             leadingContent = ListItemContent.Icon(IconSource.Vector(CompoundIcons.VideoCall())),
             content = { Text(stringResource(R.string.screen_room_attachment_source_camera_video)) },
         )
-        ListItem(
-            modifier = Modifier.clickable { state.eventSink(MessageComposerEvent.PickAttachmentSource.FromGallery) },
-            leadingContent = ListItemContent.Icon(IconSource.Vector(CompoundIcons.Image())),
-            content = { Text(stringResource(R.string.screen_room_attachment_source_gallery)) },
-        )
+        if (showGallery) {
+            ListItem(
+                modifier = Modifier.clickable { state.eventSink(MessageComposerEvent.PickAttachmentSource.FromGallery) },
+                leadingContent = ListItemContent.Icon(IconSource.Vector(CompoundIcons.Image())),
+                content = { Text(stringResource(R.string.screen_room_attachment_source_gallery)) },
+            )
+        }
         ListItem(
             modifier = Modifier.clickable { state.eventSink(MessageComposerEvent.PickAttachmentSource.FromFiles) },
             leadingContent = ListItemContent.Icon(IconSource.Vector(CompoundIcons.Attachment())),
             content = { Text(stringResource(R.string.screen_room_attachment_source_files)) },
         )
-        if (state.canShareLocation) {
+        if (showLocation && state.canShareLocation) {
             ListItem(
                 modifier = Modifier.clickable {
                     state.eventSink(MessageComposerEvent.PickAttachmentSource.Location)
@@ -133,14 +146,16 @@ private fun AttachmentSourcePickerMenu(
                 content = { Text(stringResource(R.string.screen_room_attachment_source_location)) },
             )
         }
-        ListItem(
-            modifier = Modifier.clickable {
-                state.eventSink(MessageComposerEvent.PickAttachmentSource.Poll)
-                onCreatePollClick()
-            },
-            leadingContent = ListItemContent.Icon(IconSource.Vector(CompoundIcons.Polls())),
-            content = { Text(stringResource(R.string.screen_room_attachment_source_poll)) },
-        )
+        if (showPoll) {
+            ListItem(
+                modifier = Modifier.clickable {
+                    state.eventSink(MessageComposerEvent.PickAttachmentSource.Poll)
+                    onCreatePollClick()
+                },
+                leadingContent = ListItemContent.Icon(IconSource.Vector(CompoundIcons.Polls())),
+                content = { Text(stringResource(R.string.screen_room_attachment_source_poll)) },
+            )
+        }
         if (enableTextFormatting) {
             ListItem(
                 modifier = Modifier.clickable { state.eventSink(MessageComposerEvent.ToggleTextFormatting(enabled = true)) },
