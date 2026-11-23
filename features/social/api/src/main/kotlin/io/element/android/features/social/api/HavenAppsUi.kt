@@ -23,6 +23,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -150,12 +152,27 @@ fun HavenAppIcon(app: HavenAppItem, size: Dp, modifier: Modifier = Modifier, sha
             modifier = modifier.size(size).clip(shape),
         )
         is HavenAppItem.Widget -> if (app.avatarUrl != null) {
-            AsyncImage(
-                model = MediaRequestData(MediaSource(app.avatarUrl), MediaRequestData.Kind.Thumbnail(64L, 64L)),
-                contentDescription = app.name,
-                contentScale = ContentScale.Crop,
-                modifier = modifier.size(size).clip(shape),
-            )
+            // The room name's initial underneath: shown while the avatar loads, or if it can't be loaded, instead of
+            // an invisible (but still full-width) button.
+            Box(
+                modifier = modifier
+                    .size(size)
+                    .clip(shape)
+                    .background(ElementTheme.colors.bgSubtlePrimary),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = app.name.trim().firstOrNull()?.uppercase() ?: "?",
+                    style = if (size > 28.dp) ElementTheme.typography.fontBodyLgMedium else ElementTheme.typography.fontBodySmMedium,
+                    color = ElementTheme.colors.textSecondary,
+                )
+                AsyncImage(
+                    model = MediaRequestData(MediaSource(app.avatarUrl), MediaRequestData.Kind.Thumbnail(64L, 64L)),
+                    contentDescription = app.name,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
         } else {
             Icon(
                 imageVector = CompoundIcons.Extensions(),
