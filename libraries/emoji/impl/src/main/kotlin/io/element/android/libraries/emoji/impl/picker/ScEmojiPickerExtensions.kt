@@ -119,8 +119,11 @@ internal fun scEmojiPickerPage(
                     onSelectCustomEmoji(text.value)
                 }
             }
-            LaunchedEffect(selectedIndex == state.pageFreeformReactionIndex()) {
-                if (selectedIndex == state.pageFreeformReactionIndex()) {
+            // Haven: until the emoji categories have loaded there are none, so this page is briefly page 0 (the selected
+            // one): don't pop up the keyboard over the picker for that.
+            val isFreeformSelected = selectedIndex == state.pageFreeformReactionIndex() && state.categories.isNotEmpty()
+            LaunchedEffect(isFreeformSelected) {
+                if (isFreeformSelected) {
                     focusRequester.requestFocus()
                 } else {
                     focusManager.clearFocus()
