@@ -36,6 +36,12 @@ data class MediaRequestData(
         data class Thumbnail(val width: Long, val height: Long) : Kind {
             constructor(size: Long) : this(size, size)
         }
+
+        /**
+         * Haven: a frame from the video itself, for videos sent without a thumbnail (like Haven Desktop shows them).
+         * The video is downloaded (up to [MAX_VIDEO_FRAME_SOURCE_SIZE]) and a frame near its start is decoded.
+         */
+        data class VideoFrame(val mimeType: String?) : Kind
     }
 }
 
@@ -44,3 +50,6 @@ const val MAX_THUMBNAIL_WIDTH = 800L
 
 /** Max height a thumbnail can have according to [the spec](https://spec.matrix.org/v1.10/client-server-api/#thumbnails). */
 const val MAX_THUMBNAIL_HEIGHT = 600L
+
+/** Haven: the largest video [MediaRequestData.Kind.VideoFrame] downloads to grab a frame from. */
+const val MAX_VIDEO_FRAME_SOURCE_SIZE = 50L * 1024 * 1024

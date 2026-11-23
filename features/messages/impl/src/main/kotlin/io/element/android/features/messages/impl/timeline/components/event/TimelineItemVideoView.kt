@@ -57,6 +57,7 @@ import io.element.android.libraries.matrix.ui.media.contentvalidation.NoopConten
 import io.element.android.libraries.matrix.ui.media.contentvalidation.collectOverallState
 import io.element.android.libraries.matrixmedia.api.MAX_THUMBNAIL_HEIGHT
 import io.element.android.libraries.matrixmedia.api.MAX_THUMBNAIL_WIDTH
+import io.element.android.libraries.matrixmedia.api.MAX_VIDEO_FRAME_SOURCE_SIZE
 import io.element.android.libraries.matrixmedia.api.MediaRequestData
 import io.element.android.libraries.ui.strings.CommonStrings
 import io.element.android.libraries.ui.utils.a11y.isTalkbackActive
@@ -114,13 +115,21 @@ fun TimelineItemVideoView(
                                 Modifier
                             }
                         ),
-                    model = MediaRequestData(
-                        source = content.thumbnailSource,
-                        kind = MediaRequestData.Kind.Thumbnail(
-                            width = content.thumbnailWidth?.toLong() ?: MAX_THUMBNAIL_WIDTH,
-                            height = content.thumbnailHeight?.toLong() ?: MAX_THUMBNAIL_HEIGHT,
+                    model = if (content.thumbnailSource == null && (content.fileSize ?: 0L) <= MAX_VIDEO_FRAME_SOURCE_SIZE) {
+                        // Haven: no thumbnail sent with the video: show a frame of the video itself, like Haven Desktop.
+                        MediaRequestData(
+                            source = content.mediaSource,
+                            kind = MediaRequestData.Kind.VideoFrame(content.mimeType),
                         )
-                    ),
+                    } else {
+                        MediaRequestData(
+                            source = content.thumbnailSource,
+                            kind = MediaRequestData.Kind.Thumbnail(
+                                width = content.thumbnailWidth?.toLong() ?: MAX_THUMBNAIL_WIDTH,
+                                height = content.thumbnailHeight?.toLong() ?: MAX_THUMBNAIL_HEIGHT,
+                            )
+                        )
+                    },
                     contentScale = ContentScale.Crop,
                     alignment = Alignment.Center,
                     contentDescription = description,
