@@ -22,11 +22,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Semaphore
-import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.json.JSONArray
@@ -63,14 +59,8 @@ class DefaultHavenAppsService(
         // are ready when the Social app is opened.
         sessionScope.launch {
             socialRepository.refreshSocialRooms()
-            val semaphore = Semaphore(4)
-            socialRepository.feedRooms.value.map { room ->
-                async {
-                    semaphore.withPermit {
-                        if (socialTimelineStore.joinedRoom(room.roomId) != null) socialTimelineStore.paginate(room.roomId)
-                    }
-                }
-            }.awaitAll()
+            // One sliding sync request for the feed rooms' latest posts (no room timelines are opened for this).
+            socialTimelineStore.prefetchFeed(socialRepository.feedRooms.value.map { it.roomId })
         }
     }
 

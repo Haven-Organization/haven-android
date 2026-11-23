@@ -9,6 +9,7 @@ package io.element.android.features.social.impl
 import android.os.Parcelable
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import com.bumble.appyx.core.lifecycle.subscribe
 import com.bumble.appyx.core.modality.BuildContext
 import com.bumble.appyx.core.node.Node
 import com.bumble.appyx.core.node.node
@@ -76,6 +77,8 @@ class SocialDeps(
     val emojiPickerRenderer: EmojiPickerRenderer,
     val htmlMessageParser: HtmlMessageParser,
     val permalinkParser: PermalinkParser,
+    val dateFormatter: io.element.android.libraries.dateformatter.api.DateFormatter,
+    val appPreferencesStore: io.element.android.libraries.preferences.api.store.AppPreferencesStore,
 )
 
 /** Navigation between Social screens, and out to stock Element X screens. */
@@ -83,6 +86,12 @@ interface SocialNavigator {
     fun back()
     fun openRoomPage(roomId: RoomId)
     fun openThread(roomId: RoomId, eventId: String, via: List<String> = emptyList())
+
+    /** A post's event source (Settings' "View source" / developer mode). */
+    fun openSource(roomId: RoomId, eventId: String)
+
+    /** The post composer screen, for a new post, a reply or a quote post. */
+    fun openComposer(mode: io.element.android.features.social.impl.ui.ComposeMode)
 
     /**
      * The stock join / knock screen, with "follow" wording for profiles and groups. Once joined (including after a
@@ -109,6 +118,9 @@ class SocialFlowNode(
     @Assisted plugins: List<Plugin>,
     private val deps: SocialDeps,
     private val joinRoomEntryPoint: JoinRoomEntryPoint,
+    private val roomGraphFactory: io.element.android.appnav.di.RoomGraphFactory,
+    @io.element.android.libraries.di.annotations.ApplicationContext private val context: android.content.Context,
+    @io.element.android.libraries.di.annotations.SessionCoroutineScope private val sessionScope: kotlinx.coroutines.CoroutineScope,
 ) : BaseFlowNode<SocialFlowNode.NavTarget>(
     backstack = BackStack(
         initialElement = NavTarget.Home,
@@ -119,6 +131,15 @@ class SocialFlowNode(
 ) {
     private val callback: SocialEntryPoint.Callback = callback()
 
+    override fun onBuilt() {
+        super.onBuilt()
+        // The rooms' timelines stay open while Social is, and are closed once it's left (see SocialTimelineStore.release).
+        lifecycle.subscribe(
+            onCreate = { deps.timelineStore.acquire() },
+            onDestroy = { deps.timelineStore.release() },
+        )
+    }
+
     private val navigator = object : SocialNavigator {
         override fun back() {
             if (backstack.elements.value.size > 1) backstack.pop() else navigateUp()
@@ -126,6 +147,37 @@ class SocialFlowNode(
 
         override fun openRoomPage(roomId: RoomId) = backstack.push(NavTarget.RoomPage(roomId))
         override fun openThread(roomId: RoomId, eventId: String, via: List<String>) = backstack.push(NavTarget.Thread(roomId, eventId, via))
+
+        override fun openSource(roomId: RoomId, eventId: String) = backstack.push(NavTarget.Source(roomId, eventId))
+
+        override fun openComposer(mode: io.element.android.features.social.impl.ui.ComposeMode) {
+            val target = when (mode) {
+                is io.element.android.features.social.impl.ui.ComposeMode.NewPost -> {
+                    // The room to post to: the one given, else the user's profile, else their first group.
+                    val ownProfile = deps.repository.ownProfile.value
+                    val roomId = mode.defaultRoomId
+                        ?: (ownProfile as? io.element.android.features.social.impl.data.OwnProfileState.Linked)?.link?.roomId
+                        ?: io.element.android.features.social.impl.ui.postableRooms(deps.repository.socialRooms.value, ownProfile).firstOrNull()?.roomId
+                        ?: return
+                    NavTarget.Compose(ComposeKind.Post, roomId, null, null)
+                }
+                is io.element.android.features.social.impl.ui.ComposeMode.Reply -> {
+                    val eventId = mode.parent.eventId ?: return
+                    // The composer shows the post at once (see SocialTimelineStore.openedPost).
+                    deps.timelineStore.rememberOpenedPost(mode.parent)
+                    NavTarget.Compose(ComposeKind.Reply, mode.parent.roomId, mode.parent.roomId, eventId.value)
+                }
+                is io.element.android.features.social.impl.ui.ComposeMode.Quote -> {
+                    val eventId = mode.original.eventId ?: return
+                    // Quote posts go to the user's profile.
+                    val profileRoomId = (deps.repository.ownProfile.value as? io.element.android.features.social.impl.data.OwnProfileState.Linked)
+                        ?.link?.roomId ?: return
+                    deps.timelineStore.rememberOpenedPost(mode.original)
+                    NavTarget.Compose(ComposeKind.Quote, profileRoomId, mode.original.roomId, eventId.value)
+                }
+            }
+            backstack.push(target)
+        }
 
         override fun openFollow(roomId: RoomId, eventId: String?, via: List<String>) {
             val target = NavTarget.Follow(roomId, eventId, via)
@@ -217,6 +269,16 @@ class SocialFlowNode(
         is NavTarget.User -> node(buildContext) { modifier ->
             SocialUserScreen(deps = deps, navigator = navigator, userId = navTarget.userId, modifier = modifier)
         }
+        is NavTarget.Compose -> composerNode(navTarget, buildContext)
+        is NavTarget.Source -> node(buildContext) { modifier ->
+            io.element.android.features.social.impl.ui.PostSourceScreen(
+                deps = deps,
+                roomId = navTarget.roomId,
+                eventId = navTarget.eventId,
+                onBack = navigator::back,
+                modifier = modifier,
+            )
+        }
         is NavTarget.CreateRoom -> node(buildContext) { modifier ->
             CreateSocialRoomScreen(
                 deps = deps,
@@ -261,5 +323,119 @@ class SocialFlowNode(
 
         @Parcelize
         data class CreateRoom(val kind: SocialRoomKind) : NavTarget
+
+        /** The post composer: [roomId] is the default room for a new post, else the replied-to / quoted post's room. */
+        @Parcelize
+        data class Source(val roomId: RoomId, val eventId: String) : NavTarget
+
+        /**
+         * The post composer, sending to [roomId]; [targetRoomId] / [targetEventId]: the post replied to or quoted.
+         * [initialText]: kept when a new post's room is changed.
+         */
+        @Parcelize
+        data class Compose(
+            val kind: ComposeKind,
+            val roomId: RoomId,
+            val targetRoomId: RoomId?,
+            val targetEventId: String?,
+            val initialText: String? = null,
+        ) : NavTarget
+    }
+
+    enum class ComposeKind { Post, Reply, Quote }
+
+    /**
+     * The post composer: Element X's message composer for [Compose.roomId] (HavenPostComposerNode, in that room's scope,
+     * so it has everything a message has), with the replied-to / quoted post around it.
+     */
+    private fun composerNode(target: NavTarget.Compose, buildContext: BuildContext): Node {
+        val targetRoomId = target.targetRoomId
+        val targetEventId = target.targetEventId
+        val known = if (targetRoomId != null && targetEventId != null) deps.timelineStore.openedPost(targetRoomId, targetEventId) else null
+        val inputs = io.element.android.features.messages.impl.haven.HavenPostComposerNode.Inputs(
+            title = context.getString(
+                when (target.kind) {
+                    ComposeKind.Post -> R.string.social_new_post
+                    ComposeKind.Reply -> R.string.social_action_reply
+                    ComposeKind.Quote -> R.string.social_quote_post
+                }
+            ),
+            sendLabel = context.getString(if (target.kind == ComposeKind.Reply) R.string.social_action_reply else R.string.social_post),
+            placeholder = context.getString(
+                when (target.kind) {
+                    ComposeKind.Post -> R.string.social_post_placeholder
+                    ComposeKind.Reply -> R.string.social_reply_placeholder
+                    ComposeKind.Quote -> R.string.social_quote_placeholder
+                }
+            ),
+            // A reply goes in its post's thread (the thread's root, as the post may itself be a reply), answering the post.
+            threadRootId = if (target.kind == ComposeKind.Reply && targetEventId != null) {
+                io.element.android.libraries.matrix.api.core.ThreadId(known?.post?.threadRootId ?: targetEventId)
+            } else {
+                null
+            },
+            replyToEventId = if (target.kind == ComposeKind.Reply) targetEventId?.let(::EventId) else null,
+            isQuote = target.kind == ComposeKind.Quote,
+            initialText = target.initialText,
+        )
+        val callback = object : io.element.android.features.messages.impl.haven.HavenPostComposerNode.Callback {
+            override fun onClose() {
+                navigator.back()
+            }
+
+            override fun onTextSent(markdown: String) {
+                // MSC4501 "Cross-posted reply": a copy of the reply on the user's profile, for their followers.
+                if (target.kind != ComposeKind.Reply || targetRoomId == null || targetEventId == null) return
+                sessionScope.launch {
+                    val parent = known ?: deps.timelineStore.feedPost(targetRoomId, targetEventId)
+                        ?: deps.peek.post(targetRoomId, targetEventId).getOrNull()
+                        ?: return@launch
+                    deps.actions.crossPostReply(parent, markdown)
+                }
+            }
+
+            override suspend fun sendQuote(markdown: String, attachment: Pair<android.net.Uri, String>?): Result<Unit> {
+                if (targetRoomId == null || targetEventId == null) return Result.failure(IllegalStateException("No post to quote"))
+                val original = known ?: deps.timelineStore.feedPost(targetRoomId, targetEventId)
+                    ?: deps.peek.post(targetRoomId, targetEventId).getOrNull()
+                    ?: return Result.failure(IllegalStateException("Couldn't load the quoted post"))
+                return deps.actions.publishQuote(
+                    original,
+                    markdown,
+                    attachment?.let { (uri, mimeType) -> io.element.android.features.social.impl.data.PostAttachment(uri, mimeType) },
+                )
+            }
+
+            @Composable
+            override fun Header(currentText: () -> String) {
+                when (target.kind) {
+                    ComposeKind.Post -> io.element.android.features.social.impl.ui.NewPostComposerHeader(deps, target.roomId) { roomId ->
+                        // Another room: the composer is the room's own, so it opens again there, with the text so far.
+                        backstack.replace(target.copy(roomId = roomId, initialText = currentText()))
+                    }
+                    ComposeKind.Reply -> if (targetRoomId != null && targetEventId != null) {
+                        io.element.android.features.social.impl.ui.ReplyComposerHeader(deps, targetRoomId, targetEventId)
+                    }
+                    ComposeKind.Quote -> Unit
+                }
+            }
+
+            @Composable
+            override fun Footer() {
+                if (target.kind == ComposeKind.Quote && targetRoomId != null && targetEventId != null) {
+                    io.element.android.features.social.impl.ui.QuoteComposerFooter(deps, targetRoomId, targetEventId)
+                }
+            }
+        }
+        return SocialRoomScopeNode(
+            buildContext = buildContext,
+            roomId = target.roomId,
+            loadRoom = { deps.timelineStore.joinedRoom(it) },
+            roomGraphFactory = roomGraphFactory,
+            onUnavailable = { navigator.back() },
+            child = { parent, childBuildContext ->
+                parent.createNode<io.element.android.features.messages.impl.haven.HavenPostComposerNode>(childBuildContext, listOf(inputs, callback))
+            },
+        )
     }
 }

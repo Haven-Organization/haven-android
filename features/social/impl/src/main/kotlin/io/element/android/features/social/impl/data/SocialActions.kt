@@ -6,6 +6,11 @@
 
 package io.element.android.features.social.impl.data
 
+import io.element.android.libraries.matrix.api.timeline.Timeline
+import io.element.android.libraries.mediaupload.api.MediaOptimizationConfigProviderFactory
+import io.element.android.libraries.mediaupload.api.MediaSenderRoomTimelineFactory
+import io.element.android.libraries.mediaupload.api.MediaUploadInfo
+import org.json.JSONObject
 import android.net.Uri
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
@@ -20,6 +25,9 @@ import timber.log.Timber
 
 class SocialActionException(message: String) : Exception(message)
 
+/** A file picked in the post composer (one per post, like Haven Desktop). */
+data class PostAttachment(val uri: android.net.Uri, val mimeType: String)
+
 /** Liking, reacting or replying to a post in a room the user doesn't follow: they need to follow (join) it first. */
 class FollowRequiredException(val roomId: RoomId, val eventId: String?, val via: List<String>) : Exception("Follow to interact")
 
@@ -30,6 +38,9 @@ class SocialActions(
     private val matrixClient: MatrixClient,
     private val repository: SocialRepository,
     private val timelineStore: SocialTimelineStore,
+    private val http: SocialHttpApi,
+    private val mediaSenderFactory: MediaSenderRoomTimelineFactory,
+    private val mediaOptimizationConfigProviderFactory: MediaOptimizationConfigProviderFactory,
 ) {
     /** Haven Desktop's "Cross-post replies to your profile" setting defaults to on. */
     var crossPostReplies: Boolean = true
@@ -45,7 +56,11 @@ class SocialActions(
         val rootId = parent.post.threadRootId ?: parentId.value
         val room = timelineStore.joinedRoom(parent.roomId) ?: throw followRequired(parent)
         room.sendRaw(SocialContentBuilder.POST_EVENT_TYPE, SocialContentBuilder.reply(body, rootId, parentId.value).toString()).getOrThrow()
+        crossPostReply(parent, body)
+    }
 
+    /** MSC4501 "Cross-posted reply": best effort, never fails the reply itself (already sent). */
+    suspend fun crossPostReply(parent: FeedPost, body: String) {
         val profileRoomId = (repository.ownProfile.value as? OwnProfileState.Linked)?.link?.roomId
         if (crossPostReplies && profileRoomId != null && profileRoomId != parent.roomId) {
             runCatching {
@@ -55,6 +70,89 @@ class SocialActions(
             }.onFailure { Timber.w(it, "Couldn't cross-post reply to profile") }
         }
     }
+
+
+
+    /**
+     * A quote post from the post composer, to the user's profile. With an attachment, the media message is built here
+     * (it has to carry MSC4501's `relates_to` too), which needs a plain upload: only possible in unencrypted rooms.
+     */
+    suspend fun publishQuote(original: FeedPost, markdown: String, attachment: PostAttachment?): Result<Unit> {
+        if (attachment == null) return quotePost(original, markdown)
+        return runCatching {
+            val roomId = ownProfileRoomId()
+            val room = timelineStore.joinedRoom(roomId) ?: throw SocialActionException("Not a member of this room")
+            if (room.info().isEncrypted != false) {
+                throw SocialActionException("Attachments on quote posts aren't supported in encrypted rooms yet")
+            }
+            val sender = mediaSenderFactory.create(matrixClient, room, Timeline.Mode.Live)
+            try {
+                val config = mediaOptimizationConfigProviderFactory.create(matrixClient).get()
+                val info = sender.preProcessMedia(attachment.uri, attachment.mimeType, config).getOrThrow()
+                val content = uploadedMediaContent(info, markdown)
+                content.put(Msc4501.RELATES_TO, SocialContentBuilder.quotePost("", reference(original)).getJSONObject(Msc4501.RELATES_TO))
+                room.sendRaw(SocialContentBuilder.POST_EVENT_TYPE, content.toString()).getOrThrow()
+            } finally {
+                sender.cleanUp()
+            }
+            sendRepostReaction(original)
+        }
+    }
+
+
+    /** A media message's content for pre-processed media, uploaded unencrypted (see [publishQuote]). */
+    private suspend fun uploadedMediaContent(info: MediaUploadInfo, caption: String): JSONObject {
+        suspend fun upload(file: java.io.File, mimeType: String?): String =
+            matrixClient.uploadMedia(mimeType ?: "application/octet-stream", file.readBytes()).getOrThrow()
+        val infoJson = JSONObject()
+        val (msgtype, mimeType) = when (info) {
+            is MediaUploadInfo.Image -> {
+                infoJson.putOpt("w", info.imageInfo.width).putOpt("h", info.imageInfo.height).putOpt("size", info.imageInfo.size)
+                    .putOpt("blurhash", info.imageInfo.blurhash)
+                info.thumbnailFile?.let { thumb ->
+                    infoJson.put("thumbnail_url", upload(thumb, info.imageInfo.thumbnailInfo?.mimetype ?: "image/jpeg"))
+                    info.imageInfo.thumbnailInfo?.let { t ->
+                        infoJson.put("thumbnail_info", JSONObject().putOpt("w", t.width).putOpt("h", t.height).putOpt("size", t.size).putOpt("mimetype", t.mimetype))
+                    }
+                }
+                "m.image" to info.imageInfo.mimetype
+            }
+            is MediaUploadInfo.Video -> {
+                infoJson.putOpt("w", info.videoInfo.width).putOpt("h", info.videoInfo.height).putOpt("size", info.videoInfo.size)
+                    .putOpt("duration", info.videoInfo.duration?.inWholeMilliseconds).putOpt("blurhash", info.videoInfo.blurhash)
+                info.thumbnailFile?.let { thumb ->
+                    infoJson.put("thumbnail_url", upload(thumb, info.videoInfo.thumbnailInfo?.mimetype ?: "image/jpeg"))
+                    info.videoInfo.thumbnailInfo?.let { t ->
+                        infoJson.put("thumbnail_info", JSONObject().putOpt("w", t.width).putOpt("h", t.height).putOpt("size", t.size).putOpt("mimetype", t.mimetype))
+                    }
+                }
+                "m.video" to info.videoInfo.mimetype
+            }
+            is MediaUploadInfo.Audio -> {
+                infoJson.putOpt("size", info.audioInfo.size).putOpt("duration", info.audioInfo.duration?.inWholeMilliseconds)
+                "m.audio" to info.audioInfo.mimetype
+            }
+            is MediaUploadInfo.VoiceMessage -> {
+                infoJson.putOpt("size", info.audioInfo.size).putOpt("duration", info.audioInfo.duration?.inWholeMilliseconds)
+                "m.audio" to info.audioInfo.mimetype
+            }
+            is MediaUploadInfo.AnyFile -> {
+                infoJson.putOpt("size", info.fileInfo.size)
+                "m.file" to info.fileInfo.mimetype
+            }
+        }
+        mimeType?.let { infoJson.put("mimetype", it) }
+        val filename = info.file.name
+        return JSONObject()
+            .put("msgtype", msgtype)
+            .put("body", caption.trim().ifEmpty { filename })
+            .put("filename", filename)
+            .put("url", upload(info.file, mimeType))
+            .put("info", infoJson)
+    }
+
+    /** Likes and reposts shown before the server confirms them. */
+    val optimistic = OptimisticPosts()
 
     /** Reposts [original] to the user's own profile, and counts it with a 🔁 reaction (MSC4501 "Repost counts"). */
     suspend fun repost(original: FeedPost): Result<Unit> = runCatching {
@@ -77,14 +175,58 @@ class SocialActions(
     /** Likes or unlikes a post: a 👍 reaction (MSC4501 "Liking"). */
     suspend fun toggleLike(post: FeedPost): Result<Unit> = toggleReaction(post, Msc4501.LIKE_KEY)
 
+    /**
+     * Adds the user's [key] reaction to [post], or removes it if they already reacted with it. Done on the room directly
+     * (the SDK's toggle only works for events loaded in an open timeline, and the feed doesn't keep one per room): the
+     * user's existing reactions are looked up on the server, so it's right whatever the feed has loaded.
+     */
     suspend fun toggleReaction(post: FeedPost, key: String): Result<Unit> = runCatching {
-        val timeline = timelineStore.timeline(post.roomId) ?: throw followRequired(post)
-        timeline.toggleReaction(key, post.eventOrTransactionId()).getOrThrow()
+        val eventId = post.eventId
+        if (eventId == null) {
+            // Not sent yet: only its timeline knows it.
+            val timeline = timelineStore.timeline(post.roomId) ?: throw followRequired(post)
+            timeline.toggleReaction(key, post.eventOrTransactionId()).getOrThrow()
+            return@runCatching
+        }
+        val room = timelineStore.joinedRoom(post.roomId) ?: throw followRequired(post)
+        val mine = ownReactions(post.roomId, eventId.value, key)
+        if (mine.isEmpty()) {
+            room.sendRaw("m.reaction", SocialContentBuilder.reaction(eventId.value, key).toString()).getOrThrow()
+        } else {
+            mine.forEach { http.redact(post.roomId.value, it).getOrThrow() }
+        }
+    }
+
+    /** The user's own [key] reactions to [eventId] (any variation selector), from the server. */
+    private suspend fun ownReactions(roomId: RoomId, eventId: String, key: String): List<String> {
+        val me = matrixClient.sessionId.value
+        val wanted = key.replace("\uFE0F", "")
+        val found = mutableListOf<String>()
+        var from: String? = null
+        repeat(MAX_RELATION_PAGES) {
+            val page = http.relations(roomId.value, eventId, "m.annotation", from).getOrThrow()
+            val chunk = page.optJSONArray("chunk")
+            for (i in 0 until (chunk?.length() ?: 0)) {
+                val event = chunk?.optJSONObject(i) ?: continue
+                if (event.optString("type") != "m.reaction" || event.optString("sender") != me) continue
+                val reactionKey = event.optJSONObject("content")?.optJSONObject("m.relates_to")?.optString("key") ?: continue
+                if (reactionKey.replace("\uFE0F", "") == wanted) found += event.optString("event_id")
+            }
+            from = page.optString("next_batch").takeIf { it.isNotEmpty() } ?: return found
+        }
+        return found
     }
 
     suspend fun delete(post: FeedPost): Result<Unit> = runCatching {
-        val timeline = timelineStore.timeline(post.roomId) ?: throw SocialActionException("Not a member of this room")
-        timeline.redactEvent(post.eventOrTransactionId(), reason = null).getOrThrow()
+        val eventId = post.eventId
+        if (eventId != null) {
+            if (timelineStore.joinedRoom(post.roomId) == null) throw SocialActionException("Not a member of this room")
+            http.redact(post.roomId.value, eventId.value).getOrThrow()
+        } else {
+            // Not sent yet: cancelled through its timeline.
+            val timeline = timelineStore.timeline(post.roomId) ?: throw SocialActionException("Not a member of this room")
+            timeline.redactEvent(post.eventOrTransactionId(), reason = null).getOrThrow()
+        }
     }
 
     private suspend fun sendRepostReaction(original: FeedPost) {
@@ -136,3 +278,5 @@ class SocialActions(
 
 fun FeedPost.eventOrTransactionId(): EventOrTransactionId =
     EventOrTransactionId.from(eventId, transactionId)
+
+private const val MAX_RELATION_PAGES = 10

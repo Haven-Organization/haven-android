@@ -42,7 +42,6 @@ import io.element.android.libraries.designsystem.components.avatar.Avatar
 import io.element.android.libraries.designsystem.components.avatar.AvatarData
 import io.element.android.libraries.designsystem.components.avatar.AvatarSize
 import io.element.android.libraries.designsystem.components.avatar.AvatarType
-import io.element.android.libraries.designsystem.theme.components.CircularProgressIndicator
 import io.element.android.libraries.designsystem.theme.components.HorizontalDivider
 import io.element.android.libraries.designsystem.theme.components.Icon
 import io.element.android.libraries.designsystem.theme.components.Text
@@ -245,7 +244,7 @@ private fun <T> ResultList(results: SearchResults<T>, empty: Int, row: @Composab
     when (results) {
         SearchResults.Idle -> Unit
         SearchResults.Loading -> Column(Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            CircularProgressIndicator()
+            SocialSpinner()
         }
         is SearchResults.Failed -> EmptyStateInline(results.message)
         is SearchResults.Loaded -> if (results.items.isEmpty()) {

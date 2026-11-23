@@ -6,6 +6,9 @@
 
 package io.element.android.features.social.impl.ui
 
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.update
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -27,7 +30,6 @@ import io.element.android.features.social.impl.SocialNavigator
 import io.element.android.features.social.impl.data.FeedPost
 import io.element.android.libraries.designsystem.components.button.BackButton
 import io.element.android.libraries.designsystem.theme.components.Button
-import io.element.android.libraries.designsystem.theme.components.CircularProgressIndicator
 import io.element.android.libraries.designsystem.theme.components.Scaffold
 import io.element.android.libraries.designsystem.theme.components.TopAppBar
 import io.element.android.libraries.matrix.api.core.EventId
@@ -36,6 +38,7 @@ import io.element.android.libraries.matrix.api.core.ThreadId
 import io.element.android.libraries.matrix.api.room.CreateTimelineParams
 import io.element.android.libraries.matrix.api.timeline.Timeline
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.time.Duration.Companion.seconds
 
@@ -61,7 +64,10 @@ fun SocialThreadScreen(
     DisposableEffect(Unit) {
         onDispose { openedTimelines.forEach { runCatching { it.close() } } }
     }
-    val state by produceState<ThreadState>(ThreadState.Loading, roomId, eventId) {
+    // Opened from a feed or list: that post is already known, so it shows at once while its thread loads.
+    val known = remember(roomId, eventId) { deps.timelineStore.openedPost(roomId, eventId) }
+    val initial = if (known != null) ThreadState.Loaded(listOf(known)) else ThreadState.Loading
+    val state by produceState(initial, roomId, eventId) {
         val room = deps.timelineStore.joinedRoom(roomId)
         if (room == null) {
             // Not following this room: peek, like Haven Desktop (works for world-readable profiles and groups).
@@ -70,24 +76,45 @@ fun SocialThreadScreen(
             value = if (peeked != null) ThreadState.Loaded(peeked) else ThreadState.NotJoined
             return@produceState
         }
-        // Find the thread root: the opened post may itself be a reply.
-        val focused = room.createTimeline(CreateTimelineParams.Focused(EventId(eventId))).getOrNull()
-        val rootId = focused?.let { timeline ->
+        // Find the thread root: the opened post may itself be a reply. Known already when opened from a list.
+        val knownRootId = known?.let { it.post.threadRootId ?: eventId }
+        val focused = if (knownRootId != null) null else room.createTimeline(CreateTimelineParams.Focused(EventId(eventId))).getOrNull()
+        val focusedPosts = focused?.let { timeline ->
             openedTimelines += timeline
             withTimeoutOrNull(15.seconds) {
                 deps.timelineStore.postsOf(roomId, timeline).first { list -> list.any { it.eventId?.value == eventId } }
-            }?.first { it.eventId?.value == eventId }?.post?.threadRootId
-        } ?: eventId
+            }
+        }.orEmpty()
+        val rootId = focusedPosts.firstOrNull { it.eventId?.value == eventId }?.post?.threadRootId ?: knownRootId ?: eventId
+        // Posts shown even if the thread's timeline doesn't have them (yet): the one opened from a list, and the thread
+        // root, which a threaded timeline doesn't always include (it may only hold the replies). The thread's own copy
+        // replaces either once it's there.
+        val extra = MutableStateFlow(listOfNotNull(known) + focusedPosts.filter { it.eventId?.value == eventId || it.eventId?.value == rootId })
+        launch {
+            if (extra.value.any { it.eventId?.value == rootId }) return@launch
+            val root = deps.timelineStore.feedPost(roomId, rootId)
+                ?: deps.peek.post(roomId, rootId).getOrNull()?.copy(peeked = false)
+                ?: return@launch
+            extra.update { current -> if (current.any { it.eventId == root.eventId }) current else current + root }
+        }
         val thread = room.createTimeline(CreateTimelineParams.Threaded(ThreadId(rootId))).getOrNull()
         if (thread == null) {
-            value = ThreadState.Loaded(emptyList())
+            extra.collect { posts -> value = ThreadState.Loaded(posts.distinctBy { it.listKey }.sortedBy { it.timestamp }) }
             return@produceState
         }
         openedTimelines += thread
-        thread.paginate(Timeline.PaginationDirection.BACKWARDS)
-        deps.timelineStore.postsOf(roomId, thread).collect { list ->
+        // Show the thread as it loads, rather than after the first page.
+        launch {
+            thread.paginate(Timeline.PaginationDirection.BACKWARDS)
+            // Nothing at all after loading: the post isn't available.
+            if (value == ThreadState.Loading) value = ThreadState.Loaded(emptyList())
+        }
+        combine(deps.timelineStore.postsOf(roomId, thread), extra) { list, extras ->
+            list + extras.filter { e -> list.none { it.eventId == e.eventId } }.distinctBy { it.listKey }
+        }.collect { posts ->
+            if (posts.isEmpty()) return@collect
             // Oldest first, like a conversation.
-            value = ThreadState.Loaded(list.sortedBy { it.timestamp })
+            value = ThreadState.Loaded(posts.sortedBy { it.timestamp })
         }
     }
     Scaffold(
@@ -101,7 +128,7 @@ fun SocialThreadScreen(
     ) { padding ->
         Box(Modifier.padding(padding).fillMaxSize()) {
             when (val s = state) {
-                ThreadState.Loading -> CircularProgressIndicator(Modifier.align(Alignment.Center))
+                ThreadState.Loading -> SocialSpinner(Modifier.align(Alignment.Center))
                 ThreadState.NotJoined -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     androidx.compose.foundation.layout.Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         EmptyStateInline(stringResource(R.string.social_follow_to_see_post))
@@ -112,7 +139,7 @@ fun SocialThreadScreen(
                     EmptyStateInline(stringResource(R.string.social_post_unavailable))
                 } else {
                     LazyColumn(Modifier.fillMaxSize()) {
-                        items(s.posts, key = { it.key }) { post ->
+                        items(s.posts, key = { it.listKey }) { post ->
                             val isFocused = post.eventId?.value == eventId
                             PostTile(
                                 post = post,

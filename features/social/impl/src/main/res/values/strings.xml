@@ -15,6 +15,11 @@
     <string name="social_your_profile">Your Profile</string>
     <string name="social_no_postable_rooms">Create a profile or join a group to post</string>
     <string name="social_post_placeholder">What\'s on your mind?</string>
+    <string name="social_replying_to">Replying to %1$s</string>
+    <string name="social_discard_post_title">Discard post?</string>
+    <string name="social_discard_post_content">What you\'ve written will be lost.</string>
+    <string name="social_discard">Discard</string>
+    <string name="social_remove_attachment">Remove attachment</string>
     <string name="social_reply_placeholder">Write your reply</string>
     <string name="social_quote_placeholder">Add a comment</string>
     <string name="social_cancel">Cancel</string>

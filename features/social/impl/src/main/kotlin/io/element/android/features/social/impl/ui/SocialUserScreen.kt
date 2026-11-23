@@ -27,7 +27,6 @@ import io.element.android.libraries.designsystem.components.avatar.AvatarData
 import io.element.android.libraries.designsystem.components.avatar.AvatarSize
 import io.element.android.libraries.designsystem.components.avatar.AvatarType
 import io.element.android.libraries.designsystem.components.button.BackButton
-import io.element.android.libraries.designsystem.theme.components.CircularProgressIndicator
 import io.element.android.libraries.designsystem.theme.components.OutlinedButton
 import io.element.android.libraries.designsystem.theme.components.Scaffold
 import io.element.android.libraries.designsystem.theme.components.TopAppBar
@@ -69,7 +68,7 @@ fun SocialUserScreen(
     ) { padding ->
         Box(Modifier.padding(padding).fillMaxSize()) {
             when (val s = state) {
-                UserProfileState.Loading -> CircularProgressIndicator(Modifier.align(Alignment.Center))
+                UserProfileState.Loading -> SocialSpinner(Modifier.align(Alignment.Center))
                 is UserProfileState.Linked -> SocialRoomContent(
                     deps = deps,
                     navigator = navigator,

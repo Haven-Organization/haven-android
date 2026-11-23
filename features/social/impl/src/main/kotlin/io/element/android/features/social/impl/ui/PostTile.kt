@@ -13,8 +13,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -34,8 +32,11 @@ import androidx.compose.material.icons.outlined.FormatQuote
 import androidx.compose.material.icons.outlined.Repeat
 import androidx.compose.material.icons.outlined.ThumbUp
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -74,6 +75,7 @@ import io.element.android.libraries.matrix.api.media.MediaSource
 import io.element.android.libraries.matrix.ui.messages.toHtmlDocument
 import io.element.android.libraries.matrix.api.timeline.item.event.FormattedBody
 import io.element.android.libraries.matrix.api.timeline.item.event.MessageFormat
+import io.element.android.libraries.matrixmedia.api.MAX_VIDEO_FRAME_SOURCE_SIZE
 import io.element.android.libraries.matrixmedia.api.MediaRequestData
 
 /** What a post tile can do. Callbacks get the tile's own post. */
@@ -87,8 +89,12 @@ class PostCallbacks(
     val onLike: (FeedPost) -> Unit,
     val onReact: (FeedPost) -> Unit,
     val onToggleReaction: (FeedPost, String) -> Unit,
+    /** Long press on a reaction pill: who reacted (the stock reaction summary sheet), on that reaction's tab. */
+    val onShowReactions: (FeedPost, String) -> Unit = { _, _ -> },
     val onDelete: (FeedPost) -> Unit,
     val onViewInRoom: (FeedPost) -> Unit,
+    /** The post's event source (the stock "View source" screen), when that setting (developer mode) is on. */
+    val onViewSource: (FeedPost) -> Unit = {},
     val onOpenMedia: (FeedPost, PostMedia) -> Unit = { _, _ -> },
     /** Open a post by id in a room (e.g. the post a reply replies to). */
     val onOpenEvent: (io.element.android.libraries.matrix.api.core.RoomId, String) -> Unit = { _, _ -> },
@@ -109,7 +115,13 @@ fun PostTile(
      * Otherwise (rooms and threads) the content sits beside the avatar, leaving room for a thread line.
      */
     wide: Boolean = false,
+    /** False for a read-only preview (e.g. the post being replied to, in the post composer): no reactions or buttons. */
+    showActions: Boolean = true,
 ) {
+    // Pending likes / reposts are shown until this post's live state catches up with them.
+    LaunchedEffect(post.likedByMe, post.repostedByMe) { deps.actions.optimistic.settle(post) }
+    val developerModeFlow = remember(deps) { deps.appPreferencesStore.isDeveloperModeEnabledFlow() }
+    val developerMode by developerModeFlow.collectAsState(initial = false)
     val social = post.post
     val indent = if (wide) 0.dp else 52.dp
     Column(
@@ -160,24 +172,24 @@ fun PostTile(
                 PostBody(social.content, deps, onOpenMedia = { media -> callbacks.onOpenMedia(post, media) })
                 if (relation != null) EmbeddedPost(relation, deps, callbacks)
             }
-            if (post.reactions.isNotEmpty()) ReactionsRow(post, callbacks)
+            if (showActions) ReactionsShelf(post, deps, callbacks)
         }
         if (wide) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 avatar()
                 Spacer(Modifier.width(12.dp))
-                Box(Modifier.weight(1f)) { PostHeader(post, focused, callbacks) }
+                Box(Modifier.weight(1f)) { PostHeader(post, focused, callbacks, showViewSource = developerMode) }
             }
             Column(Modifier.padding(top = 4.dp)) { content() }
-            ActionBar(post, callbacks, large = true)
+            if (showActions) ActionBar(deps.actions.optimistic.applyTo(post), callbacks, large = true)
         } else {
             Row {
                 avatar()
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
-                    PostHeader(post, focused, callbacks)
+                    PostHeader(post, focused, callbacks, showViewSource = developerMode)
                     content()
-                    ActionBar(post, callbacks)
+                    if (showActions) ActionBar(deps.actions.optimistic.applyTo(post), callbacks)
                 }
             }
         }
@@ -186,7 +198,7 @@ fun PostTile(
 }
 
 @Composable
-private fun PostHeader(post: FeedPost, focused: Boolean, callbacks: PostCallbacks) {
+private fun PostHeader(post: FeedPost, focused: Boolean, callbacks: PostCallbacks, showViewSource: Boolean) {
     var showMenu by remember { mutableStateOf(false) }
     Row(verticalAlignment = Alignment.Top) {
         // Only the name and ID open the profile: the empty space beside them opens the post, like the rest of the tile.
@@ -238,6 +250,16 @@ private fun PostHeader(post: FeedPost, focused: Boolean, callbacks: PostCallback
                         callbacks.onViewInRoom(post)
                     },
                 )
+                // Like messages in rooms: with Settings' "View source" (developer mode) on.
+                if (showViewSource && post.eventId != null) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(io.element.android.libraries.ui.strings.CommonStrings.action_view_source)) },
+                        onClick = {
+                            showMenu = false
+                            callbacks.onViewSource(post)
+                        },
+                    )
+                }
                 if (post.isOwn) {
                     DropdownMenuItem(
                         text = { Text(stringResource(R.string.social_delete_post), color = ElementTheme.colors.textCriticalPrimary) },
@@ -329,12 +351,15 @@ private fun PostMediaView(media: PostMedia, onOpen: ((PostMedia) -> Unit)?) {
                     .then(if (onOpen != null) Modifier.clickable { onOpen(media) } else Modifier),
                 contentAlignment = Alignment.Center,
             ) {
-                BlurHashAsyncImage(
+                    BlurHashAsyncImage(
                     model = source?.let {
                         MediaRequestData(
                             it,
                             if (isVideo) MediaRequestData.Kind.Thumbnail(800L, 800L) else MediaRequestData.Kind.Content,
                         )
+                    } ?: media.url?.takeIf { isVideo && (media.size ?: 0L) <= MAX_VIDEO_FRAME_SOURCE_SIZE }?.let { url ->
+                        // No thumbnail sent with the video: a frame of the video itself, like Haven Desktop.
+                        MediaRequestData(MediaSource(url, media.encryptedFileJson), MediaRequestData.Kind.VideoFrame(media.mimetype))
                     },
                     blurHash = media.blurhash,
                     contentScale = ContentScale.Crop,
@@ -392,13 +417,36 @@ private fun EmbeddedPost(relation: PostRelation, deps: SocialDeps, callbacks: Po
             .clickable { callbacks.onOpenReference(relation) }
             .padding(12.dp),
     ) {
-        Text(
-            text = relation.authorName(),
-            style = ElementTheme.typography.fontBodySmMedium,
-            color = ElementTheme.colors.textPrimary,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+        // Like Haven Desktop's repost card header, for reposts, quotes and cross-posted replies alike: the MSC4144
+        // per-message profile of the embedded post first (e.g. a bridged post's real author), then the author's live
+        // profile, then the name stored in the relation when it was sent.
+        val perMessage = relation.content?.perMessageProfile
+        val profile by produceState<Pair<String?, String?>?>(null, relation.sender) {
+            if (relation.sender.startsWith("@")) value = deps.peek.profileOf(relation.sender)
+        }
+        val name = perMessage?.displayname
+            ?: profile?.first?.takeIf { it.isNotBlank() }
+            ?: relation.authorName()
+        val avatarUrl = when {
+            perMessage?.avatarRemoved == true -> null
+            perMessage?.avatarUrl != null -> perMessage.avatarUrl
+            else -> profile?.second
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Avatar(
+                avatarData = AvatarData(perMessage?.id ?: relation.sender, name, avatarUrl, AvatarSize.RoomListItem),
+                avatarType = AvatarType.User,
+                forcedAvatarSize = 24.dp,
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = name,
+                style = ElementTheme.typography.fontBodySmMedium,
+                color = ElementTheme.colors.textPrimary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
         val content = relation.content
         if (content != null) {
             PostBody(content, deps, maxLines = 12)
@@ -407,32 +455,6 @@ private fun EmbeddedPost(relation: PostRelation, deps: SocialDeps, callbacks: Po
                 text = stringResource(R.string.social_view_original),
                 style = ElementTheme.typography.fontBodyMdRegular,
                 color = ElementTheme.colors.textActionAccent,
-            )
-        }
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun ReactionsRow(post: FeedPost, callbacks: PostCallbacks) {
-    FlowRow(
-        modifier = Modifier.padding(top = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        post.reactions.forEach { reaction ->
-            Text(
-                text = "${reaction.key} ${reaction.count}",
-                style = ElementTheme.typography.fontBodySmMedium,
-                color = if (reaction.byMe) ElementTheme.colors.textActionAccent else ElementTheme.colors.textSecondary,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(12.dp))
-                    .border(
-                        BorderStroke(1.dp, if (reaction.byMe) ElementTheme.colors.borderAccentSubtle else ElementTheme.colors.borderInteractiveSecondary),
-                        RoundedCornerShape(12.dp),
-                    )
-                    .clickable { callbacks.onToggleReaction(post, reaction.key) }
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
             )
         }
     }

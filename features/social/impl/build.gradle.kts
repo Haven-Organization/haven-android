@@ -32,6 +32,12 @@ dependencies {
     implementation(projects.libraries.uiStrings)
     implementation(projects.libraries.emoji.api)
     implementation(projects.libraries.htmlrenderer.api)
+    // The stock message reaction pills and reaction summary sheet, reused for posts' reactions shelf (like Haven Desktop).
+    implementation(projects.features.messages.impl)
+    implementation(projects.libraries.dateformatter.api)
+    implementation(projects.libraries.preferences.api)
+    // Quote posts with an attachment: media pre-processing and sending.
+    implementation(projects.libraries.mediaupload.api)
     implementation(platform(libs.network.okhttp.bom))
     implementation(libs.network.okhttp)
     implementation(libs.coil.compose)

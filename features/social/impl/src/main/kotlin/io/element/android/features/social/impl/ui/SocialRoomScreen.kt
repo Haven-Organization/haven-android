@@ -287,7 +287,7 @@ fun SocialRoomContent(
         }
         if (canPost && interactions != null) {
             FloatingActionButton(
-                onClick = { interactions.compose = ComposeMode.NewPost(roomId) },
+                onClick = { navigator.openComposer(ComposeMode.NewPost(roomId)) },
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .padding(16.dp),

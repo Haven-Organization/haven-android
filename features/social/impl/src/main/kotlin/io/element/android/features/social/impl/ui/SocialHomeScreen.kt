@@ -46,7 +46,6 @@ import io.element.android.features.social.impl.data.OwnProfileState
 import io.element.android.features.social.impl.data.SocialRoomKind
 import io.element.android.libraries.designsystem.components.button.BackButton
 import io.element.android.libraries.designsystem.theme.components.Button
-import io.element.android.libraries.designsystem.theme.components.CircularProgressIndicator
 import io.element.android.libraries.designsystem.theme.components.FloatingActionButton
 import io.element.android.libraries.designsystem.theme.components.Icon
 import io.element.android.libraries.designsystem.theme.components.NavigationBar
@@ -102,7 +101,7 @@ fun SocialHomeScreen(
         floatingActionButton = {
             if (section != SocialSection.Search) {
                 FloatingActionButton(onClick = {
-                    interactions.compose = ComposeMode.NewPost((ownProfile as? OwnProfileState.Linked)?.link?.roomId)
+                    navigator.openComposer(ComposeMode.NewPost((ownProfile as? OwnProfileState.Linked)?.link?.roomId))
                 }) {
                     Icon(CompoundIcons.Compose(), contentDescription = stringResource(R.string.social_post))
                 }
@@ -153,8 +152,8 @@ private fun FeedPane(deps: SocialDeps, callbacks: PostCallbacks) {
             .associate { it.roomId to it.info.name }
     }
     val hasScanned by deps.repository.hasScannedRooms.collectAsState()
-    val snapshot by produceState<io.element.android.features.social.impl.data.FeedSnapshot?>(null, roomIds) {
-        deps.timelineStore.feed(roomIds).collect { value = it }
+    val snapshot by produceState<io.element.android.features.social.impl.data.FeedSnapshot?>(null, roomIds, hasScanned) {
+        deps.timelineStore.feed(roomIds, roomsComplete = hasScanned).collect { value = it }
     }
     val posts = remember(snapshot, filter) {
         // Thread replies are included, like Haven Desktop's feed.
@@ -164,19 +163,25 @@ private fun FeedPane(deps: SocialDeps, callbacks: PostCallbacks) {
     val authorNames = remember(snapshot) {
         snapshot?.posts.orEmpty().mapNotNull { p -> p.eventId?.let { it.value to nameOf(p) } }.toMap()
     }
+    // Save the newest posts for next time, once the feed has settled.
+    LaunchedEffect(snapshot) {
+        val current = snapshot ?: return@LaunchedEffect
+        delay(3_000)
+        deps.timelineStore.saveFeed(current)
+    }
     val listState = rememberLazyListState()
     // Extend the feed by loading more from the rooms holding it back (the ones loaded the least far back).
     val latestSnapshot by rememberUpdatedState(snapshot)
     // Progress is the feed reaching further back (the cutoff moving), which can take several rounds of loading before
     // any older post shows up.
     PaginateOnScroll(listState, key = roomIds, progress = { latestSnapshot?.cutoff }) {
-        val limiting = latestSnapshot?.limitingRooms.orEmpty().take(8)
+        val limiting = latestSnapshot?.limitingRooms.orEmpty().take(16)
         if (limiting.isEmpty()) {
             // Nothing holding the feed back (yet): only keep going while rooms are still loading.
             latestSnapshot?.isLoading != false
         } else {
             kotlinx.coroutines.coroutineScope {
-                limiting.map { roomId -> async { deps.timelineStore.paginate(roomId) } }.awaitAll()
+                limiting.map { roomId -> async { deps.timelineStore.paginateFeed(roomId) } }.awaitAll()
             }
             true
         }
@@ -194,7 +199,7 @@ private fun FeedPane(deps: SocialDeps, callbacks: PostCallbacks) {
         return
     }
     LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
-        items(posts, key = { it.key }) { post ->
+        items(posts, key = { it.listKey }) { post ->
             PostTile(
                 post = post,
                 deps = deps,
@@ -207,7 +212,7 @@ private fun FeedPane(deps: SocialDeps, callbacks: PostCallbacks) {
         if (snapshot?.hasMore == true || snapshot?.isLoading == true) {
             item(key = "loading-more") {
                 Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
+                    SocialSpinner()
                 }
             }
         }
@@ -293,7 +298,7 @@ private fun GroupsPane(deps: SocialDeps, navigator: SocialNavigator) {
 private fun ProfilePane(deps: SocialDeps, navigator: SocialNavigator, callbacks: PostCallbacks) {
     val ownProfile by deps.repository.ownProfile.collectAsState()
     when (val state = ownProfile) {
-        OwnProfileState.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+        OwnProfileState.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { SocialSpinner() }
         OwnProfileState.None -> CreateProfilePrompt { navigator.createRoom(SocialRoomKind.Profile) }
         is OwnProfileState.Error -> Column(
             Modifier.fillMaxSize().padding(24.dp),
@@ -342,7 +347,7 @@ private fun FeedLoading(text: String) {
         verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        CircularProgressIndicator()
+        SocialSpinner()
         Text(
             text = text,
             style = ElementTheme.typography.fontBodyMdRegular,

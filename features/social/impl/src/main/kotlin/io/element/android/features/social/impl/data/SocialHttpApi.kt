@@ -65,11 +65,32 @@ class SocialHttpApi(
         )
 
     /** A page of a room's events, newest first (`dir=b`); works without joining for world-readable rooms. */
-    suspend fun roomMessages(roomId: String, from: String?, limit: Int = 50): Result<JSONObject> =
+    suspend fun roomMessages(roomId: String, from: String?, limit: Int = 50, lazyLoadMembers: Boolean = false): Result<JSONObject> =
         call(
             "GET",
-            "/_matrix/client/v3/rooms/${enc(roomId)}/messages?dir=b&limit=$limit" + (from?.let { "&from=${enc(it)}" } ?: ""),
+            "/_matrix/client/v3/rooms/${enc(roomId)}/messages?dir=b&limit=$limit" + (from?.let { "&from=${enc(it)}" } ?: "") +
+                // The senders' member events come along in `state`, for their names and avatars.
+                (if (lazyLoadMembers) "&filter=" + enc("""{"lazy_load_members":true}""") else ""),
         )
+
+    /**
+     * Simplified sliding sync (MSC4186), on a connection of its own ([body]'s `conn_id`), so the SDK's sync isn't
+     * affected. Waits up to [timeoutMs] for news when [pos] is given.
+     */
+    suspend fun slidingSync(body: JSONObject, pos: String?, timeoutMs: Long): Result<JSONObject> =
+        call(
+            "POST",
+            "/_matrix/client/unstable/org.matrix.simplified_msc3575/sync?timeout=$timeoutMs" + (pos?.let { "&pos=${enc(it)}" } ?: ""),
+            body,
+        )
+
+    /** Redacts (deletes) an event, e.g. a post or the user's own reaction. Needs no SDK timeline holding the event. */
+    suspend fun redact(roomId: String, eventId: String): Result<Unit> =
+        call(
+            "PUT",
+            "/_matrix/client/v3/rooms/${enc(roomId)}/redact/${enc(eventId)}/${enc("haven-" + java.util.UUID.randomUUID())}",
+            JSONObject(),
+        ).map { }
 
     /** One state event's content, from the server. */
     suspend fun getStateEventContent(roomId: String, eventType: String, stateKey: String): Result<JSONObject> =

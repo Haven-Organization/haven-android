@@ -82,6 +82,8 @@ class SocialPeek(
             isOwn = sender == matrixClient.sessionId.value,
             post = post,
             contentJson = event.optJSONObject("content")?.toString(),
+            // For "View source".
+            originalJson = event.toString(),
             likeCount = 0,
             likedByMe = false,
             repostCount = 0,
@@ -92,7 +94,8 @@ class SocialPeek(
         )
     }
 
-    private suspend fun profileOf(userId: String): Pair<String?, String?> {
+    /** A user's current display name and avatar URL, cached for the session. */
+    suspend fun profileOf(userId: String): Pair<String?, String?> {
         profilesMutex.withLock { profiles[userId]?.let { return it } }
         val user = matrixClient.getProfile(UserId(userId)).getOrNull()
         val result = user?.displayName to user?.avatarUrl

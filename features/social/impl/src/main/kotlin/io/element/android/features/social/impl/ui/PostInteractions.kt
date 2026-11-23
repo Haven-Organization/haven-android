@@ -6,6 +6,13 @@
 
 package io.element.android.features.social.impl.ui
 
+import io.element.android.features.messages.impl.timeline.components.reactionsummary.ReactionSummaryEvent
+import io.element.android.features.messages.impl.timeline.components.reactionsummary.ReactionSummaryState
+import io.element.android.features.messages.impl.timeline.components.reactionsummary.ReactionSummaryView
+import io.element.android.libraries.matrix.api.core.UserId
+import io.element.android.libraries.matrix.api.user.MatrixUser
+import kotlinx.collections.immutable.toImmutableList
+import kotlinx.collections.immutable.toPersistentSet
 import android.text.format.DateUtils
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -13,9 +20,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.SheetValue
@@ -55,13 +62,12 @@ import io.element.android.libraries.designsystem.theme.components.TextButton
 import io.element.android.libraries.designsystem.theme.components.TextField
 import io.element.android.libraries.designsystem.theme.components.hide
 import io.element.android.libraries.matrix.api.core.RoomId
-import kotlinx.collections.immutable.persistentSetOf
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import java.text.DateFormat
 import java.util.Date
 
-/** What the composer sheet is for. */
+/** What the post composer screen is for (see PostComposerScreen). */
 sealed interface ComposeMode {
     /** A new post, to a room picked from [SocialDeps.repository]'s postable rooms. */
     data class NewPost(val defaultRoomId: RoomId?) : ComposeMode
@@ -71,8 +77,10 @@ sealed interface ComposeMode {
 
 /** Pending dialogs and sheets for post interactions on a screen. */
 class PostInteractionState {
-    var compose by mutableStateOf<ComposeMode?>(null)
     var reactTo by mutableStateOf<FeedPost?>(null)
+
+    /** The post and reaction key whose senders are shown (the stock reaction summary sheet). */
+    var reactionsOf by mutableStateOf<Pair<FeedPost, String>?>(null)
     var confirmDelete by mutableStateOf<FeedPost?>(null)
     var error by mutableStateOf<String?>(null)
 }
@@ -102,17 +110,40 @@ fun rememberPostCallbacks(deps: SocialDeps, navigator: SocialNavigator, state: P
             }
         }
         PostCallbacks(
-            onOpenPost = { post -> post.eventId?.let { navigator.openThread(post.roomId, it.value) } },
+            onOpenPost = { post ->
+                post.eventId?.let {
+                    // The post screen shows it right away instead of waiting for its thread to load.
+                    deps.timelineStore.rememberOpenedPost(post)
+                    navigator.openThread(post.roomId, it.value)
+                }
+            },
             onOpenUser = navigator::openUser,
             onOpenReference = { relation -> navigator.openThread(RoomId(relation.roomId), relation.eventId, relation.via) },
-            onReply = { post -> if (!requireFollow(post)) state.compose = ComposeMode.Reply(post) },
-            onRepost = { post -> scope.runAction(onError) { deps.actions.repost(post) } },
-            onQuote = { state.compose = ComposeMode.Quote(it) },
-            onLike = { post -> if (!requireFollow(post)) scope.runAction(onError) { deps.actions.toggleLike(post) } },
+            onReply = { post -> if (!requireFollow(post)) navigator.openComposer(ComposeMode.Reply(post)) },
+            // Shown at once; undone (with an error) only if sending fails.
+            onRepost = { post ->
+                if (!deps.actions.optimistic.isRepostPending(post)) {
+                    scope.runAction(onError) { deps.actions.optimistic.repost(post) { deps.actions.repost(post) } }
+                }
+            },
+            onQuote = { navigator.openComposer(ComposeMode.Quote(it)) },
+            onLike = { post ->
+                // [post] is as shown, including a pending like; one like at a time per post.
+                if (!requireFollow(post) && !deps.actions.optimistic.isLikePending(post)) {
+                    scope.runAction(onError) { deps.actions.optimistic.like(post, liked = !post.likedByMe) { deps.actions.toggleLike(post) } }
+                }
+            },
             onReact = { post -> if (!requireFollow(post)) state.reactTo = post },
             onToggleReaction = { post, key -> if (!requireFollow(post)) scope.runAction(onError) { deps.actions.toggleReaction(post, key) } },
+            onShowReactions = { post, key -> state.reactionsOf = post to key },
             onDelete = { state.confirmDelete = it },
             onViewInRoom = { navigator.openRoomTimeline(it.roomId) },
+            onViewSource = { post ->
+                post.eventId?.let { eventId ->
+                    deps.timelineStore.rememberOpenedPost(post)
+                    navigator.openSource(post.roomId, eventId.value)
+                }
+            },
             onOpenEvent = { roomId, eventId -> navigator.openThread(roomId, eventId) },
             onOpenMedia = { post, media ->
                 // The stock viewer needs the room open; for peeked posts, following comes first.
@@ -138,14 +169,17 @@ private fun CoroutineScope.runAction(state: PostInteractionState, action: suspen
 @Composable
 fun PostInteractionOverlays(deps: SocialDeps, state: PostInteractionState) {
     val scope = rememberCoroutineScope()
-    state.compose?.let { mode ->
-        ComposeSheet(deps = deps, mode = mode, onDismiss = { state.compose = null }, onError = { state.error = it })
-    }
     state.reactTo?.let { post ->
         val presenter = remember { deps.emojiPickerPresenterFactory.create(deps.getRecentEmojis) }
         val pickerState = presenter.present()
         val sheetState = rememberBottomSheetState(initialValue = SheetValue.Hidden)
-        ModalBottomSheet(onDismissRequest = { state.reactTo = null }, sheetState = sheetState, scrollable = false) {
+        // Like the stock reaction sheet: above the keyboard when it's open (searching, or a freeform reaction).
+        ModalBottomSheet(
+            onDismissRequest = { state.reactTo = null },
+            sheetState = sheetState,
+            scrollable = false,
+            modifier = Modifier.imePadding(),
+        ) {
             // The stock emoji picker used for reacting to messages.
             deps.emojiPickerRenderer.Render(
                 state = pickerState,
@@ -161,10 +195,14 @@ fun PostInteractionOverlays(deps: SocialDeps, state: PostInteractionState) {
                         scope.runAction(state) { deps.actions.toggleReaction(post, key) }
                     }
                 },
-                selectedEmojis = persistentSetOf(),
+                // Like Desktop's reaction picker: the user's own reactions are marked (picking one removes it).
+                selectedEmojis = post.reactions.filter { it.byMe }.map { it.key }.toPersistentSet(),
                 modifier = Modifier.fillMaxSize(),
             )
         }
+    }
+    state.reactionsOf?.let { (post, key) ->
+        ReactionsSummarySheet(deps, post, key, onDismiss = { state.reactionsOf = null })
     }
     state.confirmDelete?.let { post ->
         ConfirmationDialog(
@@ -192,106 +230,8 @@ fun postableRooms(rooms: List<SocialRoom>, ownProfile: OwnProfileState): List<So
         .sortedWith(compareBy<SocialRoom> { it.roomId != ownProfileId }.thenBy { it.info.name.orEmpty().lowercase() })
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ComposeSheet(
-    deps: SocialDeps,
-    mode: ComposeMode,
-    onDismiss: () -> Unit,
-    onError: (String) -> Unit,
-) {
-    val scope = rememberCoroutineScope()
-    val sheetState = rememberBottomSheetState(initialValue = SheetValue.Hidden)
-    var text by remember { mutableStateOf("") }
-    var sending by remember { mutableStateOf(false) }
-    val rooms by deps.repository.socialRooms.collectAsState()
-    val ownProfile by deps.repository.ownProfile.collectAsState()
-    val postable = postableRooms(rooms, ownProfile)
-    val ownProfileId = (ownProfile as? OwnProfileState.Linked)?.link?.roomId
-    val target: MutableState<RoomId?> = remember { mutableStateOf((mode as? ComposeMode.NewPost)?.defaultRoomId) }
-    LaunchedEffect(postable, ownProfileId) {
-        if (mode is ComposeMode.NewPost && target.value == null) target.value = ownProfileId ?: postable.firstOrNull()?.roomId
-    }
-    val title = when (mode) {
-        is ComposeMode.NewPost -> stringResource(R.string.social_new_post)
-        is ComposeMode.Reply -> stringResource(R.string.social_reply_to, nameOf(mode.parent))
-        is ComposeMode.Quote -> stringResource(R.string.social_quote_post)
-    }
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, scrollable = true) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .imePadding()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Text(title, style = ElementTheme.typography.fontHeadingSmMedium, color = ElementTheme.colors.textPrimary)
-            if (mode is ComposeMode.NewPost) {
-                RoomPicker(
-                    rooms = postable,
-                    selected = target.value,
-                    ownProfileId = ownProfileId,
-                    onSelect = { target.value = it },
-                )
-            }
-            TextField(
-                value = text,
-                onValueChange = { text = it },
-                placeholder = when (mode) {
-                    is ComposeMode.Reply -> stringResource(R.string.social_reply_placeholder)
-                    is ComposeMode.Quote -> stringResource(R.string.social_quote_placeholder)
-                    is ComposeMode.NewPost -> stringResource(R.string.social_post_placeholder)
-                },
-                minLines = 3,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 96.dp),
-            )
-            when (mode) {
-                is ComposeMode.Reply -> QuotedPreview(mode.parent, deps)
-                is ComposeMode.Quote -> QuotedPreview(mode.original, deps)
-                is ComposeMode.NewPost -> Unit
-            }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                TextButton(text = stringResource(R.string.social_cancel), onClick = onDismiss)
-                val canSend = !sending && text.isNotBlank() && (mode !is ComposeMode.NewPost || target.value != null)
-                Button(
-                    text = stringResource(if (mode is ComposeMode.Reply) R.string.social_action_reply else R.string.social_post),
-                    enabled = canSend,
-                    showProgress = sending,
-                    size = ButtonSize.Medium,
-                    onClick = {
-                        sending = true
-                        scope.launch {
-                            val body = text.trim()
-                            val result = when (mode) {
-                                is ComposeMode.NewPost -> deps.actions.post(target.value!!, body)
-                                is ComposeMode.Reply -> deps.actions.reply(mode.parent, body)
-                                is ComposeMode.Quote -> deps.actions.quotePost(mode.original, body)
-                            }
-                            sending = false
-                            result.fold(
-                                onSuccess = { sheetState.hide(scope) { onDismiss() } },
-                                onFailure = { onError(it.message ?: it.toString()) },
-                            )
-                        }
-                    },
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun QuotedPreview(post: FeedPost, deps: SocialDeps) {
-    Column(Modifier.padding(start = 8.dp)) {
-        Text(nameOf(post), style = ElementTheme.typography.fontBodySmMedium, color = ElementTheme.colors.textSecondary)
-        PostBody(post.post.relation?.content?.takeIf { post.post.isPlainRepost } ?: post.post.content, deps, maxLines = 4)
-    }
-}
-
-@Composable
-private fun RoomPicker(rooms: List<SocialRoom>, selected: RoomId?, ownProfileId: RoomId?, onSelect: (RoomId) -> Unit) {
+internal fun RoomPicker(rooms: List<SocialRoom>, selected: RoomId?, ownProfileId: RoomId?, onSelect: (RoomId) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     val selectedRoom = rooms.firstOrNull { it.roomId == selected }
     Box {
@@ -338,3 +278,30 @@ fun formatRelativeTime(timestamp: Long, now: Long = System.currentTimeMillis()):
 }
 
 fun formatFullTime(timestamp: Long): String = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(timestamp))
+
+/**
+ * Who reacted to [post], and when: the stock reaction summary sheet (as for messages in rooms), opened on [key]'s tab.
+ * Senders' names and avatars fill in as their profiles load.
+ */
+@Composable
+private fun ReactionsSummarySheet(deps: SocialDeps, post: FeedPost, key: String, onDismiss: () -> Unit) {
+    val eventId = post.eventId ?: return
+    val me = deps.matrixClient.sessionId
+    var users by remember(post) { mutableStateOf(emptyMap<UserId, MatrixUser>()) }
+    LaunchedEffect(post) {
+        post.reactions.flatMap { it.senders }.map { it.userId }.distinct().forEach { userId ->
+            launch {
+                val (name, avatarUrl) = deps.peek.profileOf(userId.value)
+                users = users + (userId to MatrixUser(userId = userId, displayName = name, avatarUrl = avatarUrl))
+            }
+        }
+    }
+    val reactions = reactionsForSummary(post, me, deps.dateFormatter, users).toImmutableList()
+    if (reactions.none { it.key == key }) return
+    ReactionSummaryView(
+        state = ReactionSummaryState(
+            target = ReactionSummaryState.Summary(reactions = reactions, selectedKey = key, selectedEventId = eventId),
+            eventSink = { event -> if (event is ReactionSummaryEvent.Clear) onDismiss() },
+        ),
+    )
+}

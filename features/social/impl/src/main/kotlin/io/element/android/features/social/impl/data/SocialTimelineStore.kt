@@ -8,7 +8,6 @@ package io.element.android.features.social.impl.data
 
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
-import io.element.android.features.social.impl.msc.Msc4501
 import io.element.android.features.social.impl.msc.SocialPost
 import io.element.android.features.social.impl.msc.SocialPostParser
 import io.element.android.libraries.di.SessionScope
@@ -28,12 +27,18 @@ import io.element.android.libraries.matrix.api.timeline.item.event.ProfileDetail
 import io.element.android.libraries.matrix.api.timeline.item.event.RedactedContent
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import io.element.android.libraries.di.annotations.SessionCoroutineScope
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.merge
-import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.flowOf
@@ -51,6 +56,10 @@ data class RoomFeedState(
     val oldestLoaded: Long?,
     /** Whether the room has older history that isn't loaded yet. */
     val hasMore: Boolean,
+    /** Latest edit (event JSON) per post, seen live: also applied to posts shown from the feed cache. */
+    val edits: Map<String, String> = emptyMap(),
+    /** Posts deleted live: also taken out of the posts shown from the feed cache. */
+    val redacted: Set<String> = emptySet(),
 )
 
 /**
@@ -72,8 +81,6 @@ data class FeedSnapshot(
     val hasMore get() = limitingRooms.isNotEmpty()
 }
 
-data class ReactionSummary(val key: String, val count: Int, val byMe: Boolean)
-
 /** A post as shown in a feed, profile, group or thread. */
 data class FeedPost(
     val key: String,
@@ -92,12 +99,23 @@ data class FeedPost(
     val likedByMe: Boolean,
     val repostCount: Int,
     val repostedByMe: Boolean,
-    /** Other reactions (MSC4501 likes and repost counts are shown on their own buttons). */
+    /**
+     * All reactions, 👍 and 🔁 included (their counts are also in [likeCount] / [repostCount], shown on the Like and
+     * Repost buttons; the reactions shelf leaves them out, see [isActionBarReaction]).
+     */
     val reactions: List<ReactionSummary>,
     val replyCount: Int,
     /** Read without following the room (peeked): liking, reacting and replying need a follow first. */
     val peeked: Boolean = false,
+    /** The event's raw JSON and its latest edit's, to save the post in the feed cache ([FeedCache]). */
+    val originalJson: String? = null,
+    val latestEditJson: String? = null,
+    /** Shown from the feed cache until the room's own timeline has loaded. */
+    val fromCache: Boolean = false,
 ) {
+    /** Stable across app restarts (unlike [key]), so a cached post and its live copy are the same list item. */
+    val listKey get() = eventId?.let { roomId.value + "|" + it.value } ?: key
+
     val isThreadReply get() = post.threadRootId != null
 }
 
@@ -111,12 +129,18 @@ data class FeedPost(
 @Inject
 class SocialTimelineStore(
     private val matrixClient: MatrixClient,
+    private val feedCache: FeedCache,
+    private val feedSync: FeedSync,
+    @SessionCoroutineScope private val sessionScope: CoroutineScope,
 ) {
-    private val rooms = mutableMapOf<RoomId, JoinedRoom>()
-    private val mutex = Mutex()
-    private val parseCache = mutableMapOf<String, Pair<SocialPost?, String?>>()
+    private val rooms = java.util.concurrent.ConcurrentHashMap<RoomId, JoinedRoom>()
 
-    suspend fun joinedRoom(roomId: RoomId): JoinedRoom? = mutex.withLock {
+    // One lock per room, so the feed's rooms open in parallel instead of one after another.
+    private val roomLocks = java.util.concurrent.ConcurrentHashMap<RoomId, Mutex>()
+    private fun lockOf(roomId: RoomId) = roomLocks.getOrPut(roomId) { Mutex() }
+    private val parseCache = mutableMapOf<String, ParsedPost>()
+
+    suspend fun joinedRoom(roomId: RoomId): JoinedRoom? = rooms[roomId] ?: lockOf(roomId).withLock {
         rooms[roomId]?.let { return@withLock it }
         // Only rooms the SDK has synced: for others, Element X's room factory waits for the room list (holding a lock
         // that would also block opening ordinary rooms). Social rooms get subscribed by SocialRepository.
@@ -124,15 +148,16 @@ class SocialTimelineStore(
         matrixClient.getJoinedRoom(roomId)?.also { rooms[roomId] = it }
     }
 
-    private val socialTimelines = mutableMapOf<RoomId, Timeline>()
+    private val socialTimelines = java.util.concurrent.ConcurrentHashMap<RoomId, Timeline>()
 
     /**
      * The room's live timeline including thread replies (Element X's own live timeline hides them; Haven Desktop's feed
      * shows them). Falls back to the stock live timeline if it can't be created.
      */
     suspend fun timeline(roomId: RoomId): Timeline? {
+        socialTimelines[roomId]?.let { return it }
         val room = joinedRoom(roomId) ?: return null
-        return mutex.withLock {
+        return lockOf(roomId).withLock {
             socialTimelines[roomId] ?: room.createTimeline(CreateTimelineParams.HavenLiveWithThreads)
                 .onFailure { Timber.tag(SocialRepository.LOG_TAG).w(it, "Couldn't create a timeline with threads for %s", roomId) }
                 .getOrNull()
@@ -141,13 +166,50 @@ class SocialTimelineStore(
         }
     }
 
+    // Posts the user just opened from a list, so the post screen can show them at once (see SocialThreadScreen).
+    private val openedPosts = java.util.concurrent.ConcurrentHashMap<String, FeedPost>()
+
+    fun rememberOpenedPost(post: FeedPost) {
+        val eventId = post.eventId ?: return
+        if (openedPosts.size > 50) openedPosts.clear()
+        openedPosts[post.roomId.value + "|" + eventId.value] = post
+    }
+
+    fun openedPost(roomId: RoomId, eventId: String): FeedPost? = openedPosts[roomId.value + "|" + eventId]
+
     /** The room if its timeline is already open (no waiting). */
     fun cachedJoinedRoom(roomId: RoomId): JoinedRoom? = rooms[roomId]
 
     /** Drops a room's timeline, e.g. after leaving it. */
-    suspend fun forget(roomId: RoomId) = mutex.withLock {
+    suspend fun forget(roomId: RoomId) = lockOf(roomId).withLock {
         socialTimelines.remove(roomId)?.let { runCatching { it.close() } }
         rooms.remove(roomId)?.destroy()
+    }
+
+    // Social screens (flows) currently open: their rooms' timelines stay open meanwhile.
+    private val users = java.util.concurrent.atomic.AtomicInteger(0)
+
+    /** A Social flow opened: keep the rooms' timelines open until it's [released][release]. */
+    fun acquire() {
+        users.incrementAndGet()
+    }
+
+    /**
+     * A Social flow closed. Once none is left, closes every timeline Social opened: an open timeline keeps receiving and
+     * mapping its room's updates in the background, and with the feed's many rooms (each paginated back) that kept
+     * growing until the app ran out of memory. The next visit starts from the cached feed, so it still opens at once.
+     */
+    fun release() {
+        if (users.decrementAndGet() > 0) return
+        users.set(0)
+        // Removed from the maps first, so nothing picks up a timeline that's being closed.
+        val timelines = socialTimelines.keys.mapNotNull { socialTimelines.remove(it) }
+        val joined = rooms.keys.mapNotNull { rooms.remove(it) }
+        timelines.forEach { runCatching { it.close() } }
+        joined.forEach { runCatching { it.destroy() } }
+        synchronized(parseCache) { parseCache.clear() }
+        sessionScope.launch { feedSync.clear() }
+        Timber.tag(SocialRepository.LOG_TAG).d("Closed %d social timelines", timelines.size)
     }
 
     /** Live posts of one room, newest first. */
@@ -161,32 +223,76 @@ class SocialTimelineStore(
      * Progressive: each room's posts show up as soon as that room's timeline loads, without waiting for the others.
      * Complete: see [FeedSnapshot.cutoff].
      */
-    fun feed(roomIds: List<RoomId>): Flow<FeedSnapshot> {
+    /**
+     * @param roomsComplete false while the feed's rooms are still being found (just after the app starts, they come
+     * from the server): [roomIds] may be partial, so all of last time's cached posts are shown meanwhile.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun feed(roomIds: List<RoomId>, roomsComplete: Boolean = true): Flow<FeedSnapshot> {
+        if (roomIds.isEmpty() && !roomsComplete) {
+            // The feed's rooms aren't known yet (just after the app starts, they come from the server): show last
+            // time's feed meanwhile, still loading.
+            return flow {
+                emit(FeedSnapshot(feedCache.posts(), loadedRooms = 0, totalRooms = 1))
+            }.flowOn(Dispatchers.Default)
+        }
         if (roomIds.isEmpty()) return flowOf(FeedSnapshot(emptyList(), loadedRooms = 0, totalRooms = 0))
         val perRoom = roomIds.map { roomId ->
-            flow { emitAll(roomFeedState(roomId)) }
-                .map<RoomFeedState, Pair<RoomId, RoomFeedState?>> { roomId to it }
-                // null = this room hasn't loaded yet
-                .onStart { emit(roomId to null) }
+            feedSync.rooms
+                .map { it[roomId] }
+                .distinctUntilChanged()
+                .flatMapLatest { room ->
+                    when (room) {
+                        // null = this room hasn't loaded yet
+                        null -> flowOf(null)
+                        is FeedRoom.Loaded -> flowOf(room.state.copy(posts = withReplyCounts(room.state.posts)))
+                        // Encrypted (or no sliding sync on the server): the SDK's timeline decrypts it.
+                        FeedRoom.NeedsTimeline -> flow { emitAll(roomFeedState(roomId)) }
+                    }
+                }
+                .map { roomId to it }
         }
         // Merging and sorting many rooms is real work: keep it off the main thread.
-        return perRoom.merge()
-            .scan(emptyMap<RoomId, RoomFeedState?>()) { acc, (roomId, state) -> acc + (roomId to state) }
-            .map { byRoom -> snapshotOf(byRoom, roomIds.size) }
+        return channelFlow {
+            // The rooms' latest posts in one request, then new ones as they come, for as long as the feed is shown.
+            launch { feedSync.runLive(roomIds) }
+            val roomIdSet = roomIds.toSet()
+            // Last time's newest posts, shown right away and replaced room by room as each room loads.
+            val cached = feedCache.posts().filter { !roomsComplete || it.roomId in roomIdSet }
+            perRoom.merge()
+                .scan(emptyMap<RoomId, RoomFeedState?>()) { acc, (roomId, state) -> acc + (roomId to state) }
+                .map { byRoom -> snapshotOf(byRoom, roomIds.size, cached) }
+                .collect { send(it) }
+        }
             .conflate()
             .flowOn(Dispatchers.Default)
     }
 
-    private fun snapshotOf(byRoom: Map<RoomId, RoomFeedState?>, totalRooms: Int): FeedSnapshot {
+    /** Saves the newest posts of a fully loaded feed for next time. */
+    suspend fun saveFeed(snapshot: FeedSnapshot) {
+        if (!snapshot.isLoading && snapshot.posts.isNotEmpty()) feedCache.save(snapshot.posts)
+    }
+
+    private fun snapshotOf(byRoom: Map<RoomId, RoomFeedState?>, totalRooms: Int, cached: List<FeedPost>): FeedSnapshot {
         val loaded = byRoom.filterValues { it != null }.mapValues { it.value!! }
         // Rooms with more history, by how far back they're loaded (rooms with nothing loaded yet don't hold the feed
         // back: their posts appear as they arrive).
         val limiting = loaded.filter { it.value.hasMore && it.value.oldestLoaded != null }
             .entries.sortedByDescending { it.value.oldestLoaded }
         val cutoff = limiting.firstOrNull()?.value?.oldestLoaded ?: 0L
-        val posts = loaded.values.flatMap { it.posts }
-            .filter { it.timestamp >= cutoff }
-            .sortedByDescending { it.timestamp }
+        val live = loaded.values.flatMap { it.posts }.filter { it.timestamp >= cutoff }
+        val liveKeys = live.mapTo(HashSet()) { it.listKey }
+        // A cached post stays until its room has loaded back to it: from then on the room's live posts are the truth
+        // (a deleted post disappears). The cache was complete when saved, so it isn't held back by the cutoff.
+        val fromCache = cached.filter { post ->
+            if (post.listKey in liveKeys) return@filter false
+            val room = byRoom[post.roomId]
+            if (post.eventId?.value in room?.redacted.orEmpty()) return@filter false
+            val oldestLoaded = room?.oldestLoaded
+            // Room not loaded yet (or nothing in its timeline yet), or the post is older than what it has loaded.
+            oldestLoaded == null || post.timestamp < oldestLoaded
+        }.map { post -> withLiveEdit(post, byRoom[post.roomId]?.edits?.get(post.eventId?.value)) }
+        val posts = (live + fromCache).sortedByDescending { it.timestamp }
         return FeedSnapshot(
             posts = posts,
             loadedRooms = loaded.size,
@@ -196,6 +302,17 @@ class SocialTimelineStore(
         )
     }
 
+    /** [post] (from the feed cache) with an edit made since it was cached, if any (by its author only). */
+    private fun withLiveEdit(post: FeedPost, editJson: String?): FeedPost {
+        editJson ?: return post
+        val edit = runCatching { JSONObject(editJson) }.getOrNull() ?: return post
+        if (edit.optString("sender") != post.sender.value) return post
+        val current = post.latestEditJson?.let { runCatching { JSONObject(it) }.getOrNull() }
+        if (current != null && current.optLong("origin_server_ts") >= edit.optLong("origin_server_ts")) return post
+        val parsed = ParsedPost.of(post.originalJson ?: return post, editJson)
+        return post.copy(post = parsed.post ?: return post, contentJson = parsed.contentJson, latestEditJson = editJson)
+    }
+
     /** A room's posts, how far back it's loaded, and whether it has more. */
     private suspend fun roomFeedState(roomId: RoomId): Flow<RoomFeedState> {
         val timeline = timeline(roomId) ?: return flowOf(RoomFeedState(emptyList(), null, false))
@@ -203,9 +320,11 @@ class SocialTimelineStore(
             .conflate()
             .map { items ->
                 val events = items.filterIsInstance<MatrixTimelineItem.Event>()
-                val posts = items.asReversed().mapNotNull { item ->
-                    (item as? MatrixTimelineItem.Event)?.let { toFeedPost(roomId, it) }
-                }
+                val posts = withReplyCounts(
+                    items.asReversed().mapNotNull { item ->
+                        (item as? MatrixTimelineItem.Event)?.let { toFeedPost(roomId, it) }
+                    }
+                )
                 posts to events.minOfOrNull { it.event.timestamp }
             }
             .flowOn(Dispatchers.Default)
@@ -219,11 +338,27 @@ class SocialTimelineStore(
         .conflate()
         .map { items ->
             // Each post is parsed from its raw JSON (a call into the SDK per event): never on the main thread.
-            items.asReversed().mapNotNull { item ->
-                (item as? MatrixTimelineItem.Event)?.let { toFeedPost(roomId, it) }
-            }
+            withReplyCounts(
+                items.asReversed().mapNotNull { item ->
+                    (item as? MatrixTimelineItem.Event)?.let { toFeedPost(roomId, it) }
+                }
+            )
         }
         .flowOn(Dispatchers.Default)
+
+    /** A post the feed has loaded from the server (with its reactions), if any. */
+    fun feedPost(roomId: RoomId, eventId: String): FeedPost? =
+        (feedSync.rooms.value[roomId] as? FeedRoom.Loaded)?.state?.posts?.firstOrNull { it.eventId?.value == eventId }
+
+    /** Loads the feed rooms' latest posts ahead of time (one request), so the Feed is ready when Social opens. */
+    suspend fun prefetchFeed(roomIds: List<RoomId>) = feedSync.load(roomIds)
+
+    /** Loads older posts of a feed room: from the server, or its timeline if the feed uses one for it. */
+    suspend fun paginateFeed(roomId: RoomId): Boolean = when (feedSync.rooms.value[roomId]) {
+        is FeedRoom.Loaded -> feedSync.paginate(roomId)
+        FeedRoom.NeedsTimeline -> paginate(roomId)
+        null -> true
+    }
 
     /** Loads older posts of [roomId]. Returns whether the room may have more (false at the start, or on failure). */
     suspend fun paginate(roomId: RoomId): Boolean = withContext(Dispatchers.Default) {
@@ -237,16 +372,16 @@ class SocialTimelineStore(
         val event = item.event
         val content = event.content
         if (content is RedactedContent) return null
-        val (post, contentJson) = parse(item.uniqueId.value, event) ?: return null
-        if (post == null) return null
-        val me = matrixClient.sessionId
-        // Reactions are de-duplicated by sender, like Haven Desktop.
-        val reactions = event.reactions.map { reaction ->
-            val senders = reaction.senders.map { it.senderId }.distinct()
-            ReactionSummary(reaction.key, senders.size, me in senders)
-        }
-        val like = reactions.firstOrNull { it.key == Msc4501.LIKE_KEY }
-        val repost = reactions.firstOrNull { it.key == Msc4501.REPOST_KEY }
+        val parsed = parse(item.uniqueId.value, event) ?: return null
+        val post = parsed.post ?: return null
+        val reactions = reactionSummaries(
+            event.reactions.flatMap { reaction ->
+                reaction.senders.map { RawReaction(reaction.key, it.senderId.value, it.timestamp) }
+            },
+            me = matrixClient.sessionId.value,
+        )
+        val like = reactions.likes()
+        val repost = reactions.reposts()
         val threadReplies = ((content as? MessageContent)?.threadInfo as? EventThreadInfo.ThreadRoot)?.summary?.numberOfReplies?.toInt()
         val profile = event.senderProfile as? ProfileDetails.Ready
         return FeedPost(
@@ -260,32 +395,64 @@ class SocialTimelineStore(
             timestamp = event.timestamp,
             isOwn = event.isOwn,
             post = post,
-            contentJson = contentJson,
+            contentJson = parsed.contentJson,
+            originalJson = parsed.originalJson,
+            latestEditJson = parsed.latestEditJson,
             likeCount = like?.count ?: 0,
             likedByMe = like?.byMe ?: false,
             repostCount = repost?.count ?: 0,
             repostedByMe = repost?.byMe ?: false,
-            reactions = reactions.filter { it.key != Msc4501.LIKE_KEY && it.key != Msc4501.REPOST_KEY },
+            reactions = reactions,
+            // The thread's size, if this is a thread root: only a fallback, see withReplyCounts.
             replyCount = maxOf(threadReplies ?: 0, post.bundledReplyCount),
         )
     }
 
-    private fun parse(uniqueId: String, event: EventTimelineItem): Pair<SocialPost?, String?>? {
+    /**
+     * Haven Desktop's reply counts (replyCountFor): a post's direct replies among the loaded posts, i.e. the posts whose
+     * immediate parent (`m.in_reply_to`, else the `m.thread` event) is that post. A reply to a reply counts on the reply
+     * it answers, not on the thread root. When none are loaded, a thread root keeps its thread size from the server.
+     */
+    private fun withReplyCounts(posts: List<FeedPost>): List<FeedPost> {
+        val counts = HashMap<String, Int>()
+        posts.forEach { p -> (p.post.inReplyToId ?: p.post.threadRootId)?.let { counts[it] = (counts[it] ?: 0) + 1 } }
+        return posts.map { p ->
+            val local = p.eventId?.let { counts[it.value] } ?: 0
+            if (local > 0 && local != p.replyCount) p.copy(replyCount = local) else p
+        }
+    }
+
+    private fun parse(uniqueId: String, event: EventTimelineItem): ParsedPost? {
         val cacheKey = uniqueId + "|" + event.content.hashCode()
         synchronized(parseCache) { parseCache[cacheKey]?.let { return it } }
         val debugInfo = runCatching { event.timelineItemDebugInfoProvider() }
             .onFailure { Timber.tag(SocialRepository.LOG_TAG).w(it, "No debug info for %s", event.eventId) }
             .getOrNull() ?: return null
-        val post = SocialPostParser.parse(debugInfo.originalJson, debugInfo.latestEditedJson)
-        val contentJson = debugInfo.latestEditedJson
-            ?.let { runCatching { JSONObject(it).optJSONObject("content")?.optJSONObject("m.new_content") }.getOrNull() }
-            ?.toString()
-            ?: debugInfo.originalJson?.let { runCatching { JSONObject(it).optJSONObject("content") }.getOrNull() }?.toString()
-        val result = post to contentJson
+        val result = ParsedPost.of(debugInfo.originalJson, debugInfo.latestEditedJson)
         synchronized(parseCache) {
             if (parseCache.size > 5000) parseCache.clear()
             parseCache[cacheKey] = result
         }
         return result
+    }
+}
+
+/** A post parsed from its event's raw JSON (and its latest edit's). */
+class ParsedPost(
+    val post: SocialPost?,
+    /** The content to embed when the post is reposted, quoted or replied to. */
+    val contentJson: String?,
+    val originalJson: String?,
+    val latestEditJson: String?,
+) {
+    companion object {
+        fun of(originalJson: String?, latestEditJson: String?): ParsedPost {
+            val post = SocialPostParser.parse(originalJson, latestEditJson)
+            val contentJson = latestEditJson
+                ?.let { runCatching { JSONObject(it).optJSONObject("content")?.optJSONObject("m.new_content") }.getOrNull() }
+                ?.toString()
+                ?: originalJson?.let { runCatching { JSONObject(it).optJSONObject("content") }.getOrNull() }?.toString()
+            return ParsedPost(post, contentJson, originalJson, latestEditJson)
+        }
     }
 }
