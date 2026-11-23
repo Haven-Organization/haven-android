@@ -28,6 +28,7 @@ import io.element.android.libraries.mediaupload.api.MediaPreProcessor
 import io.element.android.libraries.mediaupload.api.MediaSender
 import io.element.android.libraries.mediaupload.api.MediaSenderFactory
 import io.element.android.libraries.mediaupload.api.MediaSenderRoomFactory
+import io.element.android.libraries.mediaupload.api.MediaSenderRoomTimelineFactory
 import io.element.android.libraries.mediaupload.api.MediaUploadInfo
 import io.element.android.libraries.mediaupload.api.toGalleryItemInfo
 import kotlinx.coroutines.CancellationException
@@ -67,6 +68,26 @@ class DefaultMediaSenderRoomFactory(
             preProcessor = preProcessor,
             room = room,
             timelineMode = Timeline.Mode.Live,
+            mediaOptimizationConfigProvider = mediaOptimizationConfigProviderFactory.create(client),
+        )
+    }
+}
+
+/** Haven: see [MediaSenderRoomTimelineFactory]. */
+@ContributesBinding(AppScope::class)
+class DefaultMediaSenderRoomTimelineFactory(
+    private val preProcessor: MediaPreProcessor,
+    private val mediaOptimizationConfigProviderFactory: MediaOptimizationConfigProviderFactory,
+) : MediaSenderRoomTimelineFactory {
+    override fun create(
+        client: MatrixClient,
+        room: JoinedRoom,
+        timelineMode: Timeline.Mode,
+    ): MediaSender {
+        return DefaultMediaSender(
+            preProcessor = preProcessor,
+            room = room,
+            timelineMode = timelineMode,
             mediaOptimizationConfigProvider = mediaOptimizationConfigProviderFactory.create(client),
         )
     }

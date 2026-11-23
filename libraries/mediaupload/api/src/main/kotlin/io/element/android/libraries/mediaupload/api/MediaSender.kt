@@ -45,6 +45,18 @@ fun interface MediaSenderRoomFactory {
 }
 
 /**
+ * Haven: like [MediaSenderRoomFactory], for any timeline of the room, e.g. a thread (Social sends a reply with an
+ * attachment into its post's thread, outside the room scope).
+ */
+fun interface MediaSenderRoomTimelineFactory {
+    fun create(
+        client: MatrixClient,
+        room: JoinedRoom,
+        timelineMode: Timeline.Mode,
+    ): MediaSender
+}
+
+/**
  * Sends media to a room, taking care of the pre-processing the timeline API does not do: resizing, transcoding and stripping metadata.
  *
  * Sending is a two-step process, and the steps can be used separately so the UI can show a preview between them.
