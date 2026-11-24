@@ -107,6 +107,7 @@ jobs:
           cat dist/SHA256SUMS
 
       # A draft: only visible to the repository's maintainers until one of them publishes it on GitHub.
+      # The changelog (changes since the last release, like Haven Desktop's release notes) is written in before publishing.
       - name: Create the GitHub release (draft)
         env:
           GH_TOKEN: ${{ github.token }}
@@ -115,6 +116,10 @@ jobs:
           cat > notes.md <<EOF
           Haven Android ${TAG#v}, based on Element X Android and SchildiChat Next.
 
+          ## Changelog
+          Changelog to come.
+
+          ## Downloads
           **Which APK?** Most phones: \`arm64-v8a\`. Older 32-bit phones: \`armeabi-v7a\`. Emulators and x86 devices: \`x86_64\`.
 
           APKs are signed with the Haven release key. Certificate SHA-256:
