@@ -10,8 +10,10 @@ package io.element.android.features.home.impl
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
@@ -21,8 +23,10 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.plus
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.FabPosition
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTopAppBarState
@@ -39,6 +43,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
@@ -397,28 +402,47 @@ private fun HomeBottomBar(
         modifier = modifier
             .zIndex(1f),
     ) {
-        HomeNavigationBarItem.entries.forEachIndexed { index, item ->
-            if (index > 0) {
-                HorizontalFloatingToolbarSeparator()
-            }
-            val isSelected = currentHomeNavigationBarItem == item
-            HorizontalFloatingToolbarItem(
-                icon = item.icon(isSelected),
-                tooltipLabel = stringResource(item.labelRes),
-                isSelected = isSelected,
-                onClick = { onItemClick(item) },
-                counter = totalUnreadCount.takeIf { item == HomeNavigationBarItem.Chats && it > 0 }
-            )
+        // Haven: pinned apps can make the items wider than the screen, so they scroll within the room left next to
+        // the button (screen minus the 16dp margins, the 56dp button and its gap, and the toolbar's 12dp padding).
+        val windowWidth = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.width.toDp() }
+        val reservedWidth = if (floatingActionButton != null) 128.dp else 56.dp
+        Row(
+            modifier = Modifier
+                .widthIn(max = (windowWidth - reservedWidth).coerceAtLeast(56.dp))
+                .horizontalScroll(rememberScrollState()),
+        ) {
+            HomeBottomBarItems(totalUnreadCount, currentHomeNavigationBarItem, onItemClick)
         }
-        // Haven: Apps button to the right of Spaces, then pinned apps
-        io.element.android.features.social.api.LocalHavenAppsBar.current?.let { havenApps ->
-            val style = io.element.android.features.social.api.HavenBarStyle.ElementToolbar
+    }
+}
+
+@Composable
+private fun HomeBottomBarItems(
+    totalUnreadCount: Int,
+    currentHomeNavigationBarItem: HomeNavigationBarItem,
+    onItemClick: (HomeNavigationBarItem) -> Unit,
+) {
+    HomeNavigationBarItem.entries.forEachIndexed { index, item ->
+        if (index > 0) {
             HorizontalFloatingToolbarSeparator()
-            io.element.android.features.social.api.HavenAppsButton(havenApps, style)
-            havenApps.pinnedApps.forEach { app ->
-                HorizontalFloatingToolbarSeparator()
-                io.element.android.features.social.api.HavenPinnedAppButton(app, havenApps, style)
-            }
+        }
+        val isSelected = currentHomeNavigationBarItem == item
+        HorizontalFloatingToolbarItem(
+            icon = item.icon(isSelected),
+            tooltipLabel = stringResource(item.labelRes),
+            isSelected = isSelected,
+            onClick = { onItemClick(item) },
+            counter = totalUnreadCount.takeIf { item == HomeNavigationBarItem.Chats && it > 0 }
+        )
+    }
+    // Haven: Apps button to the right of Spaces, then pinned apps
+    io.element.android.features.social.api.LocalHavenAppsBar.current?.let { havenApps ->
+        val style = io.element.android.features.social.api.HavenBarStyle.ElementToolbar
+        HorizontalFloatingToolbarSeparator()
+        io.element.android.features.social.api.HavenAppsButton(havenApps, style)
+        havenApps.pinnedApps.forEach { app ->
+            HorizontalFloatingToolbarSeparator()
+            io.element.android.features.social.api.HavenPinnedAppButton(app, havenApps, style)
         }
     }
 }
