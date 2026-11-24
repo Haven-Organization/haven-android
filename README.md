@@ -2,6 +2,15 @@
   <img src="metadata/en-US/images/featureGraphic.png" alt="Haven" width="400">
 </p>
 
+<p align="center">
+  <a href="https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%22software.haven.HavenAndroid%22%2C%22url%22%3A%22https%3A%2F%2Fgithub.com%2FHaven-Organization%2Fhaven-android%22%2C%22author%22%3A%22Haven-Organization%22%2C%22name%22%3A%22Haven%22%7D"><img src="docs/images/badge_obtainium.png" alt="Get it on Obtainium" height="56"></a>
+</p>
+
+Install Haven with [Obtainium](https://github.com/ImranR98/Obtainium) and it updates straight from this repository's
+[releases](https://github.com/Haven-Organization/haven-android/releases). You can also download the APK from the
+[latest release](https://github.com/Haven-Organization/haven-android/releases/latest) yourself (most phones need
+`arm64-v8a`).
+
 Haven for Android is the companion app to [Haven Desktop](https://github.com/Haven-Organization/haven-desktop).
 It is a Matrix client built on [Element X Android](https://github.com/element-hq/element-x-android) that brings in
 everything from [SchildiChat Next](https://github.com/SchildiChat/schildichat-android-next), including the
