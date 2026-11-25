@@ -388,13 +388,17 @@ class HavenPostComposerNode(
         }
         val hasText = markdown(state.textEditorState).isNotBlank()
         val canSend = !quoteSending && sendingText == null && (hasText || (inputs.isQuote && quoteAttachment != null))
+        // Reads everything from state when tapped, never from values captured in a composition: the click handler can be
+        // a copy from an earlier frame (e.g. the first one, with the text box still empty), which would then do nothing.
         fun send() {
-            if (!canSend) return
+            val current = latestState
+            val text = markdown(current.textEditorState).trim()
+            if (quoteSending || sendingText != null) return
             if (inputs.isQuote) {
-                sendQuote()
-            } else {
-                sendingText = markdown(state.textEditorState).trim()
-                state.eventSink(MessageComposerEvent.SendMessage)
+                if (text.isNotEmpty() || quoteAttachment != null) sendQuote()
+            } else if (text.isNotEmpty()) {
+                sendingText = text
+                current.eventSink(MessageComposerEvent.SendMessage)
             }
         }
 
