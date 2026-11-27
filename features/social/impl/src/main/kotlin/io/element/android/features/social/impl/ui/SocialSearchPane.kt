@@ -49,7 +49,11 @@ import io.element.android.libraries.designsystem.theme.components.TextField
 import io.element.android.libraries.matrix.api.core.RoomId
 import io.element.android.libraries.matrix.api.core.UserId
 import io.element.android.libraries.matrix.api.user.MatrixUser
+import io.element.android.features.social.impl.data.SocialRoomKind
+import io.element.android.libraries.matrix.api.room.RoomMembershipState
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
 private enum class SearchTab { People, Groups, Posts }
@@ -71,6 +75,8 @@ private sealed interface SearchResults<out T> {
 fun SocialSearchPane(deps: SocialDeps, navigator: SocialNavigator) {
     var query by rememberSaveable { mutableStateOf("") }
     var tab by rememberSaveable { mutableStateOf(SearchTab.People) }
+    // Built once while Search is open, so typing filters it locally
+    val localPeople by produceState<List<MatrixUser>?>(null, deps) { value = loadLocalPeople(deps) }
     Column(Modifier.fillMaxSize()) {
         TextField(
             value = query,
@@ -100,25 +106,69 @@ fun SocialSearchPane(deps: SocialDeps, navigator: SocialNavigator) {
             }
         }
         when (tab) {
-            SearchTab.People -> PeopleResults(deps, navigator, query)
+            SearchTab.People -> PeopleResults(deps, navigator, query, localPeople)
             SearchTab.Groups -> GroupResults(deps, navigator, query)
             SearchTab.Posts -> PostResults(deps, navigator, query)
         }
     }
 }
 
+/**
+ * Everyone you share a room with, from the members already in the local store, plus the owners of the profile rooms
+ * you follow. Synapse's user directory leaves out appservice (bridged) users, so without this, followed fediverse
+ * people can't be found. Same idea as Haven Desktop's People search, which merges in your rooms' members.
+ */
+private suspend fun loadLocalPeople(deps: SocialDeps): List<MatrixUser> = withContext(Dispatchers.Default) {
+    val me = deps.matrixClient.sessionId
+    val people = LinkedHashMap<UserId, MatrixUser>()
+    // Profile room owners first: the room's name and avatar stand in until a member event fills them in
+    deps.repository.socialRooms.value.filter { it.kind == SocialRoomKind.Profile }.forEach { room ->
+        val owner = room.info.creators.firstOrNull() ?: return@forEach
+        people.putIfAbsent(owner, MatrixUser(owner, room.info.name, room.info.avatarUrl))
+    }
+    val roomIds = deps.matrixClient.getJoinedRoomIds().getOrDefault(emptySet())
+    for (roomId in roomIds) {
+        val members = deps.matrixClient.getRoom(roomId)?.use { it.cachedMembers() }.orEmpty()
+        for (member in members) {
+            if (member.membership != RoomMembershipState.JOIN || member.isServiceMember) continue
+            val known = people[member.userId]
+            if (known == null) {
+                people[member.userId] = MatrixUser(member.userId, member.displayName, member.avatarUrl)
+            } else if (known.displayName == null || known.avatarUrl == null) {
+                people[member.userId] = known.copy(
+                    displayName = known.displayName ?: member.displayName,
+                    avatarUrl = known.avatarUrl ?: member.avatarUrl,
+                )
+            }
+        }
+    }
+    people.remove(me)
+    people.values.toList()
+}
+
+private fun MatrixUser.matches(query: String): Boolean =
+    userId.value.contains(query, ignoreCase = true) || displayName?.contains(query, ignoreCase = true) == true
+
 @Composable
-private fun PeopleResults(deps: SocialDeps, navigator: SocialNavigator, query: String) {
-    val results by produceState<SearchResults<MatrixUser>>(SearchResults.Idle, query) {
-        if (query.isBlank()) {
+private fun PeopleResults(deps: SocialDeps, navigator: SocialNavigator, query: String, localPeople: List<MatrixUser>?) {
+    val results by produceState<SearchResults<MatrixUser>>(SearchResults.Idle, query, localPeople) {
+        val trimmed = query.trim()
+        if (trimmed.isEmpty()) {
             value = SearchResults.Idle
             return@produceState
         }
+        // People you share a room with show right away, then the directory's matches are added after them
+        val local = localPeople.orEmpty().filter { it.matches(trimmed) }
+            .sortedWith(compareByDescending<MatrixUser> { it.displayName?.startsWith(trimmed, ignoreCase = true) == true }.thenBy { it.displayName ?: it.userId.value })
+        value = if (local.isNotEmpty()) SearchResults.Loaded(local) else SearchResults.Loading
         delay(400)
-        value = SearchResults.Loading
-        value = deps.matrixClient.searchUsers(query.trim(), 30).fold(
-            onSuccess = { SearchResults.Loaded(it.results) },
-            onFailure = { SearchResults.Failed(it.message ?: it.toString()) },
+        val directory = deps.matrixClient.searchUsers(trimmed, 30)
+        value = directory.fold(
+            onSuccess = { response ->
+                val localIds = local.mapTo(HashSet()) { it.userId }
+                SearchResults.Loaded(local + response.results.filter { it.userId !in localIds && it.userId != deps.matrixClient.sessionId })
+            },
+            onFailure = { if (local.isNotEmpty()) SearchResults.Loaded(local) else SearchResults.Failed(it.message ?: it.toString()) },
         )
     }
     ResultList(results, empty = R.string.social_search_people_empty) { user ->

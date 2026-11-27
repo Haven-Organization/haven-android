@@ -87,6 +87,12 @@ interface BaseRoom : Closeable {
     suspend fun getMembers(limit: Int = 5): Result<List<RoomMember>>
 
     /**
+     * Haven: the members already in the local store, without any network request. Empty if the room's
+     * members were never loaded. Used by Social's People search to match people you share a room with.
+     */
+    suspend fun cachedMembers(): List<RoomMember> = emptyList()
+
+    /**
      * Will return an updated member or an error.
      *
      * @param userId the member to fetch.

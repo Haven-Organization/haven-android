@@ -109,6 +109,14 @@ class RustBaseRoom(
         }
     }
 
+    override suspend fun cachedMembers(): List<RoomMember> = withContext(roomDispatcher) {
+        runCatchingExceptions {
+            innerRoom.membersNoSync().use { members ->
+                members.nextChunk(members.len()).orEmpty().map(RoomMemberMapper::map)
+            }
+        }.getOrDefault(emptyList())
+    }
+
     override suspend fun getDirectRoomMember(): RoomMember? = withContext(roomDispatcher) {
         runCatchingExceptions {
             if (info().isDm) {
