@@ -25,6 +25,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -55,6 +56,7 @@ import io.element.android.libraries.designsystem.utils.OnLifecycleEvent
 import io.element.android.libraries.mediaviewer.api.local.LocalMedia
 import io.element.android.libraries.mediaviewer.impl.local.LocalMediaViewState
 import io.element.android.libraries.mediaviewer.impl.local.PlayableState
+import io.element.android.libraries.mediaviewer.impl.local.player.HavenVideoStreams
 import io.element.android.libraries.mediaviewer.impl.local.player.MediaPlayerControllerState
 import io.element.android.libraries.mediaviewer.impl.local.player.MediaPlayerControllerView
 import io.element.android.libraries.mediaviewer.impl.local.player.rememberExoPlayer
@@ -133,6 +135,7 @@ private fun ExoPlayerMediaVideoView(
 
     localMediaViewState.playableState = playableState
 
+    val currentLocalMedia by rememberUpdatedState(localMedia)
     val playerListener = remember {
         object : Player.Listener {
             override fun onRenderedFirstFrame() {
@@ -171,6 +174,13 @@ private fun ExoPlayerMediaVideoView(
             override fun onPlayerError(error: PlaybackException) {
                 super.onPlayerError(error)
                 Timber.w(error, "Player error")
+                val streamUri = currentLocalMedia?.uri?.takeIf { HavenVideoStreams.isStream(it) }
+                // The ERROR_CODE_IO_* codes are 2xxx
+                if (streamUri != null && error.errorCode / 1000 == PlaybackException.ERROR_CODE_IO_UNSPECIFIED / 1000) {
+                    // Haven: the server couldn't stream it, download it whole instead
+                    HavenVideoStreams.onPlaybackFailed(streamUri)
+                    return
+                }
                 if (error is ExoPlaybackException && error.cause is ParserException) {
                     // The cause can be:
                     // androidx.media3.common.ParserException: Invalid NAL length {contentIsMalformed=true, dataType=1}

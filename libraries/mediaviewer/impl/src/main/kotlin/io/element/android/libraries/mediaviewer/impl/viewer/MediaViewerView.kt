@@ -109,6 +109,7 @@ import io.element.android.libraries.mediaviewer.impl.details.MediaDeleteConfirma
 import io.element.android.libraries.mediaviewer.impl.details.MediaDetailsBottomSheet
 import io.element.android.libraries.mediaviewer.impl.local.LocalMediaView
 import io.element.android.libraries.mediaviewer.impl.local.PlayableState
+import io.element.android.libraries.mediaviewer.impl.local.player.HavenVideoStreams
 import io.element.android.libraries.mediaviewer.impl.local.rememberLocalMediaViewState
 import io.element.android.libraries.mediaviewer.impl.util.bgCanvasWithTransparency
 import io.element.android.libraries.textcomposer.ElementRichTextEditorStyle
@@ -475,6 +476,16 @@ private fun MediaViewerPage(
                             thumbnailSource = data.thumbnailSource,
                         )
                     }
+                    // Haven: a streamed video shows its thumbnail until its first frame has come in
+                    if (showThumbnail && !showProgress && HavenVideoStreams.isStream(downloadedMedia.dataOrNull()?.uri)) {
+                        LinearProgressIndicator(
+                            modifier = Modifier
+                                .align(Alignment.TopCenter)
+                                .padding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top).asPaddingValues())
+                                .fillMaxWidth()
+                                .height(2.dp)
+                        )
+                    }
                 }
 
                 if (showError) {
@@ -563,8 +574,6 @@ private fun MediaViewerTopBar(
     onSaveClick: () -> Unit,
     onInfoClick: () -> Unit,
 ) {
-    val downloadedMedia by data.downloadedMedia
-    val actionsEnabled = downloadedMedia.isSuccess()
     val senderName = data.mediaInfo.senderName
     val dateSent = data.mediaInfo.dateSent
     TopAppBar(
@@ -607,7 +616,6 @@ private fun MediaViewerTopBar(
         actions = {
             IconButton(
                 onClick = onShareClick,
-                enabled = actionsEnabled,
             ) {
                 Icon(
                     imageVector = CompoundIcons.ShareAndroid(),
@@ -616,7 +624,6 @@ private fun MediaViewerTopBar(
             }
             IconButton(
                 onClick = onSaveClick,
-                enabled = actionsEnabled,
             ) {
                 Icon(
                     imageVector = CompoundIcons.Download(),
@@ -626,8 +633,7 @@ private fun MediaViewerTopBar(
             if (canShowInfo) {
                 IconButton(
                     onClick = onInfoClick,
-                    enabled = actionsEnabled,
-                ) {
+                    ) {
                     Icon(
                         imageVector = CompoundIcons.Info(),
                         contentDescription = stringResource(id = CommonStrings.a11y_view_details),

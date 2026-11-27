@@ -8,6 +8,7 @@
 
 package io.element.android.libraries.mediaviewer.impl.viewer
 
+import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -31,6 +32,8 @@ import io.element.android.libraries.architecture.inputs
 import io.element.android.libraries.audio.api.AudioFocus
 import io.element.android.libraries.core.coroutine.CoroutineDispatchers
 import io.element.android.libraries.di.RoomScope
+import io.element.android.libraries.di.annotations.ApplicationContext
+import io.element.android.libraries.matrix.api.MatrixClient
 import io.element.android.libraries.matrix.api.core.EventId
 import io.element.android.libraries.matrix.api.core.SessionId
 import io.element.android.libraries.matrix.api.media.MatrixMediaLoader
@@ -41,6 +44,7 @@ import io.element.android.libraries.mediaviewer.api.MediaViewerEntryPoint
 import io.element.android.libraries.mediaviewer.api.local.LocalMediaFactory
 import io.element.android.libraries.mediaviewer.impl.datasource.FocusedTimelineMediaGalleryDataSourceFactory
 import io.element.android.libraries.mediaviewer.impl.datasource.TimelineMediaGalleryDataSource
+import io.element.android.libraries.mediaviewer.impl.local.player.HavenVideoStreams
 import io.element.android.libraries.mediaviewer.impl.model.hasEvent
 import io.element.android.services.toolbox.api.systemclock.SystemClock
 
@@ -63,6 +67,8 @@ class MediaViewerNode(
     private val enterpriseService: EnterpriseService,
     private val contentScannerService: ContentScannerService,
     private val contentValidationCache: EventContentValidationCache,
+    matrixClient: MatrixClient,
+    @ApplicationContext context: Context,
 ) : Node(buildContext, plugins = plugins),
     MediaViewerNavigator {
     private val callback: MediaViewerEntryPoint.Callback = callback()
@@ -151,6 +157,9 @@ class MediaViewerNode(
             pagerKeysHandler = pagerKeysHandler,
             contentScannerService = contentScannerService,
             contentValidationCache = contentValidationCache,
+            streamCredentials = { matrixClient.havenRawCredentials().getOrNull() },
+            cachedStreamFile = { uri, filename -> HavenVideoStreams.copyFromCache(context, uri, filename) },
+            deleteCachedStreamFile = HavenVideoStreams::deleteCopy,
         )
     )
 

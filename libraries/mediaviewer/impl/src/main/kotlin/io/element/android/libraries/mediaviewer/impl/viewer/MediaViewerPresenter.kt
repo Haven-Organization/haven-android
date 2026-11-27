@@ -26,7 +26,6 @@ import dev.zacsweers.metro.AssistedInject
 import io.element.android.features.messages.api.timeline.HtmlConverterProvider
 import io.element.android.features.messages.api.timeline.TextPillificator
 import io.element.android.libraries.androidutils.text.safeLinkify
-import io.element.android.libraries.architecture.AsyncData
 import io.element.android.libraries.architecture.Presenter
 import io.element.android.libraries.designsystem.utils.snackbar.SnackbarDispatcher
 import io.element.android.libraries.designsystem.utils.snackbar.SnackbarMessage
@@ -59,6 +58,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import org.jsoup.nodes.Document
+import timber.log.Timber
 import io.element.android.libraries.androidutils.R as UtilsR
 
 @AssistedInject
@@ -156,15 +156,15 @@ class MediaViewerPresenter(
                 }
                 is MediaViewerEvent.SaveOnDisk -> {
                     mediaBottomSheetState = MediaBottomSheetState.Hidden
-                    coroutineScope.saveOnDisk(event.data.downloadedMedia.value)
+                    coroutineScope.saveOnDisk(event.data)
                 }
                 is MediaViewerEvent.Share -> {
                     mediaBottomSheetState = MediaBottomSheetState.Hidden
-                    coroutineScope.share(event.data.downloadedMedia.value)
+                    coroutineScope.share(event.data)
                 }
                 is MediaViewerEvent.OpenWith -> {
                     mediaBottomSheetState = MediaBottomSheetState.Hidden
-                    coroutineScope.open(event.data.downloadedMedia.value)
+                    coroutineScope.open(event.data)
                 }
                 is MediaViewerEvent.Delete -> {
                     mediaBottomSheetState = MediaBottomSheetState.Hidden
@@ -306,9 +306,25 @@ class MediaViewerPresenter(
         dataSource.loadMedia(data)
     }
 
-    private fun CoroutineScope.saveOnDisk(localMedia: AsyncData<LocalMedia>) = launch {
-        if (localMedia is AsyncData.Success) {
-            localMediaActions.saveOnDisk(localMedia.data)
+    /**
+     * Haven: share and save work straight away, while the media is still loading or a video is streaming: they wait for
+     * the file to download.
+     */
+    private suspend fun withLocalFile(data: MediaViewerPageData.MediaViewerData, action: suspend (LocalMedia) -> Unit) {
+        if (dataSource.needsDownload(data)) {
+            snackbarDispatcher.post(SnackbarMessage(CommonStrings.common_downloading))
+        }
+        dataSource.localFile(data)
+            .onSuccess { action(it) }
+            .onFailure {
+                Timber.w(it, "Couldn't download the media for ${data.eventId}")
+                snackbarDispatcher.post(SnackbarMessage(CommonStrings.common_download_failed))
+            }
+    }
+
+    private fun CoroutineScope.saveOnDisk(data: MediaViewerPageData.MediaViewerData) = launch {
+        withLocalFile(data) { localMedia ->
+            localMediaActions.saveOnDisk(localMedia)
                 .onSuccess {
                     val snackbarMessage = SnackbarMessage(CommonStrings.common_file_saved_on_disk_android)
                     snackbarDispatcher.post(snackbarMessage)
@@ -331,9 +347,9 @@ class MediaViewerPresenter(
             }
     }
 
-    private fun CoroutineScope.share(localMedia: AsyncData<LocalMedia>) = launch {
-        if (localMedia is AsyncData.Success) {
-            localMediaActions.share(localMedia.data)
+    private fun CoroutineScope.share(data: MediaViewerPageData.MediaViewerData) = launch {
+        withLocalFile(data) { localMedia ->
+            localMediaActions.share(localMedia)
                 .onFailure {
                     val snackbarMessage = SnackbarMessage(mediaActionsError(it))
                     snackbarDispatcher.post(snackbarMessage)
@@ -341,9 +357,9 @@ class MediaViewerPresenter(
         }
     }
 
-    private fun CoroutineScope.open(localMedia: AsyncData<LocalMedia>) = launch {
-        if (localMedia is AsyncData.Success) {
-            localMediaActions.open(localMedia.data)
+    private fun CoroutineScope.open(data: MediaViewerPageData.MediaViewerData) = launch {
+        withLocalFile(data) { localMedia ->
+            localMediaActions.open(localMedia)
                 .onFailure {
                     val snackbarMessage = SnackbarMessage(mediaActionsError(it))
                     snackbarDispatcher.post(snackbarMessage)

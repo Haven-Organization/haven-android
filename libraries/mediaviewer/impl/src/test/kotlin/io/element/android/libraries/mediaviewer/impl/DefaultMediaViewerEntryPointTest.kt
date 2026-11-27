@@ -18,6 +18,7 @@ import io.element.android.libraries.audio.test.FakeAudioFocus
 import io.element.android.libraries.matrix.api.core.EventId
 import io.element.android.libraries.matrix.api.media.MediaSource
 import io.element.android.libraries.matrix.test.A_SESSION_ID
+import io.element.android.libraries.matrix.test.FakeMatrixClient
 import io.element.android.libraries.matrix.test.media.FakeMatrixMediaLoader
 import io.element.android.libraries.matrix.ui.media.contentvalidation.NoopEventContentValidationCache
 import io.element.android.libraries.mediaviewer.api.AvatarInfo
@@ -75,6 +76,8 @@ class DefaultMediaViewerEntryPointTest {
                 enterpriseService = FakeEnterpriseService(),
                 contentValidationCache = NoopEventContentValidationCache(),
                 contentScannerService = ContentScannerService { _, _ -> },
+                matrixClient = FakeMatrixClient(),
+                context = mockk(),
             )
         }
         val callback = object : MediaViewerEntryPoint.Callback {
@@ -124,6 +127,8 @@ class DefaultMediaViewerEntryPointTest {
                 enterpriseService = FakeEnterpriseService(),
                 contentValidationCache = NoopEventContentValidationCache(),
                 contentScannerService = ContentScannerService { _, _ -> },
+                matrixClient = FakeMatrixClient(),
+                context = mockk(),
             )
         }
         val callback = object : MediaViewerEntryPoint.Callback {

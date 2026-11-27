@@ -14,8 +14,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 
 @OptIn(UnstableApi::class)
 @Composable
@@ -33,7 +35,11 @@ fun rememberExoPlayer(forAudioOnly: Boolean): ExoPlayer {
                     .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
                 ExoPlayer.Builder(context, renderersFactory).build()
             } else {
-                ExoPlayer.Builder(context).build()
+                // Haven: videos streamed from the homeserver, see HavenVideoStreams
+                val dataSourceFactory = DefaultDataSource.Factory(context, HavenVideoStreams.dataSourceFactory(context))
+                ExoPlayer.Builder(context)
+                    .setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory))
+                    .build()
             }
         }
     }
