@@ -6,6 +6,7 @@
 
 package io.element.android.features.social.impl.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -76,6 +77,10 @@ fun SocialHomeScreen(
     val callbacks = rememberPostCallbacks(deps, navigator, interactions)
     val ownProfile by deps.repository.ownProfile.collectAsState()
     LaunchedEffect(Unit) { deps.repository.refreshSocialRooms() }
+    // Hoisted so tapping the top bar, or Feed while already on it, can scroll the feed back to the top
+    val feedListState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+    val scrollFeedToTop = { scope.launch { feedListState.animateScrollToItem(0) }; Unit }
     Scaffold(
         modifier = modifier,
         topBar = {
@@ -89,6 +94,11 @@ fun SocialHomeScreen(
                     }
                 ),
                 navigationIcon = { BackButton(onClick = onBack) },
+                modifier = if (section == SocialSection.Feed) {
+                    Modifier.clickable(interactionSource = null, indication = null, onClick = scrollFeedToTop)
+                } else {
+                    Modifier
+                },
                 actions = {
                     if (section == SocialSection.Feed) {
                         io.element.android.libraries.designsystem.theme.components.IconButton(onClick = { showFeedFilter = true }) {
@@ -118,7 +128,7 @@ fun SocialHomeScreen(
                     }
                     NavigationBarItem(
                         selected = section == item,
-                        onClick = { section = item },
+                        onClick = { if (section == item && item == SocialSection.Feed) scrollFeedToTop() else section = item },
                         icon = { Icon(icon, contentDescription = null) },
                         label = { Text(stringResource(label)) },
                     )
@@ -128,7 +138,7 @@ fun SocialHomeScreen(
     ) { padding ->
         Box(Modifier.padding(padding)) {
             when (section) {
-                SocialSection.Feed -> FeedPane(deps, callbacks)
+                SocialSection.Feed -> FeedPane(deps, callbacks, feedListState)
                 SocialSection.Groups -> GroupsPane(deps, navigator)
                 SocialSection.Profile -> ProfilePane(deps, navigator, callbacks)
                 SocialSection.Search -> SocialSearchPane(deps, navigator)
@@ -140,7 +150,7 @@ fun SocialHomeScreen(
 }
 
 @Composable
-private fun FeedPane(deps: SocialDeps, callbacks: PostCallbacks) {
+private fun FeedPane(deps: SocialDeps, callbacks: PostCallbacks, listState: LazyListState) {
     val feedRooms by deps.repository.feedRooms.collectAsState()
     val filter by deps.repository.feedFilter.collectAsState()
     val roomIds = remember(feedRooms) { feedRooms.map { it.roomId } }
@@ -169,7 +179,6 @@ private fun FeedPane(deps: SocialDeps, callbacks: PostCallbacks) {
         delay(3_000)
         deps.timelineStore.saveFeed(current)
     }
-    val listState = rememberLazyListState()
     // Extend the feed by loading more from the rooms holding it back (the ones loaded the least far back).
     val latestSnapshot by rememberUpdatedState(snapshot)
     // Progress is the feed reaching further back (the cutoff moving), which can take several rounds of loading before
