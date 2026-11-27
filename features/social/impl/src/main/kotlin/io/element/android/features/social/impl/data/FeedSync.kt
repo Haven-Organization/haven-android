@@ -88,13 +88,15 @@ class FeedSync(
     private val _rooms = MutableStateFlow<Map<RoomId, FeedRoom>>(emptyMap())
     val rooms: StateFlow<Map<RoomId, FeedRoom>> = _rooms.asStateFlow()
 
-    /** Loads the latest posts of the [roomIds] not loaded yet, in one request. */
+    /** Loads the latest posts of the [roomIds] not loaded yet, in growing batches (see [syncLocked]). */
     suspend fun load(roomIds: Collection<RoomId>) {
         if (roomIds.none { it !in _rooms.value }) return
         // Already syncing (the feed is open): that request loads them.
         if (!syncMutex.tryLock()) return
         try {
-            syncLocked(roomIds, timeoutMs = 0)
+            while (roomIds.any { it !in _rooms.value } && syncLocked(roomIds, timeoutMs = 0)) {
+                // Next batch
+            }
         } finally {
             syncMutex.unlock()
         }
@@ -168,12 +170,20 @@ class FeedSync(
         _rooms.value = emptyMap()
     }
 
-    /** One sliding sync request (holding [syncMutex]). Returns false on failure. */
-    private suspend fun syncLocked(roomIds: Collection<RoomId>, timeoutMs: Long): Boolean {
+    /**
+     * One sliding sync request (holding [syncMutex]). Returns false on failure.
+     *
+     * Rooms not loaded yet are added in growing batches (the ones already loaded stay subscribed): [LOAD_BATCH], then as
+     * many as are loaded so far (10, 10, 20, 40, ...). So the first posts show and the "x of y rooms" count moves after one
+     * small response, while a big feed still takes only a few requests (each waits for the one before it).
+     */
+    private suspend fun syncLocked(allRoomIds: Collection<RoomId>, timeoutMs: Long): Boolean {
         if (unsupported) {
-            markNeedsTimeline(roomIds)
+            markNeedsTimeline(allRoomIds)
             return false
         }
+        val (loadedIds, notLoaded) = allRoomIds.partition { it in _rooms.value }
+        val roomIds = loadedIds + notLoaded.take(maxOf(LOAD_BATCH, loadedIds.size))
         val subscriptions = JSONObject()
         roomIds.forEach { subscriptions.put(it.value, SUBSCRIPTION) }
         val body = JSONObject()
@@ -190,7 +200,7 @@ class FeedSync(
                 error is SocialHttpException && (error.statusCode == 404 || error.errcode == "M_UNRECOGNIZED") -> {
                     Timber.tag(SocialRepository.LOG_TAG).w("No simplified sliding sync on the server: the feed uses room timelines")
                     unsupported = true
-                    markNeedsTimeline(roomIds)
+                    markNeedsTimeline(allRoomIds)
                 }
                 else -> Timber.tag(SocialRepository.LOG_TAG).w(error, "Feed sync failed")
             }
@@ -371,6 +381,7 @@ class FeedSync(
         // first screen of the feed back to their last few minutes.
         const val TIMELINE_LIMIT = 50
         const val PAGE_SIZE = 100
+        const val LOAD_BATCH = 10
         const val LIVE_TIMEOUT_MS = 20_000L
 
         val SUBSCRIPTION: JSONObject
