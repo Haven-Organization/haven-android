@@ -17,6 +17,7 @@ import io.element.android.libraries.di.CacheDirectory
 import io.element.android.libraries.di.SessionScope
 import io.element.android.libraries.di.annotations.SessionCoroutineScope
 import io.element.android.libraries.matrix.api.MatrixClient
+import io.element.android.libraries.matrix.api.roomlist.awaitRoomListLoaded
 import io.element.android.libraries.matrix.api.core.RoomId
 import io.element.android.libraries.matrix.api.media.MediaSource
 import io.element.android.libraries.matrix.api.room.havenStateEventRaw
@@ -81,6 +82,9 @@ class DefaultHavenAppsService(
         // Created with the home screen: find and load the Social rooms ahead of time, so the Feed, Groups and Profile
         // are ready when the Social app is opened.
         sessionScope.launch {
+            // Not until the room list's first sync is in: on a fresh cache every Social room is still unknown, and
+            // subscribing to them all (plus the feed's own sync) on top of that first sync could leave it stuck.
+            matrixClient.awaitRoomListLoaded()
             socialRepository.refreshSocialRooms()
             // One sliding sync request for the feed rooms' latest posts (no room timelines are opened for this).
             socialTimelineStore.prefetchFeed(socialRepository.feedRooms.value.map { it.roomId })

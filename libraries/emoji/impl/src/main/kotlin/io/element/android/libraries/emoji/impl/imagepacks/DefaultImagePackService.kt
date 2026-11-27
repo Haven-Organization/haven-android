@@ -18,6 +18,7 @@ import io.element.android.libraries.emoji.api.imagepacks.ImageUsage
 import io.element.android.libraries.emoji.api.imagepacks.PackImage
 import io.element.android.libraries.emoji.api.imagepacks.PackRef
 import io.element.android.libraries.matrix.api.MatrixClient
+import io.element.android.libraries.matrix.api.roomlist.awaitRoomListLoaded
 import io.element.android.libraries.matrix.api.core.RoomId
 import io.element.android.libraries.matrix.api.room.havenStateEventsRaw
 import io.element.android.libraries.matrix.api.room.join.JoinRule
@@ -146,8 +147,10 @@ class DefaultImagePackService(
 
     init {
         // Read the saved copy (and start refreshing it) as soon as the session has this service, before any picker opens
+        // (the server fetch waits for the room list's first sync, so it doesn't slow that down on a fresh cache).
         sessionCoroutineScope.launch {
             mutex.withLock { if (cache == null) cache = readDiskCache() }
+            matrixClient.awaitRoomListLoaded()
             allRoomPacks()
         }
     }
