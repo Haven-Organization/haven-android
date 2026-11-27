@@ -34,12 +34,16 @@ import io.element.android.libraries.designsystem.theme.components.Scaffold
 import io.element.android.libraries.designsystem.theme.components.TopAppBar
 import io.element.android.libraries.matrix.api.core.EventId
 import io.element.android.libraries.matrix.api.core.RoomId
+import io.element.android.libraries.matrix.api.room.CurrentUserMembership
+import io.element.android.libraries.matrix.api.room.JoinedRoom
 import io.element.android.libraries.matrix.api.core.ThreadId
 import io.element.android.libraries.matrix.api.room.CreateTimelineParams
 import io.element.android.libraries.matrix.api.timeline.Timeline
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 private sealed interface ThreadState {
@@ -68,13 +72,13 @@ fun SocialThreadScreen(
     val known = remember(roomId, eventId) { deps.timelineStore.openedPost(roomId, eventId) }
     val initial = if (known != null) ThreadState.Loaded(listOf(known)) else ThreadState.Loading
     val state by produceState(initial, roomId, eventId) {
-        val room = deps.timelineStore.joinedRoom(roomId)
-        if (room == null) {
+        val room = deps.timelineStore.joinedRoom(roomId) ?: run {
             // Not following this room: peek, like Haven Desktop (works for world-readable profiles and groups).
             val focusedPost = deps.peek.post(roomId, eventId).getOrNull()
             val peeked = focusedPost?.let { deps.peek.thread(roomId, it.post.threadRootId ?: eventId).getOrNull() }
             value = if (peeked != null) ThreadState.Loaded(peeked) else ThreadState.NotJoined
-            return@produceState
+            // Then live once the room is joined (a follow, or just joined and not ready yet), so new replies show.
+            awaitJoinedRoom(deps, roomId)
         }
         // Find the thread root: the opened post may itself be a reply. Known already when opened from a list.
         val knownRootId = known?.let { it.post.threadRootId ?: eventId }
@@ -157,3 +161,14 @@ fun SocialThreadScreen(
     PostInteractionOverlays(deps, interactions)
 }
 
+/**
+ * Waits until the user is in the room and the SDK has it ready (just after a join it can take a moment to appear in the
+ * room list).
+ */
+private suspend fun awaitJoinedRoom(deps: SocialDeps, roomId: RoomId): JoinedRoom {
+    deps.matrixClient.getRoomInfoFlow(roomId).first { it.orElse(null)?.currentUserMembership == CurrentUserMembership.JOINED }
+    while (true) {
+        deps.timelineStore.joinedRoom(roomId)?.let { return it }
+        delay(500.milliseconds)
+    }
+}
