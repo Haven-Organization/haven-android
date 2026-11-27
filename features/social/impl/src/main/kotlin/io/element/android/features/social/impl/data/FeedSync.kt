@@ -100,6 +100,19 @@ class FeedSync(
         }
     }
 
+    /**
+     * Haven: checks for new posts now (pull to refresh). While the feed is open its live request is already waiting for
+     * news and hands new posts over as soon as they arrive, so there's nothing more to do then.
+     */
+    suspend fun refreshNow(roomIds: Collection<RoomId>): Boolean {
+        if (!syncMutex.tryLock()) return true
+        return try {
+            syncLocked(roomIds, timeoutMs = 0)
+        } finally {
+            syncMutex.unlock()
+        }
+    }
+
     /** Loads [roomIds], then keeps them up to date (new posts, likes, edits, deletions) until cancelled. */
     suspend fun runLive(roomIds: Collection<RoomId>) {
         var failures = 0

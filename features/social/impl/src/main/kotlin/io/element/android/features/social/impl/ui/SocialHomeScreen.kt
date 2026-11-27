@@ -149,6 +149,7 @@ fun SocialHomeScreen(
     if (showFeedFilter) FeedFilterSheet(deps = deps, onDismiss = { showFeedFilter = false })
 }
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 private fun FeedPane(deps: SocialDeps, callbacks: PostCallbacks, listState: LazyListState) {
     val feedRooms by deps.repository.feedRooms.collectAsState()
@@ -207,21 +208,43 @@ private fun FeedPane(deps: SocialDeps, callbacks: PostCallbacks, listState: Lazy
         }
         return
     }
-    LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
-        items(posts, key = { it.listKey }) { post ->
-            PostTile(
-                post = post,
-                deps = deps,
-                callbacks = callbacks,
-                roomName = roomNames[post.roomId],
-                repliedToName = post.post.inReplyToId?.let { authorNames[it] },
-                wide = true,
-            )
-        }
-        if (snapshot?.hasMore == true || snapshot?.isLoading == true) {
-            item(key = "loading-more") {
-                Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
-                    SocialSpinner()
+    // Pull down at the top to check for new posts (and newly followed rooms) now; new posts go on top.
+    val refreshScope = rememberCoroutineScope()
+    var isRefreshing by remember { mutableStateOf(false) }
+    androidx.compose.material3.pulltorefresh.PullToRefreshBox(
+        isRefreshing = isRefreshing,
+        onRefresh = {
+            isRefreshing = true
+            refreshScope.launch {
+                val started = System.currentTimeMillis()
+                runCatching {
+                    deps.repository.refreshSocialRooms()
+                    deps.timelineStore.refreshFeed(deps.repository.feedRooms.value.map { it.roomId })
+                }
+                // Long enough for the spinner to register, even when the check was instant
+                delay((600 - (System.currentTimeMillis() - started)).coerceAtLeast(0))
+                isRefreshing = false
+                listState.animateScrollToItem(0)
+            }
+        },
+        modifier = Modifier.fillMaxSize(),
+    ) {
+        LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
+            items(posts, key = { it.listKey }) { post ->
+                PostTile(
+                    post = post,
+                    deps = deps,
+                    callbacks = callbacks,
+                    roomName = roomNames[post.roomId],
+                    repliedToName = post.post.inReplyToId?.let { authorNames[it] },
+                    wide = true,
+                )
+            }
+            if (snapshot?.hasMore == true || snapshot?.isLoading == true) {
+                item(key = "loading-more") {
+                    Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
+                        SocialSpinner()
+                    }
                 }
             }
         }

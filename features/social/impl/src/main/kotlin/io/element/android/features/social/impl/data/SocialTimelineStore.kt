@@ -353,6 +353,9 @@ class SocialTimelineStore(
     /** Loads the feed rooms' latest posts ahead of time (one request), so the Feed is ready when Social opens. */
     suspend fun prefetchFeed(roomIds: List<RoomId>) = feedSync.load(roomIds)
 
+    /** Haven: checks the feed rooms for new posts now (pull to refresh). */
+    suspend fun refreshFeed(roomIds: List<RoomId>) = feedSync.refreshNow(roomIds)
+
     /** Loads older posts of a feed room: from the server, or its timeline if the feed uses one for it. */
     suspend fun paginateFeed(roomId: RoomId): Boolean = when (feedSync.rooms.value[roomId]) {
         is FeedRoom.Loaded -> feedSync.paginate(roomId)
