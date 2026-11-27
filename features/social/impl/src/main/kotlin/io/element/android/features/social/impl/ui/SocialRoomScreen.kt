@@ -241,12 +241,7 @@ fun SocialRoomContent(
                             Text(it, style = ElementTheme.typography.fontBodyMdRegular, color = ElementTheme.colors.textSecondary)
                         }
                         topic?.takeIf { it.isNotBlank() }?.let {
-                            Text(
-                                text = it,
-                                style = ElementTheme.typography.fontBodyMdRegular,
-                                color = ElementTheme.colors.textPrimary,
-                                modifier = Modifier.padding(top = 8.dp),
-                            )
+                            SocialTopicText(topic = it, deps = deps)
                         }
                         Text(
                             text = if (isProfile) {
@@ -375,7 +370,7 @@ fun SocialRoomRow(
                 overflow = TextOverflow.Ellipsis,
             )
             topic?.takeIf { it.isNotBlank() }?.let {
-                Text(it, style = ElementTheme.typography.fontBodySmRegular, color = ElementTheme.colors.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(topicPlainText(it), style = ElementTheme.typography.fontBodySmRegular, color = ElementTheme.colors.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             Text(
                 text = pluralStringResource(
