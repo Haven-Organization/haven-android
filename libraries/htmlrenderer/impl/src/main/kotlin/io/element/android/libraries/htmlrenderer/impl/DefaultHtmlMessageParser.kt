@@ -149,6 +149,7 @@ class DefaultHtmlMessageParser(
                 TAG_CODE -> appendInlineCode(element)
                 TAG_A -> appendLink(element)
                 TAG_MX_REPLY -> Unit
+                TAG_IMG -> appendImage(element)
                 // Unknown inline wrapper: keep its text so nothing is dropped.
                 else -> appendChildren(element)
             }
@@ -175,6 +176,22 @@ class DefaultHtmlMessageParser(
             if (builder.length > start) {
                 builder.addStyle(InlineCodeSpanStyle, start, builder.length)
                 builder.addStringAnnotation(INLINE_CODE_ANNOTATION_TAG, "", start, builder.length)
+            }
+        }
+
+        /**
+         * Haven: an inline `<img>` from Matrix's media repo (a custom emoji, `data-mx-emoticon`) becomes an inline image
+         * placeholder; any other image falls back to its title or alt text, so nothing silently disappears.
+         */
+        private fun appendImage(element: Element) {
+            val src = element.attr("src")
+            val label = element.attr("title").ifBlank { element.attr("alt") }
+            if (src.startsWith("mxc://")) {
+                val id = "$EMOJI_ID_PREFIX${mentionCount++}"
+                mentions[id] = MentionNodeContent.CustomEmoji(displayText = label.ifBlank { "\uFFFC" }, url = src)
+                builder.appendInlineContent(id, label.ifBlank { "\uFFFC" })
+            } else if (label.isNotBlank()) {
+                builder.append(label)
             }
         }
 
@@ -260,5 +277,7 @@ private const val TAG_STRIKE = "strike"
 private const val TAG_CODE = "code"
 private const val TAG_A = "a"
 private const val TAG_MX_REPLY = "mx-reply"
+private const val TAG_IMG = "img"
+private const val EMOJI_ID_PREFIX = "emoji_"
 
 private const val MENTION_ID_PREFIX = "mention_"

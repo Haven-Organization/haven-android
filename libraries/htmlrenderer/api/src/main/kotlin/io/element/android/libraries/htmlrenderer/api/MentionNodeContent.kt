@@ -41,4 +41,13 @@ sealed interface MentionNodeContent {
     data class Everyone(
         override val displayText: String,
     ) : MentionNodeContent
+
+    /**
+     * Haven: an inline image (`<img src="mxc://...">`), in practice a custom emoji (`data-mx-emoticon`), drawn as a
+     * small image the size of the text. [displayText] is its `:shortcode:` (from `title` or `alt`).
+     */
+    data class CustomEmoji(
+        override val displayText: String,
+        val url: String,
+    ) : MentionNodeContent
 }

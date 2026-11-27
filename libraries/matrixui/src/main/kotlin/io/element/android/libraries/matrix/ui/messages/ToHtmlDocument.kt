@@ -45,7 +45,8 @@ fun FormattedBody.toHtmlDocument(
             // Prepend `@` to mentions
             fixMentions(dom, permalinkParser)
 
-            dom.takeIf { it.text().isNotBlank() }
+            // Haven: a message of only custom emoji has no text, but still renders (as inline images)
+            dom.takeIf { it.text().isNotBlank() || it.select("img[src^=mxc://]").isNotEmpty() }
         }
 }
 

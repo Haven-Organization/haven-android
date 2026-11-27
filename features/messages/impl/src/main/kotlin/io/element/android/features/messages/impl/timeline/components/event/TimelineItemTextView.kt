@@ -82,6 +82,7 @@ fun TimelineItemTextView(
                         is MentionNodeContent.Room -> onLinkClick(Link(url = mention.permalinkUrl, text = mention.displayText))
                         is MentionNodeContent.User -> onLinkClick(Link(url = mention.permalinkUrl, text = mention.displayText))
                         is MentionNodeContent.Everyone -> { /* No action for @room mentions */ }
+                        is MentionNodeContent.CustomEmoji -> Unit
                     }
                 },
                 onContentLayoutChange = { data ->

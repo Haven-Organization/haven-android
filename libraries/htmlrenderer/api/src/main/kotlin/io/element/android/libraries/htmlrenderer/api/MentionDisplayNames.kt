@@ -53,6 +53,7 @@ class MentionDisplayNames(
         is MentionNodeContent.User -> users.value[mention.userId]?.let { "@$it" }
         is MentionNodeContent.Room -> rooms.value[mention.roomIdOrAlias]?.let { "#$it" }
         is MentionNodeContent.Everyone -> null
+        is MentionNodeContent.CustomEmoji -> null
     } ?: mention.displayText
 
     /**

@@ -80,6 +80,11 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
+import androidx.compose.ui.layout.ContentScale
+import coil3.compose.AsyncImage
+import io.element.android.libraries.matrix.api.media.MediaSource
+import io.element.android.libraries.matrixmedia.api.MediaRequestData
 import io.element.android.compound.theme.ElementTheme
 import io.element.android.libraries.designsystem.components.linkify
 import io.element.android.libraries.designsystem.text.toPx
@@ -491,6 +496,7 @@ private fun buildMentionInlineContent(
     layoutDirection: LayoutDirection,
 ): ImmutableMap<String, InlineTextContent> {
     return mentions.mapValues { (id, mention) ->
+        if (mention is MentionNodeContent.CustomEmoji) return@mapValues customEmojiInlineContent(mention)
         val displayText = displayTexts[id] ?: mention.displayText
         val textSize = PillTextSizeCache.getOrMeasure(displayText, pillTextStyle, density, layoutDirection, textMeasurer)
         val width = with(density) { textSize.width.toDp() + PillPaddingHorizontal * 2 }
@@ -509,6 +515,18 @@ private fun buildMentionInlineContent(
             )
         }
     }.toImmutableMap()
+}
+
+/** Haven: a custom emoji drawn inline, a little taller than the text around it (like Haven Desktop's 1.25em). */
+private fun customEmojiInlineContent(emoji: MentionNodeContent.CustomEmoji) = InlineTextContent(
+    placeholder = Placeholder(width = 1.25.em, height = 1.25.em, placeholderVerticalAlign = PlaceholderVerticalAlign.TextCenter),
+) {
+    AsyncImage(
+        model = MediaRequestData(MediaSource(emoji.url), MediaRequestData.Kind.Thumbnail(96L)),
+        contentDescription = emoji.displayText,
+        contentScale = ContentScale.Fit,
+        modifier = Modifier.fillMaxSize(),
+    )
 }
 
 /** Overlays the theme-dependent link color onto the link-annotated ranges. */

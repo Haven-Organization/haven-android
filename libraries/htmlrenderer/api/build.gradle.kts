@@ -20,6 +20,9 @@ dependencies {
     implementation(projects.libraries.designsystem)
     implementation(projects.libraries.uiCommon)
     implementation(projects.libraries.uiStrings)
+    // Haven: custom emoji (inline mxc images)
+    implementation(projects.libraries.matrixmedia.api)
+    implementation(libs.coil.compose)
 
     api(libs.jsoup)
 

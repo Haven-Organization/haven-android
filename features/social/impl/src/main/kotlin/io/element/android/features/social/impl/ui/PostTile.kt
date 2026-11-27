@@ -19,6 +19,8 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.unit.Dp
 import androidx.compose.foundation.layout.padding
@@ -305,12 +307,17 @@ fun PostBody(content: PostContent, deps: SocialDeps, maxLines: Int = Int.MAX_VAL
             }
         }
         val uriHandler = LocalUriHandler.current
-        if (documentNode != null && maxLines == Int.MAX_VALUE) {
+        if (documentNode != null) {
+            // Embedded posts (reposts, quotes, replied-to cards) render the same formatting and custom emoji, cut off
+            // at about [maxLines] lines
+            val lineHeight = with(LocalDensity.current) { ElementTheme.typography.fontBodyLgRegular.lineHeight.toDp() }
             HtmlMessageContent(
                 node = documentNode,
                 currentUserId = deps.matrixClient.sessionId,
                 onLinkClick = { url, _ -> runCatching { uriHandler.openUri(url) } },
-                modifier = Modifier.padding(top = 4.dp),
+                modifier = Modifier
+                    .padding(top = 4.dp)
+                    .then(if (maxLines == Int.MAX_VALUE) Modifier else Modifier.heightIn(max = lineHeight * maxLines).clipToBounds()),
             )
         } else {
             Text(
