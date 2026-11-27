@@ -139,6 +139,7 @@ class LoggedInFlowNode(
     private val ftueService: FtueService,
     private val roomDirectoryEntryPoint: RoomDirectoryEntryPoint,
     private val socialEntryPoint: io.element.android.features.social.api.SocialEntryPoint, // Haven
+    private val socialPermalinkResolver: io.element.android.features.social.api.SocialPermalinkResolver, // Haven
     private val widgetsEntryPoint: io.element.android.features.widgets.api.WidgetsEntryPoint, // Haven
     private val matrixClient: MatrixClient,
     private val sendingQueue: SendQueues,
@@ -300,9 +301,11 @@ class LoggedInFlowNode(
         @Parcelize
         data object RoomDirectory : NavTarget
 
-        // Haven: the Social app
+        // Haven: the Social app, at its home or (from a matrix.to link) at a profile/group page or post
         @Parcelize
-        data object Social : NavTarget
+        data class Social(
+            val initialTarget: io.element.android.features.social.api.SocialEntryPoint.InitialTarget? = null,
+        ) : NavTarget
 
         // Haven: a room widget added to Apps
         @Parcelize
@@ -385,7 +388,7 @@ class LoggedInFlowNode(
                         when {
                             widget != null -> backstack.push(NavTarget.WidgetApp(RoomId(widget.first), widget.second))
                             io.element.android.features.social.api.HavenApp.fromId(appId) == io.element.android.features.social.api.HavenApp.Social ->
-                                backstack.push(NavTarget.Social)
+                                backstack.push(NavTarget.Social())
                         }
                     }
                 }
@@ -413,17 +416,19 @@ class LoggedInFlowNode(
                                 // Should not happen (handled by MessagesNode)
                                 Timber.e("User link clicked: ${data.userId}.")
                             }
-                            is PermalinkData.RoomLink -> {
-                                if (pushToBackstack) {
-                                    lifecycleScope.launch {
-                                        attachRoom(
-                                            roomIdOrAlias = data.roomIdOrAlias,
-                                            serverNames = data.viaParameters,
-                                            trigger = JoinedRoomAnalyticsEvent.Trigger.Timeline,
-                                            initialElement = RoomNavigationTarget.Root(data.eventId),
-                                            clearBackstack = false
-                                        )
-                                    }
+                            is PermalinkData.RoomLink -> lifecycleScope.launch {
+                                // Haven: a profile or group room (or a post in one) opens in Social, like Haven Desktop
+                                val social = socialTargetOf(data)
+                                if (social != null) {
+                                    if (pushToBackstack) backstack.push(social) else backstack.replace(social)
+                                } else if (pushToBackstack) {
+                                    attachRoom(
+                                        roomIdOrAlias = data.roomIdOrAlias,
+                                        serverNames = data.viaParameters,
+                                        trigger = JoinedRoomAnalyticsEvent.Trigger.Timeline,
+                                        initialElement = RoomNavigationTarget.Root(data.eventId),
+                                        clearBackstack = false
+                                    )
                                 } else {
                                     backstack.replace(
                                         NavTarget.Room(
@@ -614,10 +619,11 @@ class LoggedInFlowNode(
                 }
                 widgetsEntryPoint.createWidgetNode(this, buildContext, navTarget.roomId, navTarget.widgetId, widgetsCallback)
             }
-            NavTarget.Social -> {
+            is NavTarget.Social -> {
                 socialEntryPoint.createNode(
                     parentNode = this,
                     buildContext = buildContext,
+                    initialTarget = navTarget.initialTarget,
                     callback = object : io.element.android.features.social.api.SocialEntryPoint.Callback {
                         override fun navigateToRoomDetails(roomId: RoomId) {
                             backstack.push(NavTarget.Room(roomId.toRoomIdOrAlias(), initialElement = RoomNavigationTarget.Details))
@@ -676,6 +682,29 @@ class LoggedInFlowNode(
         waitForNavTargetAttached { navTarget ->
             navTarget is NavTarget.Home
         }
+    }
+
+    /** Haven: Social at the link's profile/group page or post, when the link points into Social; else null. */
+    private suspend fun socialTargetOf(link: PermalinkData.RoomLink): NavTarget.Social? {
+        val roomId = socialPermalinkResolver.socialRoomId(link.roomIdOrAlias, link.viaParameters) ?: return null
+        return NavTarget.Social(
+            io.element.android.features.social.api.SocialEntryPoint.InitialTarget(
+                roomId = roomId,
+                eventId = link.eventId?.value,
+                via = link.viaParameters,
+            )
+        )
+    }
+
+    /**
+     * Haven: opens a link from outside the app (or from Social) in Social when it points to a profile or group room, or a
+     * post in one, like Haven Desktop. Returns false (nothing done) for any other room.
+     */
+    suspend fun attachSocialPermalink(link: PermalinkData.RoomLink): Boolean {
+        waitForNavTargetAttached { navTarget -> navTarget is NavTarget.Home }
+        val social = socialTargetOf(link) ?: return false
+        backstack.accept(AttachRoomOperation(social, clearBackstack = true))
+        return true
     }
 
     suspend fun attachRoom(
@@ -762,7 +791,8 @@ class LoggedInFlowNode(
 
 @Parcelize
 private class AttachRoomOperation(
-    val roomTarget: LoggedInFlowNode.NavTarget.Room,
+    // Haven: also Social at a linked page or post (only ever with clearBackstack)
+    val roomTarget: LoggedInFlowNode.NavTarget,
     val clearBackstack: Boolean,
 ) : BackStackOperation<LoggedInFlowNode.NavTarget> {
     /**
@@ -794,7 +824,8 @@ private class AttachRoomOperation(
         } else {
             val existingRoomElement = elements.find {
                 val roomNavTarget = it.key.navTarget as? LoggedInFlowNode.NavTarget.Room
-                roomNavTarget?.roomIdOrAlias == roomTarget.roomIdOrAlias
+                val target = roomTarget as? LoggedInFlowNode.NavTarget.Room
+                target != null && roomNavTarget?.roomIdOrAlias == target.roomIdOrAlias
             }
 
             // Make sure the backstack of rooms can't grow indefinitely when opening permalinks.

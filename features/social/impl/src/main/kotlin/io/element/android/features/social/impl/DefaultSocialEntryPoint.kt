@@ -19,7 +19,8 @@ class DefaultSocialEntryPoint : SocialEntryPoint {
         parentNode: Node,
         buildContext: BuildContext,
         callback: SocialEntryPoint.Callback,
+        initialTarget: SocialEntryPoint.InitialTarget?,
     ): Node {
-        return parentNode.createNode<SocialFlowNode>(buildContext, listOf(callback))
+        return parentNode.createNode<SocialFlowNode>(buildContext, listOfNotNull(callback, initialTarget))
     }
 }

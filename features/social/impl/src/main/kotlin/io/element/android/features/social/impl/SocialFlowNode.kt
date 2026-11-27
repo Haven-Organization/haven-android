@@ -8,6 +8,11 @@ package io.element.android.features.social.impl
 
 import android.os.Parcelable
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.UriHandler
+import io.element.android.libraries.matrix.api.permalink.PermalinkData
 import androidx.compose.ui.Modifier
 import com.bumble.appyx.core.lifecycle.subscribe
 import com.bumble.appyx.core.modality.BuildContext
@@ -121,9 +126,18 @@ class SocialFlowNode(
     private val roomGraphFactory: io.element.android.appnav.di.RoomGraphFactory,
     @io.element.android.libraries.di.annotations.ApplicationContext private val context: android.content.Context,
     @io.element.android.libraries.di.annotations.SessionCoroutineScope private val sessionScope: kotlinx.coroutines.CoroutineScope,
+    private val socialPermalinkResolver: io.element.android.features.social.api.SocialPermalinkResolver,
 ) : BaseFlowNode<SocialFlowNode.NavTarget>(
     backstack = BackStack(
-        initialElement = NavTarget.Home,
+        // Haven: a matrix.to link opens Social straight at that page or post (Back then returns to where the link was)
+        initialElement = plugins.filterIsInstance<SocialEntryPoint.InitialTarget>().firstOrNull()?.let { target ->
+            val eventId = target.eventId
+            if (eventId != null) {
+                NavTarget.Thread(target.roomId, eventId, target.via)
+            } else {
+                NavTarget.RoomPage(target.roomId, target.via)
+            }
+        } ?: NavTarget.Home,
         savedStateMap = buildContext.savedStateMap,
     ),
     buildContext = buildContext,
@@ -199,7 +213,7 @@ class SocialFlowNode(
                     if (fromSameScreen) {
                         backstack.pop()
                     } else {
-                        backstack.replace(if (eventId != null) NavTarget.Thread(roomId, eventId, via) else NavTarget.RoomPage(roomId))
+                        backstack.replace(if (eventId != null) NavTarget.Thread(roomId, eventId, via) else NavTarget.RoomPage(roomId, via))
                     }
                 }
                 deps.repository.refreshSocialRooms()
@@ -239,7 +253,7 @@ class SocialFlowNode(
             SocialHomeScreen(deps = deps, navigator = navigator, onBack = ::navigateUp, modifier = modifier)
         }
         is NavTarget.RoomPage -> node(buildContext) { modifier ->
-            SocialRoomScreen(deps = deps, navigator = navigator, roomId = navTarget.roomId, modifier = modifier)
+            SocialRoomScreen(deps = deps, navigator = navigator, roomId = navTarget.roomId, via = navTarget.via, modifier = modifier)
         }
         is NavTarget.Thread -> node(buildContext) { modifier ->
             SocialThreadScreen(deps = deps, navigator = navigator, roomId = navTarget.roomId, eventId = navTarget.eventId, via = navTarget.via, modifier = modifier)
@@ -305,7 +319,33 @@ class SocialFlowNode(
 
     @Composable
     override fun View(modifier: Modifier) {
-        BackstackView()
+        // Haven: links tapped in Social (post bodies) that point to a profile or group room, or a post in one, open here,
+        // like Haven Desktop; any other link opens as before.
+        val platformUriHandler = LocalUriHandler.current
+        val uriHandler = remember(platformUriHandler) {
+            object : UriHandler {
+                override fun openUri(uri: String) {
+                    if (!openSocialLink(uri, platformUriHandler)) platformUriHandler.openUri(uri)
+                }
+            }
+        }
+        CompositionLocalProvider(LocalUriHandler provides uriHandler) {
+            BackstackView()
+        }
+    }
+
+    /** Takes a link to a room (true), opening it in Social when it's a profile or group room, else as before. */
+    private fun openSocialLink(uri: String, fallback: UriHandler): Boolean {
+        val link = deps.permalinkParser.parse(uri) as? PermalinkData.RoomLink ?: return false
+        lifecycleScope.launch {
+            val roomId = socialPermalinkResolver.socialRoomId(link.roomIdOrAlias, link.viaParameters)
+            when {
+                roomId == null -> runCatching { fallback.openUri(uri) }
+                link.eventId != null -> backstack.push(NavTarget.Thread(roomId, link.eventId!!.value, link.viaParameters))
+                else -> backstack.push(NavTarget.RoomPage(roomId, link.viaParameters))
+            }
+        }
+        return true
     }
 
     sealed interface NavTarget : Parcelable {
@@ -313,7 +353,7 @@ class SocialFlowNode(
         data object Home : NavTarget
 
         @Parcelize
-        data class RoomPage(val roomId: RoomId) : NavTarget
+        data class RoomPage(val roomId: RoomId, val via: List<String> = emptyList()) : NavTarget
 
         @Parcelize
         data class Thread(val roomId: RoomId, val eventId: String, val via: List<String> = emptyList()) : NavTarget

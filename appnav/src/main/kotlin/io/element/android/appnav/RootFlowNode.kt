@@ -697,6 +697,8 @@ class RootFlowNode(
             is PermalinkData.FallbackLink -> Unit
             is PermalinkData.RoomEmailInviteLink -> Unit
             is PermalinkData.RoomLink -> {
+                // Haven: a profile or group room (or a post in one) opens in Social, like Haven Desktop
+                if (attachSocialPermalink(permalinkData)) return
                 // If there is a thread id, focus on it in the main timeline
                 val focusedEventId = if (permalinkData.threadId != null) {
                     permalinkData.threadId?.asEventId()
