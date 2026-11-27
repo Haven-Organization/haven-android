@@ -52,6 +52,8 @@ class DefaultImageLoaderFactory(
                 add(okHttpNetworkFetcherFactory)
                 // Add svg support
                 add(SvgDecoder.Factory())
+                // Haven: animated PNGs (many sticker packs), before the platform decoder, which only draws their first frame
+                add(ApngDecoder.Factory())
                 // Add gif support
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                     add(AnimatedImageDecoder.Factory())

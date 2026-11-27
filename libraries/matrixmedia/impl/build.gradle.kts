@@ -27,6 +27,7 @@ dependencies {
     implementation(libs.coil.compose)
     implementation(libs.coil.gif)
     implementation(libs.coil.svg)
+    implementation(libs.apng) // Haven
     implementation(libs.coil.network.okhttp)
 
     testCommonDependencies(libs, true)

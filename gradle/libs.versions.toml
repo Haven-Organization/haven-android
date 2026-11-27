@@ -195,6 +195,8 @@ coil_network_okhttp = { module = "io.coil-kt.coil3:coil-network-okhttp", version
 coil_compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil" }
 coil_gif = { module = "io.coil-kt.coil3:coil-gif", version.ref = "coil" }
 coil_svg = { module = "io.coil-kt.coil3:coil-svg", version.ref = "coil" }
+# Haven: animated PNG (APNG) stickers and custom emoji, which Android's own image decoder only shows the first frame of
+apng = { module = "com.github.penfeizhou.android.animation:apng", version = "3.0.5" }
 coil_test = { module = "io.coil-kt.coil3:coil-test", version.ref = "coil" }
 datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "datetime" }
 serialization_json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization_json" }
