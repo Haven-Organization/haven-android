@@ -186,8 +186,21 @@ class SocialFlowNode(
                 deps.matrixClient.getRoomInfoFlow(roomId)
                     .first { it.orElse(null)?.currentUserMembership == CurrentUserMembership.JOINED }
                 // Straight to the post (only if the follow screen is still the one showing); the room list catches up after.
-                if (backstack.elements.value.lastOrNull()?.key?.navTarget == target) {
-                    backstack.replace(if (eventId != null) NavTarget.Thread(roomId, eventId, via) else NavTarget.RoomPage(roomId))
+                val elements = backstack.elements.value
+                if (elements.lastOrNull()?.key?.navTarget == target) {
+                    // Followed from that post or page itself: back to it (it goes live once joined) rather than a second copy,
+                    // which Back would then return to.
+                    val below = elements.getOrNull(elements.size - 2)?.key?.navTarget
+                    val fromSameScreen = when (below) {
+                        is NavTarget.Thread -> eventId != null && below.roomId == roomId && below.eventId == eventId
+                        is NavTarget.RoomPage -> eventId == null && below.roomId == roomId
+                        else -> false
+                    }
+                    if (fromSameScreen) {
+                        backstack.pop()
+                    } else {
+                        backstack.replace(if (eventId != null) NavTarget.Thread(roomId, eventId, via) else NavTarget.RoomPage(roomId))
+                    }
                 }
                 deps.repository.refreshSocialRooms()
             }
