@@ -25,10 +25,11 @@ fun RadioButtonListItem(
     style: ListItemStyle = ListItemStyle.Default,
     enabled: Boolean = true,
     compactLayout: Boolean = false,
+    styledHeadline: androidx.compose.ui.text.AnnotatedString? = null,
 ) {
     ListItem(
         modifier = modifier,
-        content = { Text(headline) },
+        content = { if (styledHeadline != null) Text(styledHeadline) else Text(headline) },
         supportingContent = supportingText?.let { @Composable { Text(it) } },
         leadingContent = ListItemContent.RadioButton(
             selected = selected,

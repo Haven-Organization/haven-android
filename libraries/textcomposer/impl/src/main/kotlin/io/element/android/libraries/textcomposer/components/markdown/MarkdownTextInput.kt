@@ -8,6 +8,7 @@
 
 package io.element.android.libraries.textcomposer.components.markdown
 
+import chat.schildi.lib.preferences.value
 import android.content.ClipData
 import android.content.res.ColorStateList
 import android.graphics.Color
@@ -80,6 +81,8 @@ fun MarkdownTextInput(
     }
 
     val mentionSpanUpdater = LocalMentionSpanUpdater.current
+    // Haven: 🔫 in the chosen style while typing too (the composer is a View, outside the Compose theme's fonts)
+    val gunEmojiStyle = chat.schildi.lib.preferences.ScPrefs.HAVEN_GUN_EMOJI_STYLE.value()
 
     AndroidView(
         modifier = Modifier
@@ -133,6 +136,9 @@ fun MarkdownTextInput(
         update = { editText ->
             editText.contentDescription = placeholder
             editText.applyStyleInCompose(richTextEditorStyle)
+            chat.schildi.lib.haven.HavenGunEmoji.typeface(editText.context, gunEmojiStyle)?.let { gunTypeface ->
+                if (editText.typeface != gunTypeface) editText.typeface = gunTypeface
+            }
             editText.onEnterKeyListener = {
                 onSendMessage()
                 true

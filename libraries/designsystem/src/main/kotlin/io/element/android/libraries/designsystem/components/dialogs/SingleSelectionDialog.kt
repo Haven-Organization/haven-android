@@ -84,6 +84,7 @@ private fun SingleSelectionDialogContent(
             itemsIndexed(options) { index, option ->
                 RadioButtonListItem(
                     headline = option.title,
+                    styledHeadline = option.styledTitle,
                     supportingText = option.subtitle,
                     selected = index == initialSelection,
                     onSelect = { onOptionClick(index) },

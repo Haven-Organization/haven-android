@@ -86,7 +86,7 @@ object ElementTheme {
 // Global variables (application level)
 internal val LocalCompoundColors = staticCompositionLocalOf { compoundColorsLight }
 
-internal val LocalTypography = staticCompositionLocalOf { ElTypographyTokens }
+internal val LocalTypography = staticCompositionLocalOf<ExposedTypographyTokens> { ElTypographyTokens }
 
 /**
  * Sets up the theme for the application, or a part of it.
@@ -177,6 +177,8 @@ fun ElementTheme(
     }
     CompositionLocalProvider(
         LocalCompoundColors provides currentCompoundColor,
+        // Haven: the typography tokens given (before, the parameter was ignored and the default ones always used)
+        LocalTypography provides typographyTokens,
         LocalContentColor provides colorScheme.onSurface,
         // Configure the keyboard focus style: Draw a blue inset ring around the focused component.
         // Ref: https://www.figma.com/design/hlbsmSekQorGRN1t2R9JEy/Accessibility-checks?node-id=271-42066

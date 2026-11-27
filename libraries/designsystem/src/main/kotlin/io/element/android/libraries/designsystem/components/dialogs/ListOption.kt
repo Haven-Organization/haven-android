@@ -17,6 +17,8 @@ import kotlinx.collections.immutable.toImmutableList
 data class ListOption(
     val title: String,
     val subtitle: String? = null,
+    /** Haven: shown instead of [title] when given, e.g. to draw part of it in a font of its own. */
+    val styledTitle: androidx.compose.ui.text.AnnotatedString? = null,
 )
 
 /** Creates an immutable list of [ListOption]s from the given [values], using them as titles. */

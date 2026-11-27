@@ -251,6 +251,11 @@
     <string name="haven_disable_custom_emoji_picker_summary">Restores Element\'s stock emoji picker. You\'ll still be able to view custom emoji and stickers from others, and manage image packs.</string>
     <string name="haven_emoji_skin_tone_title">Emoji skin tone</string>
     <string name="haven_emoji_skin_tone_summary">Used for emoji that come in different skin tones, in the emoji picker. Doesn\'t change how emoji look to other people.</string>
+    <string name="haven_gun_emoji_style_title">Gun emoji</string>
+    <string name="haven_gun_emoji_style_summary">How the 🔫 emoji looks on your screen. This doesn\'t change what other people see. Needs Android 10 or newer, and doesn\'t apply to notifications or your keyboard.</string>
+    <string name="haven_gun_emoji_style_revolver">Revolver</string>
+    <string name="haven_gun_emoji_style_handgun">Handgun</string>
+    <string name="haven_gun_emoji_style_water_pistol">Water Pistol</string>
     <string name="haven_emoji_skin_tone_none">👍 Default</string>
     <string name="haven_emoji_skin_tone_light">👍🏻 Light</string>
     <string name="haven_emoji_skin_tone_medium_light">👍🏼 Medium-light</string>

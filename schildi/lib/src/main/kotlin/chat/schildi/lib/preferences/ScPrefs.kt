@@ -11,6 +11,14 @@ object ScPrefs {
         const val HIDE = "HIDE"
     }
 
+    /** Haven: how 🔫 is drawn (same values as Haven Desktop's `Haven.gunEmojiStyle`). */
+    object GunEmojiStyle {
+        const val REVOLVER = "revolver"
+        const val HANDGUN = "handgun"
+        const val WATER_PISTOL = "water-pistol"
+        val ALL = arrayOf(REVOLVER, HANDGUN, WATER_PISTOL)
+    }
+
     /** Haven: the skin tone used in the emoji picker (same values as Haven Desktop's `Haven.emojiSkinTone`). */
     object EmojiSkinTone {
         const val NONE = "none"
@@ -116,6 +124,16 @@ object ScPrefs {
         null,
         R.string.haven_emoji_skin_tone_title,
         R.string.haven_emoji_skin_tone_summary,
+    )
+    /** Haven: how 🔫 looks (Haven Desktop's `Haven.gunEmojiStyle`, same values and default). */
+    val HAVEN_GUN_EMOJI_STYLE = ScStringListPref(
+        "HAVEN_GUN_EMOJI_STYLE",
+        GunEmojiStyle.REVOLVER,
+        GunEmojiStyle.ALL,
+        R.array.haven_gun_emoji_style_names,
+        null,
+        R.string.haven_gun_emoji_style_title,
+        R.string.haven_gun_emoji_style_summary,
     )
     val HAVEN_FAVORITE_PACKS = ScCustomPref("HAVEN_FAVORITE_PACKS", R.string.haven_favorite_packs_title, R.string.haven_favorite_packs_summary)
 
@@ -288,6 +306,7 @@ object ScPrefs {
             HAVEN_SEND_IMAGE_PACK_REFERENCES,
             HAVEN_DISABLE_CUSTOM_EMOJI_PICKER,
             HAVEN_EMOJI_SKIN_TONE,
+            HAVEN_GUN_EMOJI_STYLE,
             // Last, like Haven Desktop
             ScPrefCategory(R.string.haven_favorite_packs_title, null, listOf(
                 HAVEN_FAVORITE_PACKS,

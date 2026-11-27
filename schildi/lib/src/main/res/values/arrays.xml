@@ -5,6 +5,11 @@
         <item>@string/sc_space_unread_counts_mode_chats</item>
         <item>@string/sc_space_unread_counts_mode_hide</item>
     </string-array>
+    <string-array name="haven_gun_emoji_style_names">
+        <item>@string/haven_gun_emoji_style_revolver</item>
+        <item>@string/haven_gun_emoji_style_handgun</item>
+        <item>@string/haven_gun_emoji_style_water_pistol</item>
+    </string-array>
     <string-array name="haven_emoji_skin_tone_names">
         <item>@string/haven_emoji_skin_tone_none</item>
         <item>@string/haven_emoji_skin_tone_light</item>

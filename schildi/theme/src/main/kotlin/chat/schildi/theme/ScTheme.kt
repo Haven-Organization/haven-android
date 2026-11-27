@@ -71,8 +71,17 @@ fun ScTheme(
     content: @Composable () -> Unit,
 ) {
     val darkTheme = theme.isDark()
-    val typography = if (useElTypography) elTypography else scTypography
-    val typographyTokens = if (useElTypography) ElTypographyTokens else ScTypographyTokens
+    val baseTypography = if (useElTypography) elTypography else scTypography
+    // Haven: Element's tokens either way, as they always were in effect (ElementTheme ignored the tokens given to it until
+    // they were needed for the gun emoji font; passing ScTypographyTokens now would change how all the text looks)
+    val baseTypographyTokens: io.element.android.compound.tokens.sc.ExposedTypographyTokens = ElTypographyTokens
+    // Haven: 🔫 drawn in the chosen style, by a font family that's the default font apart from that one emoji
+    val gunStyle = ScPrefs.HAVEN_GUN_EMOJI_STYLE.value()
+    val gunFontFamily = remember(gunStyle) { chat.schildi.lib.haven.HavenGunEmoji.fontFamily(gunStyle) }
+    val typography = remember(baseTypography, gunFontFamily) { gunFontFamily?.let { baseTypography.withGunFont(it) } ?: baseTypography }
+    val typographyTokens = remember(baseTypographyTokens, gunFontFamily) {
+        gunFontFamily?.let { GunFontTypographyTokens(baseTypographyTokens, it) } ?: baseTypographyTokens
+    }
     val useElTheme = ScPrefs.EL_THEME.value()
     val useBlackTheme = ScPrefs.BLACK_THEME.value()
 

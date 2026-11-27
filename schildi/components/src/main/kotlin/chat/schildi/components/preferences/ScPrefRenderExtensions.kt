@@ -329,7 +329,7 @@ fun <T>ScListPref<T>.Rendered(initial: Any, onChange: (Any) -> Unit) {
             title = stringResource(id = titleRes),
             subtitle = summaryRes?.let { stringResource(id = it) },
             options = names.mapIndexed { index, name ->
-                ListOption(name, summaries?.get(index))
+                ListOption(name, summaries?.get(index), styledTitle = havenStyledOptionTitle(this, index, name))
             }.toImmutableList(),
             onSelectOption = { index ->
                 if (index != selectedIndex) {
@@ -344,6 +344,25 @@ fun <T>ScListPref<T>.Rendered(initial: Any, onChange: (Any) -> Unit) {
             onDismissRequest = { openDialog.value = false },
             initialSelection = selectedIndex,
         )
+    }
+}
+
+/**
+ * Haven: the gun emoji options each show their own gun (the 🔫 drawn in that option's font: the app's text otherwise
+ * draws it in the chosen style, whichever option it's next to).
+ */
+private fun havenStyledOptionTitle(pref: ScListPref<*>, index: Int, name: String): androidx.compose.ui.text.AnnotatedString? {
+    if (pref != chat.schildi.lib.preferences.ScPrefs.HAVEN_GUN_EMOJI_STYLE) return null
+    val style = pref.itemKeys[index] as? String ?: return null
+    val family = chat.schildi.lib.haven.HavenGunEmoji.fontFamily(style)
+        // The water pistol (or an Android too old for the others) is the system's own
+        ?: androidx.compose.ui.text.font.FontFamily.SansSerif
+    return androidx.compose.ui.text.buildAnnotatedString {
+        pushStyle(androidx.compose.ui.text.SpanStyle(fontFamily = family))
+        append("\uD83D\uDD2B")
+        pop()
+        append("\u2002")
+        append(name)
     }
 }
 
