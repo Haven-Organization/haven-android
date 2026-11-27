@@ -183,7 +183,9 @@ fun HavenAppIcon(app: HavenAppItem, size: Dp, modifier: Modifier = Modifier, sha
                 }
                 key(attempt) {
                     AsyncImage(
-                        model = MediaRequestData(MediaSource(app.avatarUrl), MediaRequestData.Kind.Thumbnail(64L, 64L)),
+                        // The icon saved on the device when there is one: no waiting for the session or network
+                        model = app.iconFile?.let { java.io.File(it) }
+                            ?: MediaRequestData(MediaSource(app.avatarUrl), MediaRequestData.Kind.Thumbnail(64L, 64L)),
                         contentDescription = app.name,
                         contentScale = ContentScale.Crop,
                         onError = { failed = true },

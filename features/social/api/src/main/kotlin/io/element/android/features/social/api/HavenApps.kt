@@ -47,6 +47,8 @@ sealed interface HavenAppItem {
         /** mxc:// avatar of the widget, if any. */
         val avatarUrl: String?,
         val roomName: String?,
+        /** The icon saved on this device (a file path), so it shows without being loaded again. */
+        val iconFile: String? = null,
     ) : HavenAppItem {
         override val id = widgetAppId(roomId, widgetId)
     }

@@ -13,20 +13,27 @@ import io.element.android.features.social.api.HavenAppsService
 import io.element.android.features.social.impl.msc.HavenAccountData
 import io.element.android.features.social.impl.msc.optStringOrNull
 import io.element.android.features.social.impl.msc.toStringList
+import io.element.android.libraries.di.CacheDirectory
 import io.element.android.libraries.di.SessionScope
 import io.element.android.libraries.di.annotations.SessionCoroutineScope
 import io.element.android.libraries.matrix.api.MatrixClient
 import io.element.android.libraries.matrix.api.core.RoomId
+import io.element.android.libraries.matrix.api.media.MediaSource
 import io.element.android.libraries.matrix.api.room.havenStateEventRaw
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
+import timber.log.Timber
+import java.io.File
+import java.security.MessageDigest
 
 /**
  * Pinned apps and widget apps, in account data shared with Haven Desktop:
@@ -34,16 +41,27 @@ import org.json.JSONObject
  * - `software.haven.widget_apps`: `{"widgets": [{room_id, widget_id, room_name, state_types, content, sender}]}`
  *
  * A widget app links to the room's live widget (`im.vector.modular.widgets` state), it isn't a copy.
+ *
+ * Both lists, and the widgets' icons, are also saved to the cache directory, so after a restart the pinned apps and their
+ * icons show straight away (from the saved copy, without waiting for the session or the network) and are then brought
+ * up to date from the account data.
  */
 @SingleIn(SessionScope::class)
 @ContributesBinding(SessionScope::class)
 class DefaultHavenAppsService(
     private val matrixClient: MatrixClient,
-    @SessionCoroutineScope sessionScope: CoroutineScope,
+    @SessionCoroutineScope private val sessionScope: CoroutineScope,
     socialRepository: SocialRepository,
     socialTimelineStore: SocialTimelineStore,
+    @CacheDirectory cacheDirectory: File,
 ) : HavenAppsService {
     private val writeMutex = Mutex()
+    private val cacheDir = File(cacheDirectory, "haven_apps")
+    private val iconDir = File(cacheDir, "icons")
+    private val savedFile = File(cacheDir, sha(matrixClient.sessionId.value) + ".json")
+
+    /** The valid widget entries, as last read or written (what the saved copy holds). */
+    @Volatile private var widgetEntries: List<JSONObject> = emptyList()
     private val _pinnedAppIds = MutableStateFlow<List<String>>(emptyList())
     override val pinnedAppIds: StateFlow<List<String>> = _pinnedAppIds.asStateFlow()
 
@@ -51,9 +69,14 @@ class DefaultHavenAppsService(
     override val widgetApps: StateFlow<List<HavenAppItem.Widget>> = _widgetApps.asStateFlow()
 
     init {
+        // The saved copy first (a small file, read here so the very first frame already has the pinned apps)...
+        readSaved()
         sessionScope.launch {
-            _pinnedAppIds.value = readPinned()
-            _widgetApps.value = readWidgetEntries().map { it.toItem() }
+            // ...then the account data, when there is some (none yet means "not synced yet", so the saved copy stays)
+            readContent(HavenAccountData.PINNED_APPS)?.let { content -> _pinnedAppIds.value = content.optJSONArray("pinned").toStringList() }
+            readContent(HavenAccountData.WIDGET_APPS)?.let { content -> setWidgetEntries(validEntries(content)) }
+            save()
+            cacheIcons()
         }
         // Created with the home screen: find and load the Social rooms ahead of time, so the Feed, Groups and Profile
         // are ready when the Social app is opened.
@@ -77,9 +100,11 @@ class DefaultHavenAppsService(
 
     private suspend fun readPinned(): List<String> = readContent(HavenAccountData.PINNED_APPS)?.optJSONArray("pinned").toStringList()
 
+    private suspend fun readWidgetEntries(): List<JSONObject> = readContent(HavenAccountData.WIDGET_APPS)?.let { validEntries(it) }.orEmpty()
+
     /** Valid entries only, like Haven Desktop's `isEntry`. */
-    private suspend fun readWidgetEntries(): List<JSONObject> {
-        val array = readContent(HavenAccountData.WIDGET_APPS)?.optJSONArray("widgets") ?: return emptyList()
+    private fun validEntries(content: JSONObject): List<JSONObject> {
+        val array = content.optJSONArray("widgets") ?: return emptyList()
         return (0 until array.length()).mapNotNull { i ->
             array.optJSONObject(i)?.takeIf { entry ->
                 entry.optStringOrNull("room_id") != null &&
@@ -91,17 +116,73 @@ class DefaultHavenAppsService(
         }
     }
 
+    private fun setWidgetEntries(entries: List<JSONObject>) {
+        widgetEntries = entries
+        _widgetApps.value = entries.map { it.toItem() }
+    }
+
+    private fun readSaved() {
+        runCatching {
+            if (!savedFile.exists()) return
+            val saved = JSONObject(savedFile.readText())
+            _pinnedAppIds.value = saved.optJSONArray("pinned").toStringList()
+            setWidgetEntries(validEntries(saved))
+        }.onFailure { Timber.w(it, "Couldn't read the saved apps") }
+    }
+
+    private suspend fun save() = withContext(Dispatchers.IO) {
+        runCatching {
+            val json = JSONObject()
+                .put("pinned", JSONArray(_pinnedAppIds.value))
+                .put("widgets", JSONArray(widgetEntries))
+            cacheDir.mkdirs()
+            val tmp = File(savedFile.path + ".tmp")
+            tmp.writeText(json.toString())
+            if (!tmp.renameTo(savedFile)) {
+                savedFile.delete()
+                tmp.renameTo(savedFile)
+            }
+        }.onFailure { Timber.w(it, "Couldn't save the apps") }
+    }
+
+    private fun iconFile(avatarUrl: String) = File(iconDir, sha(avatarUrl))
+
+    /** Downloads the icons not saved yet (once each: an icon's mxc URL never changes what it points to). */
+    private suspend fun cacheIcons() {
+        val missing = _widgetApps.value.mapNotNull { it.avatarUrl }.distinct().filter { !iconFile(it).exists() }
+        if (missing.isEmpty()) return
+        var added = false
+        missing.forEach { url ->
+            matrixClient.matrixMediaLoader.loadMediaThumbnail(MediaSource(url), ICON_SIZE, ICON_SIZE)
+                .onSuccess { bytes ->
+                    withContext(Dispatchers.IO) {
+                        runCatching {
+                            iconDir.mkdirs()
+                            val tmp = File(iconFile(url).path + ".tmp")
+                            tmp.writeBytes(bytes)
+                            tmp.renameTo(iconFile(url))
+                            added = true
+                        }
+                    }
+                }
+                .onFailure { Timber.w(it, "Couldn't save an app icon") }
+        }
+        if (added) setWidgetEntries(widgetEntries)
+    }
+
     private fun JSONObject.toItem(): HavenAppItem.Widget {
         val content = getJSONObject("content")
         val name = content.optStringOrNull("name")?.trim()?.takeIf { it.isNotEmpty() }
             ?: content.optJSONObject("data")?.optStringOrNull("title")?.trim()?.takeIf { it.isNotEmpty() }
             ?: "Widget"
+        val avatarUrl = content.optStringOrNull("avatar_url")?.takeIf { it.startsWith("mxc://") }
         return HavenAppItem.Widget(
             roomId = getString("room_id"),
             widgetId = getString("widget_id"),
             name = name,
-            avatarUrl = content.optStringOrNull("avatar_url")?.takeIf { it.startsWith("mxc://") },
+            avatarUrl = avatarUrl,
             roomName = optStringOrNull("room_name"),
+            iconFile = avatarUrl?.let { iconFile(it) }?.takeIf { it.exists() }?.path,
         )
     }
 
@@ -110,7 +191,10 @@ class DefaultHavenAppsService(
         val current = readPinned().filter { it != appId }
         val updated = if (pinned) current + appId else current
         matrixClient.setAccountData(HavenAccountData.PINNED_APPS, JSONObject().put("pinned", JSONArray(updated)).toString())
-            .onSuccess { _pinnedAppIds.value = updated }
+            .onSuccess {
+                _pinnedAppIds.value = updated
+                save()
+            }
     }
 
     override suspend fun addWidgetApp(roomId: String, widgetId: String): Result<Unit> = runCatching {
@@ -134,8 +218,10 @@ class DefaultHavenAppsService(
             val others = readWidgetEntries().filter { e -> !(e.getString("room_id") == roomId && e.getString("widget_id") == widgetId) }
             val updated = others + entry
             matrixClient.setAccountData(HavenAccountData.WIDGET_APPS, JSONObject().put("widgets", JSONArray(updated)).toString()).getOrThrow()
-            _widgetApps.value = updated.map { it.toItem() }
+            setWidgetEntries(updated)
+            save()
         }
+        sessionScope.launch { cacheIcons() }
         setPinned(HavenAppItem.widgetAppId(roomId, widgetId), true).getOrThrow()
     }
 
@@ -144,12 +230,19 @@ class DefaultHavenAppsService(
         writeMutex.withLock {
             val updated = readWidgetEntries().filter { e -> !(e.getString("room_id") == roomId && e.getString("widget_id") == widgetId) }
             matrixClient.setAccountData(HavenAccountData.WIDGET_APPS, JSONObject().put("widgets", JSONArray(updated)).toString()).getOrThrow()
-            _widgetApps.value = updated.map { it.toItem() }
+            setWidgetEntries(updated)
+            save()
         }
         setPinned(appId, false).getOrThrow()
     }
 
     private companion object {
+        /** Px; the same size the icons were already asked for, at most 64dp-ish on the bars. */
+        const val ICON_SIZE = 128L
+
+        fun sha(value: String): String = MessageDigest.getInstance("SHA-256").digest(value.toByteArray())
+            .joinToString("") { "%02x".format(it) }.take(32)
+
         const val WIDGET_LEGACY = "im.vector.modular.widgets"
         const val WIDGET_STABLE = "m.widget"
     }
