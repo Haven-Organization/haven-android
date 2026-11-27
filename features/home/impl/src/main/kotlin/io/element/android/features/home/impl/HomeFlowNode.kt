@@ -231,7 +231,9 @@ class HomeFlowNode(
             val havenAllApps = io.element.android.features.social.api.HavenApp.entries.map { io.element.android.features.social.api.HavenAppItem.Builtin(it) } + havenWidgetApps
             val havenAppsBar = io.element.android.features.social.api.HavenAppsBarState(
                 allApps = havenAllApps,
-                pinnedApps = havenPinnedAppIds.mapNotNull { id -> havenAllApps.firstOrNull { it.id == id } },
+                // In the Apps menu's order (built-in apps, then widget apps), not the order they were pinned in, on both
+                // Element's and SchildiChat's bars
+                pinnedApps = havenAllApps.filter { it.id in havenPinnedAppIds },
                 onOpenApp = { app -> callback.navigateToHavenApp(app.id) },
                 onSetPinned = { app, pinned -> sessionCoroutineScope.launch { havenAppsService.setPinned(app.id, pinned) } },
                 onRemoveWidgetApp = { app -> sessionCoroutineScope.launch { havenAppsService.removeWidgetApp(app.id) } },
