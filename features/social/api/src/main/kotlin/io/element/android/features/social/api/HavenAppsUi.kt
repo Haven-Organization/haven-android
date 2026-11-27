@@ -26,7 +26,10 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -51,6 +54,8 @@ import io.element.android.libraries.designsystem.theme.components.ModalBottomShe
 import io.element.android.libraries.designsystem.theme.components.Text
 import io.element.android.libraries.matrix.api.media.MediaSource
 import io.element.android.libraries.matrixmedia.api.MediaRequestData
+import kotlinx.coroutines.delay
+import kotlin.time.Duration.Companion.milliseconds
 
 /** What the home screen needs to show the Apps button and pinned apps. Provided through [LocalHavenAppsBar]. */
 data class HavenAppsBarState(
@@ -166,12 +171,25 @@ fun HavenAppIcon(app: HavenAppItem, size: Dp, modifier: Modifier = Modifier, sha
                     style = if (size > 28.dp) ElementTheme.typography.fontBodyLgMedium else ElementTheme.typography.fontBodySmMedium,
                     color = ElementTheme.colors.textSecondary,
                 )
-                AsyncImage(
-                    model = MediaRequestData(MediaSource(app.avatarUrl), MediaRequestData.Kind.Thumbnail(64L, 64L)),
-                    contentDescription = app.name,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize(),
-                )
+                // A failed load (e.g. right after the app starts, before the network or session is ready) isn't retried
+                // by Coil, which would leave the initial until a restart: try again after a growing delay.
+                var attempt by remember(app.avatarUrl) { mutableIntStateOf(0) }
+                var failed by remember(app.avatarUrl) { mutableStateOf(false) }
+                LaunchedEffect(failed) {
+                    if (!failed) return@LaunchedEffect
+                    delay((2_000L shl attempt.coerceAtMost(5)).milliseconds)
+                    failed = false
+                    attempt++
+                }
+                key(attempt) {
+                    AsyncImage(
+                        model = MediaRequestData(MediaSource(app.avatarUrl), MediaRequestData.Kind.Thumbnail(64L, 64L)),
+                        contentDescription = app.name,
+                        contentScale = ContentScale.Crop,
+                        onError = { failed = true },
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
             }
         } else {
             Icon(
