@@ -55,6 +55,7 @@ class DefaultHavenAppsService(
     socialRepository: SocialRepository,
     socialTimelineStore: SocialTimelineStore,
     @CacheDirectory cacheDirectory: File,
+    private val httpApi: SocialHttpApi,
 ) : HavenAppsService {
     private val writeMutex = Mutex()
     private val cacheDir = File(cacheDirectory, "haven_apps")
@@ -74,9 +75,13 @@ class DefaultHavenAppsService(
         readSaved()
         sessionScope.launch {
             // ...then the account data, when there is some (none yet means "not synced yet", so the saved copy stays)
-            readContent(HavenAccountData.PINNED_APPS)?.let { content -> _pinnedAppIds.value = content.optJSONArray("pinned").toStringList() }
-            readContent(HavenAccountData.WIDGET_APPS)?.let { content -> setWidgetEntries(validEntries(content)) }
+            if (!readAccountData()) {
+                // Couldn't reach the server either (offline): the first sync brings the account data
+                matrixClient.awaitRoomListLoaded()
+                readAccountData()
+            }
             save()
+            syncWidgetRoomsFirst()
             cacheIcons()
         }
         // Created with the home screen: find and load the Social rooms ahead of time, so the Feed, Groups and Profile
@@ -91,20 +96,53 @@ class DefaultHavenAppsService(
         }
     }
 
-    private suspend fun readContent(type: String): JSONObject? {
-        val json = matrixClient.getAccountData(type).getOrNull()
-            ?.let { runCatching { JSONObject(it) }.getOrNull() } ?: return null
-        // Accept both the bare content and a whole event.
-        return if (json.has("content") && json.optJSONObject("content") != null && !json.has("pinned") && !json.has("widgets")) {
-            json.optJSONObject("content")
+    /**
+     * After clearing the cache, the widget apps' rooms are synced ahead of the rest, so the apps open straight away (the
+     * bar shows them already: everything it needs is in the account data).
+     */
+    private suspend fun syncWidgetRoomsFirst() {
+        val unknown = widgetEntries.mapNotNull { it.optStringOrNull("room_id") }.distinct()
+            .mapNotNull { runCatching { RoomId(it) }.getOrNull() }
+            .filter { roomId -> matrixClient.getRoom(roomId)?.use { true } != true }
+        if (unknown.isNotEmpty()) matrixClient.roomListService.subscribeToVisibleRooms(unknown)
+    }
+
+    /** Returns whether both lists could be read (from the session's store, or else from the server). */
+    private suspend fun readAccountData(): Boolean {
+        val pinned = readContentOrError(HavenAccountData.PINNED_APPS)
+            .onSuccess { content -> content?.let { _pinnedAppIds.value = it.optJSONArray("pinned").toStringList() } }
+        val widgets = readContentOrError(HavenAccountData.WIDGET_APPS)
+            .onSuccess { content -> content?.let { setWidgetEntries(validEntries(it)) } }
+        return pinned.isSuccess && widgets.isSuccess
+    }
+
+    /**
+     * The account data of [type]: from the session's store, or else from the server. After clearing the cache the store
+     * doesn't have it, and the lists mustn't look empty meanwhile (pinning or adding an app then would save over them).
+     * Null when it has never been set; fails when it's not known whether there is any (offline with nothing stored).
+     */
+    private suspend fun readContentOrError(type: String): Result<JSONObject?> {
+        matrixClient.getAccountData(type).getOrNull()
+            ?.let { runCatching { JSONObject(it) }.getOrNull() }
+            ?.let { return Result.success(unwrap(it)) }
+        return httpApi.getAccountData(type)
+            .map { it?.let(::unwrap) }
+            .onFailure { Timber.w(it, "Couldn't read the %s account data", type) }
+    }
+
+    // Accept both the bare content and a whole event.
+    private fun unwrap(json: JSONObject): JSONObject =
+        if (json.has("content") && json.optJSONObject("content") != null && !json.has("pinned") && !json.has("widgets")) {
+            json.getJSONObject("content")
         } else {
             json
         }
-    }
 
-    private suspend fun readPinned(): List<String> = readContent(HavenAccountData.PINNED_APPS)?.optJSONArray("pinned").toStringList()
+    private suspend fun readPinned(): List<String> =
+        readContentOrError(HavenAccountData.PINNED_APPS).getOrThrow()?.optJSONArray("pinned").toStringList()
 
-    private suspend fun readWidgetEntries(): List<JSONObject> = readContent(HavenAccountData.WIDGET_APPS)?.let { validEntries(it) }.orEmpty()
+    private suspend fun readWidgetEntries(): List<JSONObject> =
+        readContentOrError(HavenAccountData.WIDGET_APPS).getOrThrow()?.let { validEntries(it) }.orEmpty()
 
     /** Valid entries only, like Haven Desktop's `isEntry`. */
     private fun validEntries(content: JSONObject): List<JSONObject> {
@@ -192,7 +230,8 @@ class DefaultHavenAppsService(
 
     override suspend fun setPinned(appId: String, pinned: Boolean): Result<Unit> = writeMutex.withLock {
         // Like Haven Desktop: re-read so pins made on another device aren't lost, then remove and (when pinning) append.
-        val current = readPinned().filter { it != appId }
+        // When the current list can't be read, nothing is saved rather than saving over it.
+        val current = runCatching { readPinned() }.getOrElse { return@withLock Result.failure(it) }.filter { it != appId }
         val updated = if (pinned) current + appId else current
         matrixClient.setAccountData(HavenAccountData.PINNED_APPS, JSONObject().put("pinned", JSONArray(updated)).toString())
             .onSuccess {

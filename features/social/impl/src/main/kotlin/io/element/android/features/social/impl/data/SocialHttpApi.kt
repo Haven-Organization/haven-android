@@ -96,6 +96,12 @@ class SocialHttpApi(
     suspend fun getStateEventContent(roomId: String, eventType: String, stateKey: String): Result<JSONObject> =
         call("GET", "/_matrix/client/v3/rooms/${enc(roomId)}/state/${enc(eventType)}/${enc(stateKey)}")
 
+    /** Haven: the user's account data of [type] straight from the server; null when it has never been set. */
+    suspend fun getAccountData(type: String): Result<JSONObject?> =
+        call("GET", "/_matrix/client/v3/user/${enc(matrixClient.sessionId.value)}/account_data/${enc(type)}")
+            .map { json -> json as JSONObject? }
+            .recoverCatching { error -> if (error is SocialHttpException && error.statusCode == 404) null else throw error }
+
     /** The whole profile of [userId], including custom fields. */
     suspend fun getProfile(userId: String): Result<JSONObject> = call("GET", "/_matrix/client/v3/profile/${enc(userId)}")
 

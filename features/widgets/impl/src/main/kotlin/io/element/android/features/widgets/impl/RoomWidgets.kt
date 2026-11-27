@@ -9,9 +9,13 @@ package io.element.android.features.widgets.impl
 import dev.zacsweers.metro.Inject
 import io.element.android.libraries.matrix.api.MatrixClient
 import io.element.android.libraries.matrix.api.core.RoomId
+import io.element.android.libraries.matrix.api.room.BaseRoom
 import io.element.android.libraries.matrix.api.room.havenStateEventRaw
 import io.element.android.libraries.matrix.api.room.havenStateEventsRaw
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONObject
+import kotlin.time.Duration.Companion.seconds
 
 /** A room widget from `im.vector.modular.widgets` state (what Element and Haven Desktop read). */
 data class RoomWidget(
@@ -41,9 +45,20 @@ class RoomWidgets(
     }
 
     suspend fun get(roomId: RoomId, widgetId: String): RoomWidget? {
-        val room = matrixClient.getRoom(roomId) ?: return null
+        val room = awaitRoom(roomId) ?: return null
         val json = room.use { it.havenStateEventRaw(WIDGET_EVENT_TYPE, widgetId) } ?: return null
         return parse(roomId, json)
+    }
+
+    /**
+     * Haven: the room, waiting a little for it when it isn't known yet: a widget app on the home bar can be opened right
+     * after clearing the cache, before the first sync has brought its room. Asks for the room to be synced first.
+     */
+    private suspend fun awaitRoom(roomId: RoomId): BaseRoom? {
+        matrixClient.getRoom(roomId)?.let { return it }
+        matrixClient.roomListService.subscribeToVisibleRooms(listOf(roomId))
+        withTimeoutOrNull(ROOM_WAIT) { matrixClient.getRoomInfoFlow(roomId).first { it.isPresent } }
+        return matrixClient.getRoom(roomId)
     }
 
     private fun parse(roomId: RoomId, json: String): RoomWidget? {
@@ -92,5 +107,6 @@ class RoomWidgets(
     companion object {
         const val WIDGET_EVENT_TYPE = "im.vector.modular.widgets"
         private const val ALLOWED_WIDGETS = "im.vector.setting.allowed_widgets"
+        private val ROOM_WAIT = 20.seconds
     }
 }
