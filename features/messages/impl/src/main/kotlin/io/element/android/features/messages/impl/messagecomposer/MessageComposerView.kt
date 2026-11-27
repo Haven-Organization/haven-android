@@ -8,6 +8,8 @@
 
 package io.element.android.features.messages.impl.messagecomposer
 
+import chat.schildi.lib.preferences.ScPrefs
+import chat.schildi.lib.preferences.value
 import androidx.compose.ui.unit.Dp
 import android.net.Uri
 import androidx.compose.foundation.layout.Column
@@ -123,6 +125,8 @@ internal fun MessageComposerView(
     }
 
     val onToggleEmojiPicker = rememberEmojiPickerKeyboardToggle(state)
+    val onToggleStickerPicker = rememberEmojiPickerKeyboardToggle(state, stickers = true)
+    val isCustomPickerDisabled = ScPrefs.HAVEN_DISABLE_CUSTOM_EMOJI_PICKER.value()
 
     val onDeleteVoiceMessage = {
         voiceMessageState.eventSink(VoiceMessageComposerEvent.DeleteVoiceMessage)
@@ -155,6 +159,8 @@ internal fun MessageComposerView(
         onTyping = ::onTyping,
         onSelectRichContent = ::sendUri,
         onAddEmoji = onToggleEmojiPicker.takeIf { showEmojiButton },
+        // Haven: stickers from image packs (not with the rich text editor, like Haven Desktop's custom emoji)
+        onAddSticker = onToggleStickerPicker.takeIf { showEmojiButton && !isCustomPickerDisabled && !state.showTextFormatting },
         minInputHeight = minInputHeight,
         showEndButton = showEndButton,
         placeholderOverride = placeholderOverride,
@@ -177,7 +183,11 @@ internal fun MessageComposerView(
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun rememberEmojiPickerKeyboardToggle(state: MessageComposerState): () -> Unit {
+internal fun rememberEmojiPickerKeyboardToggle(
+    state: MessageComposerState,
+    // Haven: for the sticker button, which shows the sticker picker in the same place
+    stickers: Boolean = false,
+): () -> Unit {
     val view = LocalView.current
     val coroutineScope = rememberCoroutineScope()
     val isEmojiPickerVisible = state.emojiPickerState != ComposerEmojiPickerState.Hidden
@@ -211,7 +221,10 @@ internal fun rememberEmojiPickerKeyboardToggle(state: MessageComposerState): () 
         state.eventSink(MessageComposerEvent.DismissEmojiPicker)
     }
     return {
-        if (isEmojiPickerVisible) {
+        if (isEmojiPickerVisible && state.isStickerPickerShown != stickers) {
+            // Haven: switching between the emoji and sticker pickers, the keyboard stays away
+            state.eventSink(if (stickers) MessageComposerEvent.OpenStickerPicker else MessageComposerEvent.OpenEmojiPicker)
+        } else if (isEmojiPickerVisible) {
             isEmojiPickerClosing = true
             coroutineScope.launch {
                 state.textEditorState.requestFocus()
@@ -219,7 +232,7 @@ internal fun rememberEmojiPickerKeyboardToggle(state: MessageComposerState): () 
                 (view.findFocus() ?: view).showKeyboard()
             }
         } else {
-            state.eventSink(MessageComposerEvent.OpenEmojiPicker)
+            state.eventSink(if (stickers) MessageComposerEvent.OpenStickerPicker else MessageComposerEvent.OpenEmojiPicker)
             view.hideKeyboard()
         }
     }

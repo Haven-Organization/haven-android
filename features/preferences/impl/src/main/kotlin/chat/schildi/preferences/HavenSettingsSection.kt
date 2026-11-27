@@ -43,6 +43,7 @@ private fun HavenSettingsItem(
         // Upstream already has a "Notifications" entry, so use a distinct title here
         R.string.sc_pref_category_notifications -> R.string.haven_pref_notification_alerts_title to CompoundIcons.Notifications()
         R.string.sc_pref_screen_experimental_title -> screen.titleRes to CompoundIcons.Labs()
+        R.string.haven_pref_emoji_stickers_title -> screen.titleRes to CompoundIcons.Reaction()
         R.string.haven_pref_advanced_title -> screen.titleRes to CompoundIcons.AdvancedSettings()
         else -> screen.titleRes to CompoundIcons.Settings()
     }

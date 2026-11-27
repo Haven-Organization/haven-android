@@ -99,14 +99,23 @@ internal fun ComposerEmojiPicker(
             .height(height),
         contentAlignment = Alignment.Center,
     ) {
-        when (sheetState) {
-            is ComposerEmojiPickerState.Shown -> emojiPickerRenderer.Render(
+        when {
+            // Haven: the sticker picker, in the same place
+            state.isStickerPickerShown -> emojiPickerRenderer.RenderStickers(
+                roomId = state.roomId,
+                onSelectSticker = { image -> state.eventSink(MessageComposerEvent.SendSticker(image)) },
+                modifier = Modifier.fillMaxSize(),
+            )
+            sheetState is ComposerEmojiPickerState.Shown -> emojiPickerRenderer.Render(
                 state = sheetState.state,
                 onSelectEmoji = { emoji -> state.eventSink(MessageComposerEvent.InsertEmoji(emoji.unicode)) },
                 onSelectCustomEmoji = { emoji -> state.eventSink(MessageComposerEvent.InsertEmoji(emoji)) }, // SC
                 selectedEmojis = persistentSetOf(),
                 modifier = Modifier.fillMaxSize(),
                 onBackspace = { state.eventSink(MessageComposerEvent.DeleteBackward) },
+                // Haven: custom emoji go in as their :shortcode:, which becomes the image when the message is sent
+                roomId = state.roomId,
+                onSelectPackImage = { image -> state.eventSink(MessageComposerEvent.InsertEmoji(":${image.shortcode}:")) },
             )
             // Loading
             else -> CircularProgressIndicator()

@@ -8,6 +8,14 @@
 
 package io.element.android.features.messages.impl.messagecomposer
 
+import chat.schildi.lib.preferences.ScPreferencesStore
+import chat.schildi.lib.preferences.ScPrefs
+import io.element.android.libraries.emoji.api.imagepacks.CustomEmojiHtml
+import io.element.android.libraries.emoji.api.imagepacks.IMAGE_SOURCE_PACKS_KEY
+import io.element.android.libraries.emoji.api.imagepacks.ImagePackService
+import io.element.android.libraries.emoji.api.imagepacks.PackImage
+import io.element.android.libraries.matrix.api.HavenMarkdown
+import org.json.JSONObject
 import android.Manifest
 import android.annotation.SuppressLint
 import android.net.Uri
@@ -153,6 +161,10 @@ class MessageComposerPresenter(
     emojiPickerPresenterFactory: EmojiPickerPresenter.Factory,
     getRecentEmojis: GetRecentEmojis,
     private val addRecentEmoji: AddRecentEmoji,
+    // Haven: custom emoji and stickers
+    private val imagePackService: ImagePackService,
+    private val havenMarkdown: HavenMarkdown,
+    private val scPreferencesStore: ScPreferencesStore,
 ) : Presenter<MessageComposerState> {
     @AssistedFactory
     interface Factory {
@@ -227,6 +239,7 @@ class MessageComposerPresenter(
         }
         var showAttachmentSourcePicker: Boolean by remember { mutableStateOf(false) }
         var showEmojiPicker: Boolean by remember { mutableStateOf(false) }
+        var showStickerPicker: Boolean by remember { mutableStateOf(false) }
         // The picker presenter is composed only while the picker is visible, so recent emojis reload each time it opens.
         val emojiPickerState = if (showEmojiPicker) {
             val pickerState = emojiPickerPresenter.present()
@@ -327,8 +340,25 @@ class MessageComposerPresenter(
                     showAttachmentSourcePicker = true
                 }
                 MessageComposerEvent.DismissAttachmentMenu -> showAttachmentSourcePicker = false
-                MessageComposerEvent.OpenEmojiPicker -> showEmojiPicker = true
-                MessageComposerEvent.DismissEmojiPicker -> showEmojiPicker = false
+                MessageComposerEvent.OpenEmojiPicker -> {
+                    showEmojiPicker = true
+                    showStickerPicker = false
+                }
+                MessageComposerEvent.DismissEmojiPicker -> {
+                    showEmojiPicker = false
+                    showStickerPicker = false
+                }
+                MessageComposerEvent.OpenStickerPicker -> {
+                    showEmojiPicker = true
+                    showStickerPicker = true
+                }
+                is MessageComposerEvent.SendSticker -> {
+                    val mode = messageComposerContext.composerMode
+                    sessionCoroutineScope.sendSticker(event.image, mode as? MessageComposerMode.Reply)
+                    if (mode is MessageComposerMode.Reply) {
+                        messageComposerContext.composerMode = MessageComposerMode.Normal
+                    }
+                }
                 MessageComposerEvent.DeleteBackward -> markdownTextEditorState.deleteBackward()
                 is MessageComposerEvent.InsertEmoji -> {
                     markdownTextEditorState.insertText(event.emoji)
@@ -462,6 +492,8 @@ class MessageComposerPresenter(
             isInThreadTimeline = isInThread,
             showAttachmentSourcePicker = showAttachmentSourcePicker,
             emojiPickerState = emojiPickerState,
+            roomId = room.roomId,
+            isStickerPickerShown = showStickerPicker && showEmojiPicker,
             showTextFormatting = showTextFormatting,
             canShareLocation = canShareLocation,
             suggestions = suggestions.toImmutableList(),
@@ -522,12 +554,49 @@ class MessageComposerPresenter(
         }
     }
 
+    /**
+     * Haven: a markdown message with `:shortcode:`s of custom emoji from the room's or the favorite packs gets HTML with
+     * their images, like Haven Desktop (the plain body keeps the shortcodes). Rich text messages are left alone.
+     */
+    private suspend fun Message.withCustomEmoji(): Message {
+        if (html != null || !markdown.contains(':')) return this
+        val shortcodes = runCatching { imagePackService.emoticonShortcodes(room.roomId) }.getOrDefault(emptyMap())
+        val customHtml = CustomEmojiHtml.htmlFromMarkdown(markdown, shortcodes, havenMarkdown) ?: return this
+        return copy(html = customHtml)
+    }
+
+    /** Haven: sends an image pack's sticker (an `m.sticker` event, like Haven Desktop), in the thread and as a reply when needed. */
+    private fun CoroutineScope.sendSticker(image: PackImage, reply: MessageComposerMode.Reply?) = launch {
+        val content = JSONObject()
+            .put("body", image.shortcode)
+            .put("url", image.url)
+            .put("info", image.infoJson?.let { runCatching { JSONObject(it) }.getOrNull() } ?: JSONObject())
+        val replyToId = reply?.eventId?.value
+        when {
+            threadRoot != null -> content.put(
+                "m.relates_to",
+                JSONObject()
+                    .put("rel_type", "m.thread")
+                    .put("event_id", threadRoot.value)
+                    .put("is_falling_back", replyToId == null)
+                    .put("m.in_reply_to", JSONObject().put("event_id", replyToId ?: threadRoot.value)),
+            )
+            replyToId != null -> content.put("m.relates_to", JSONObject().put("m.in_reply_to", JSONObject().put("event_id", replyToId)))
+        }
+        if (scPreferencesStore.getSetting(ScPrefs.HAVEN_SEND_IMAGE_PACK_REFERENCES)) {
+            imagePackService.imageSourcePacksJson(listOf(image))?.let { content.put(IMAGE_SOURCE_PACKS_KEY, JSONObject(it)) }
+        }
+        room.sendRaw("m.sticker", content.toString())
+            .onFailure { Timber.e(it, "Failed to send sticker") }
+    }
+
     private fun CoroutineScope.sendMessage(
         markdownTextEditorState: MarkdownTextEditorState,
         richTextEditorState: RichTextEditorState,
         slashCommandAction: MutableState<AsyncAction<Unit>>,
     ) = launch {
         val message = currentComposerMessage(markdownTextEditorState, richTextEditorState, withMentions = true)
+            .withCustomEmoji()
         val capturedMode = messageComposerContext.composerMode
 
         val slashCommand = if (capturedMode is MessageComposerMode.Normal) {

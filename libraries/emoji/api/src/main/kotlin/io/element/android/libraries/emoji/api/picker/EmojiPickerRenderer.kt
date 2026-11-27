@@ -11,6 +11,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Modifier
 import io.element.android.emojibasebindings.Emoji
+import io.element.android.libraries.emoji.api.imagepacks.PackImage
+import io.element.android.libraries.matrix.api.core.RoomId
 import kotlinx.collections.immutable.ImmutableSet
 
 /**
@@ -29,6 +31,8 @@ interface EmojiPickerRenderer {
      * @param modifier layout modifier for the picker container.
      * @param onBackspace when supplied, the picker shows a backspace key that invokes it, allowing a picker standing in for the keyboard to delete as well.
      * @param contentDescription accessibility label for each emoji cell.
+     * @param roomId Haven: the room the picker is for, whose image packs (and the favorite ones) it offers.
+     * @param onSelectPackImage Haven: invoked when a custom emoji is picked; without it, no custom emoji are offered.
      */
     @Composable
     fun Render(
@@ -39,7 +43,20 @@ interface EmojiPickerRenderer {
         modifier: Modifier = Modifier,
         onBackspace: (() -> Unit)? = null,
         contentDescription: @Composable (Emoji, Boolean) -> String = { emoji, _ -> emoji.unicode },
+        roomId: RoomId? = null,
+        onSelectPackImage: ((PackImage) -> Unit)? = null,
     )
+
+    /**
+     * Haven: the sticker picker, the stickers of [roomId]'s packs and the favorite packs, with a rail of the packs.
+     * Draws nothing when the custom emoji & sticker picker is turned off.
+     */
+    @Composable
+    fun RenderStickers(
+        roomId: RoomId?,
+        onSelectSticker: (PackImage) -> Unit,
+        modifier: Modifier = Modifier,
+    ) = Unit
 }
 
 object NoOpEmojiPickerRenderer : EmojiPickerRenderer {
@@ -52,5 +69,7 @@ object NoOpEmojiPickerRenderer : EmojiPickerRenderer {
         modifier: Modifier,
         onBackspace: (() -> Unit)?,
         contentDescription: @Composable (Emoji, Boolean) -> String,
+        roomId: RoomId?,
+        onSelectPackImage: ((PackImage) -> Unit)?,
     ) = Unit
 }

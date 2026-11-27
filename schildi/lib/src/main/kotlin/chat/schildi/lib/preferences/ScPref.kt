@@ -212,6 +212,15 @@ data class ScActionablePref(
     override val dependencies: List<ScPrefDependency> = emptyList(),
 ) : AbstractScPref
 
+/** Haven: a settings entry drawn by the settings screen itself (by [key]), e.g. a list loaded from the server. */
+@Parcelize
+data class ScCustomPref(
+    val key: String,
+    override val titleRes: Int,
+    override val summaryRes: Int? = null,
+    override val dependencies: List<ScPrefDependency> = emptyList(),
+) : AbstractScPref
+
 @Parcelize
 data class ScDisclaimerPref(
     val key: String,

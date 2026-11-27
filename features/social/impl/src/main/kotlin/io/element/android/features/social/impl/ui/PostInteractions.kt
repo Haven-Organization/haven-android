@@ -198,6 +198,14 @@ fun PostInteractionOverlays(deps: SocialDeps, state: PostInteractionState) {
                 // Like Desktop's reaction picker: the user's own reactions are marked (picking one removes it).
                 selectedEmojis = post.reactions.filter { it.byMe }.map { it.key }.toPersistentSet(),
                 modifier = Modifier.fillMaxSize(),
+                // Custom emoji from the room's and the favorite packs: the reaction's key is the image's mxc:// URL
+                roomId = post.roomId,
+                onSelectPackImage = { image ->
+                    sheetState.hide(scope) {
+                        state.reactTo = null
+                        scope.runAction(state) { deps.actions.toggleReaction(post, image.url) }
+                    }
+                },
             )
         }
     }

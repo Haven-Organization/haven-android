@@ -35,6 +35,12 @@ dependencies {
     implementation(libs.kotlinx.collections.immutable)
     implementation(libs.matrix.emojibase.bindings)
 
+    // Haven: image packs (custom emoji and stickers)
+    implementation(projects.libraries.matrixmedia.api)
+    implementation(libs.coil.compose)
+    implementation(platform(libs.network.okhttp.bom))
+    implementation(libs.network.okhttp)
+
     testImplementation(projects.libraries.matrix.test)
     testCommonDependencies(libs, includeTestComposeView = true)
 }

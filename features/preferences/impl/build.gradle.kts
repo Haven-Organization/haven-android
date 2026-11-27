@@ -83,6 +83,7 @@ dependencies {
     implementation(projects.features.deactivation.api)
     implementation(projects.features.invite.api)
     implementation(projects.libraries.emoji.api)
+    implementation(projects.libraries.matrixmedia.api) // Haven: pack images
     implementation(projects.services.analytics.api)
     implementation(projects.services.analytics.compose)
     implementation(projects.services.appnavstate.api)

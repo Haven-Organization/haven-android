@@ -137,6 +137,8 @@ fun TextComposer(
     showTextFormatting: Boolean = false,
     isInThreadTimeline: Boolean = false,
     onAddEmoji: (() -> Unit)? = null,
+    // Haven: the sticker picker button, left of the emoji button
+    onAddSticker: (() -> Unit)? = null,
     // Haven: a tall, multi-line text box (Social's post composer): at least this high, text from the top.
     minInputHeight: Dp? = null,
     // Haven: false to leave out the send / voice message button (Social's post composer has its own Post button).
@@ -247,7 +249,12 @@ fun TextComposer(
                     isTextEmpty = state.state.text.value().isEmpty(),
                     minHeight = minInputHeight,
                     trailingContent = onAddEmoji?.let { onClick ->
-                        @Composable { AddEmojiButton(onClick = onClick) }
+                        @Composable {
+                            Row {
+                                onAddSticker?.let { AddStickerButton(onClick = it) }
+                                AddEmojiButton(onClick = onClick)
+                            }
+                        }
                     },
                 ) {
                     MarkdownTextInput(
@@ -749,6 +756,28 @@ private fun TextInputBox(
                 }
             }
             trailingContent?.invoke()
+        }
+    }
+}
+
+/** Haven: opens the sticker picker. Sized like [AddEmojiButton]. */
+@Composable
+private fun AddStickerButton(onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .padding(bottom = 4.dp)
+            .size(width = 36.dp, height = 34.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        IconButton(
+            modifier = Modifier.requiredSize(40.dp),
+            onClick = onClick,
+        ) {
+            Icon(
+                imageVector = CompoundIcons.Sticker(),
+                contentDescription = stringResource(chat.schildi.lib.R.string.haven_send_sticker),
+                tint = ElementTheme.colors.iconSecondary,
+            )
         }
     }
 }

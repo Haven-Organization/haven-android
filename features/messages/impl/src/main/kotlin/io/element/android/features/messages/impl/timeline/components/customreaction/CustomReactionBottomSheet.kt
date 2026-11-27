@@ -28,6 +28,7 @@ import io.element.android.features.messages.impl.timeline.a11y.a11yReactionActio
 import io.element.android.libraries.designsystem.theme.components.ModalBottomSheet
 import io.element.android.libraries.designsystem.theme.components.hide
 import io.element.android.libraries.emoji.api.picker.EmojiPickerRenderer
+import io.element.android.libraries.matrix.api.core.RoomId
 import io.element.android.libraries.matrix.api.timeline.item.event.EventOrTransactionId
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -38,6 +39,8 @@ fun CustomReactionBottomSheet(
     onSelectCustomEmoji: (EventOrTransactionId, String) -> Unit, // SC
     emojiPickerRenderer: EmojiPickerRenderer,
     modifier: Modifier = Modifier,
+    // Haven: whose image packs to offer (with the favorite ones) as custom emoji reactions
+    roomId: RoomId? = null,
 ) {
     val sheetState = rememberBottomSheetState(
         initialValue = SheetValue.Hidden,
@@ -84,6 +87,9 @@ fun CustomReactionBottomSheet(
                     contentDescription = { emoji, isSelected ->
                         a11yReactionAction(emoji = emoji.unicode, userAlreadyReacted = isSelected)
                     },
+                    roomId = roomId,
+                    // Haven: a custom emoji reaction's key is the image's mxc:// URL, like Haven Desktop
+                    onSelectPackImage = { image -> onCustomEmojiSelectedDismiss(image.url) },
                 )
             }
         }

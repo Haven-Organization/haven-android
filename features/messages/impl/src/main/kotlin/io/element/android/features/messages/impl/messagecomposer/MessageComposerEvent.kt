@@ -23,6 +23,10 @@ sealed interface MessageComposerEvent {
     data object DismissAttachmentMenu : MessageComposerEvent
     data object OpenEmojiPicker : MessageComposerEvent
     data object DismissEmojiPicker : MessageComposerEvent
+
+    /** Haven: the sticker picker, shown in the emoji picker's place. */
+    data object OpenStickerPicker : MessageComposerEvent
+    data class SendSticker(val image: io.element.android.libraries.emoji.api.imagepacks.PackImage) : MessageComposerEvent
     data object DeleteBackward : MessageComposerEvent
     data class InsertEmoji(val emoji: String) : MessageComposerEvent
     sealed interface PickAttachmentSource : MessageComposerEvent {

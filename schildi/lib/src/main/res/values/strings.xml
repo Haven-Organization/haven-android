@@ -241,4 +241,33 @@
     <string name="sc_notification_lookup_failure_summary">Failed to look up message for notification</string>
     <string name="sc_bg_notification_channel">Background service</string>
     <string name="sc_push_failure_notification_channel">Notification failures</string>
+
+    <!-- Haven: Emoji & Stickers (same wording as Haven Desktop) -->
+    <string name="haven_pref_emoji_stickers_title">Emoji &amp; Stickers</string>
+    <string name="haven_pref_emoji_stickers_summary">Custom emoji, stickers, image packs and skin tone</string>
+    <string name="haven_send_image_pack_references_title">Send pack information with emoji &amp; stickers</string>
+    <string name="haven_send_image_pack_references_summary">Lets recipients find and add the pack a custom emoji or sticker came from. Does not affect your own ability to find packs from others.</string>
+    <string name="haven_disable_custom_emoji_picker_title">Disable custom emoji &amp; sticker picker</string>
+    <string name="haven_disable_custom_emoji_picker_summary">Restores Element\'s stock emoji picker. You\'ll still be able to view custom emoji and stickers from others, and manage image packs.</string>
+    <string name="haven_emoji_skin_tone_title">Emoji skin tone</string>
+    <string name="haven_emoji_skin_tone_summary">Used for emoji that come in different skin tones, in the emoji picker. Doesn\'t change how emoji look to other people.</string>
+    <string name="haven_emoji_skin_tone_none">👍 Default</string>
+    <string name="haven_emoji_skin_tone_light">👍🏻 Light</string>
+    <string name="haven_emoji_skin_tone_medium_light">👍🏼 Medium-light</string>
+    <string name="haven_emoji_skin_tone_medium">👍🏽 Medium</string>
+    <string name="haven_emoji_skin_tone_medium_dark">👍🏾 Medium-dark</string>
+    <string name="haven_emoji_skin_tone_dark">👍🏿 Dark</string>
+    <string name="haven_favorite_packs_title">Favorite Packs</string>
+    <string name="haven_favorite_packs_summary">Choose which rooms\' emoji and sticker packs you want to use everywhere, not just in the room they belong to.</string>
+    <string name="haven_favorite_packs_empty">You haven\'t joined any rooms with emoji or sticker packs yet. Look for rooms with packs to join.</string>
+    <string name="haven_favorite_packs_loading">Loading packs…</string>
+    <string name="haven_favorite_packs_save">Save</string>
+    <string name="haven_favorite_packs_discard">Discard</string>
+    <string name="haven_favorite_packs_save_failed">Couldn\'t save your favorite packs</string>
+    <string name="haven_pack_view">View</string>
+    <string name="haven_pack_images_count">%1$d images</string>
+    <string name="haven_stickers">Stickers</string>
+    <string name="haven_send_sticker">Send a sticker</string>
+    <string name="haven_no_sticker_packs">This room has no sticker packs yet. Add stickers from other rooms in Favorite Packs.</string>
+    <string name="haven_emoji_stickers_settings">Emoji &amp; Stickers settings</string>
 </resources>

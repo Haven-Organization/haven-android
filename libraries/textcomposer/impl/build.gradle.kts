@@ -25,6 +25,7 @@ setupDependencyInjection(generateNodeFactories = false)
 
 dependencies {
     implementation(projects.schildi.theme)
+    implementation(projects.schildi.lib) // Haven: strings
 
     implementation(projects.libraries.architecture)
     implementation(projects.libraries.uiStrings)

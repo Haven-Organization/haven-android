@@ -6,6 +6,8 @@
 
 package io.element.android.features.messages.impl.haven
 
+import chat.schildi.lib.preferences.value
+import chat.schildi.lib.preferences.ScPrefs
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -460,7 +462,11 @@ class HavenPostComposerNode(
                     )
                     AttachmentShelf(
                         onToggleEmoji = rememberEmojiPickerKeyboardToggle(state),
-                        isEmojiPickerShown = state.emojiPickerState != ComposerEmojiPickerState.Hidden,
+                        isEmojiPickerShown = state.emojiPickerState != ComposerEmojiPickerState.Hidden && !state.isStickerPickerShown,
+                        // Haven: stickers from image packs, left of the emoji button
+                        onToggleSticker = rememberEmojiPickerKeyboardToggle(state, stickers = true)
+                            .takeIf { !ScPrefs.HAVEN_DISABLE_CUSTOM_EMOJI_PICKER.value() && !inputs.isQuote },
+                        isStickerPickerShown = state.isStickerPickerShown,
                         // A quote post can't be a voice message (it couldn't carry the quote).
                         voiceMessageState = voiceState.voiceMessageState.takeIf { !inputs.isQuote },
                         onVoiceRecorderEvent = { voiceState.eventSink(VoiceMessageComposerEvent.RecorderEvent(it)) },
@@ -580,6 +586,8 @@ private fun QuoteAttachmentPreview(uri: Uri, mimeType: String, onRemove: () -> U
 private fun AttachmentShelf(
     onToggleEmoji: () -> Unit,
     isEmojiPickerShown: Boolean,
+    onToggleSticker: (() -> Unit)?,
+    isStickerPickerShown: Boolean,
     voiceMessageState: VoiceMessageState?,
     onVoiceRecorderEvent: (VoiceMessageRecorderEvent) -> Unit,
     onSendVoiceMessage: () -> Unit,
@@ -620,6 +628,24 @@ private fun AttachmentShelf(
                     imageVector = CompoundIcons.Polls(),
                     contentDescription = stringResource(R.string.screen_room_attachment_source_poll),
                     tint = ElementTheme.colors.iconSecondary,
+                )
+            }
+        }
+        if (onToggleSticker != null) {
+            IconButton(onClick = onToggleSticker, modifier = Modifier.size(48.dp)) {
+                Icon(
+                    imageVector = CompoundIcons.Sticker(),
+                    contentDescription = stringResource(chat.schildi.lib.R.string.haven_send_sticker),
+                    tint = if (isStickerPickerShown) ElementTheme.colors.iconAccentPrimary else ElementTheme.colors.iconSecondary,
+                    modifier = if (isStickerPickerShown) {
+                        Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(ElementTheme.colors.bgAccentSelected)
+                            .padding(8.dp)
+                    } else {
+                        Modifier
+                    },
                 )
             }
         }

@@ -11,6 +11,27 @@ object ScPrefs {
         const val HIDE = "HIDE"
     }
 
+    /** Haven: the skin tone used in the emoji picker (same values as Haven Desktop's `Haven.emojiSkinTone`). */
+    object EmojiSkinTone {
+        const val NONE = "none"
+        const val LIGHT = "light"
+        const val MEDIUM_LIGHT = "medium-light"
+        const val MEDIUM = "medium"
+        const val MEDIUM_DARK = "medium-dark"
+        const val DARK = "dark"
+        val ALL = arrayOf(NONE, LIGHT, MEDIUM_LIGHT, MEDIUM, MEDIUM_DARK, DARK)
+
+        /** The Fitzpatrick modifier's code point, e.g. `1F3FB`, or null for none. */
+        fun modifierHex(value: String): String? = when (value) {
+            LIGHT -> "1F3FB"
+            MEDIUM_LIGHT -> "1F3FC"
+            MEDIUM -> "1F3FD"
+            MEDIUM_DARK -> "1F3FE"
+            DARK -> "1F3FF"
+            else -> null
+        }
+    }
+
     // Developer options
     private const val SC_DEVELOPER_OPTIONS_CATEGORY_KEY = "SC_DEVELOPER_OPTIONS_CATEGORY"
     private val SC_DANGER_ZONE = ScBoolPref("SC_DANGER_ZONE", false, R.string.sc_pref_danger_zone, R.string.sc_pref_danger_zone_summary, authorsChoice = true)
@@ -84,6 +105,20 @@ object ScPrefs {
         R.string.sc_space_unread_counts_mode_title,
         dependencies = SPACE_NAV.asDependencies(),
     )
+    // Haven: Emoji & Stickers (like Haven Desktop's settings tab of that name)
+    val HAVEN_SEND_IMAGE_PACK_REFERENCES = ScBoolPref("HAVEN_SEND_IMAGE_PACK_REFERENCES", false, R.string.haven_send_image_pack_references_title, R.string.haven_send_image_pack_references_summary, upstreamChoice = false)
+    val HAVEN_DISABLE_CUSTOM_EMOJI_PICKER = ScBoolPref("HAVEN_DISABLE_CUSTOM_EMOJI_PICKER", false, R.string.haven_disable_custom_emoji_picker_title, R.string.haven_disable_custom_emoji_picker_summary, upstreamChoice = true)
+    val HAVEN_EMOJI_SKIN_TONE = ScStringListPref(
+        "HAVEN_EMOJI_SKIN_TONE",
+        EmojiSkinTone.NONE,
+        EmojiSkinTone.ALL,
+        R.array.haven_emoji_skin_tone_names,
+        null,
+        R.string.haven_emoji_skin_tone_title,
+        R.string.haven_emoji_skin_tone_summary,
+    )
+    val HAVEN_FAVORITE_PACKS = ScCustomPref("HAVEN_FAVORITE_PACKS", R.string.haven_favorite_packs_title, R.string.haven_favorite_packs_summary)
+
     // Haven: the Apps framework (Apps button, pinned apps, Social, widget apps) can be turned off entirely
     val HAVEN_APPS_ENABLED = ScBoolPref("HAVEN_APPS_ENABLED", true, R.string.haven_apps_enabled_title, R.string.haven_apps_enabled_summary, upstreamChoice = false)
     // Haven: where the Apps button and pinned apps go on the space bar (left by default)
@@ -247,6 +282,15 @@ object ScPrefs {
                 PREFER_FREEFORM_REACTIONS,
                 PREFER_FULLSCREEN_REACTION_SHEET,
                 ALWAYS_SHOW_REACTION_SEARCH_BAR,
+            )),
+        )),
+        ScPrefScreen(R.string.haven_pref_emoji_stickers_title, R.string.haven_pref_emoji_stickers_summary, listOf(
+            HAVEN_SEND_IMAGE_PACK_REFERENCES,
+            HAVEN_DISABLE_CUSTOM_EMOJI_PICKER,
+            HAVEN_EMOJI_SKIN_TONE,
+            // Last, like Haven Desktop
+            ScPrefCategory(R.string.haven_favorite_packs_title, null, listOf(
+                HAVEN_FAVORITE_PACKS,
             )),
         )),
         ScPrefScreen(R.string.sc_pref_category_notifications, null, listOf(

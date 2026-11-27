@@ -16,6 +16,7 @@
 
 package chat.schildi.preferences.tweaks
 
+import chat.schildi.lib.preferences.ScCustomPref
 import android.content.Context
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -147,6 +148,8 @@ fun RecursiveScPrefsView(
             is ScDisclaimerPref -> {
                 scPref.Rendered()
             }
+            // Haven
+            is ScCustomPref -> LocalScCustomPrefContent.current(scPref.key)
             is ScPref<*> -> {
                 val prefVal = state.prefVals[scPref.sKey]
                 if (prefVal == null) {

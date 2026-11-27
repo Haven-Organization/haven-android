@@ -15,6 +15,8 @@ android {
 
 dependencies {
     implementation(projects.libraries.architecture)
+    // Haven: image packs (custom emoji and stickers)
+    api(projects.libraries.matrix.api)
 
     implementation(libs.kotlinx.collections.immutable)
     api(libs.matrix.emojibase.bindings)

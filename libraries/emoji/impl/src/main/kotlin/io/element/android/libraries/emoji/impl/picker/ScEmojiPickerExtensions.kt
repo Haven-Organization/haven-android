@@ -42,15 +42,16 @@ import io.element.android.libraries.designsystem.theme.components.IconButton
 import kotlinx.coroutines.launch
 
 @Composable
-internal fun DefaultEmojiPickerState.scEmojiPickerSize() = categories.size + 1 + (if (ScPrefs.ALWAYS_SHOW_REACTION_SEARCH_BAR.value()) 0 else 1)
-internal fun DefaultEmojiPickerState.pageFreeformReactionIndex() = categories.size
-internal fun DefaultEmojiPickerState.pageSearchIndex() = categories.size + 1
+// Haven: by the number of pages (emoji categories and image packs) rather than of categories
+internal fun scEmojiPickerSize(pageCount: Int) = pageCount + 1 + (if (ScPrefs.ALWAYS_SHOW_REACTION_SEARCH_BAR.value()) 0 else 1)
+internal fun pageFreeformReactionIndex(pageCount: Int) = pageCount
+internal fun pageSearchIndex(pageCount: Int) = pageCount + 1
 internal fun Int.removeScPickerOffset() = this //- 1
 internal fun Int.addScPickerOffset() = this //+ 1
 
 @Composable
 internal fun ScEmojiPickerTabsEnd(
-    state: DefaultEmojiPickerState,
+    pageCount: Int,
     pagerState: PagerState,
     launchSearch: () -> Unit
 ) {
@@ -62,9 +63,9 @@ internal fun ScEmojiPickerTabsEnd(
                 contentDescription = stringResource(id = R.string.sc_freeform_reaction),
             )
         },
-        selected = pagerState.currentPage == state.pageFreeformReactionIndex(),
+        selected = pagerState.currentPage == pageFreeformReactionIndex(pageCount),
         onClick = {
-            coroutineScope.launch { pagerState.animateScrollToPage(state.pageFreeformReactionIndex()) }
+            coroutineScope.launch { pagerState.animateScrollToPage(pageFreeformReactionIndex(pageCount)) }
         }
     )
     if (!ScPrefs.ALWAYS_SHOW_REACTION_SEARCH_BAR.value()) {
@@ -75,7 +76,7 @@ internal fun ScEmojiPickerTabsEnd(
                     contentDescription = stringResource(id = io.element.android.libraries.ui.strings.R.string.action_search),
                 )
             },
-            selected = pagerState.currentPage == state.pageSearchIndex(),
+            selected = pagerState.currentPage == pageSearchIndex(pageCount),
             onClick = launchSearch,
         )
     }
@@ -83,14 +84,14 @@ internal fun ScEmojiPickerTabsEnd(
 
 @Composable
 internal fun scEmojiPickerPage(
-    state: DefaultEmojiPickerState,
+    pageCount: Int,
     index: Int,
     selectedIndex: Int,
     onSelectCustomEmoji: (String) -> Unit,
     launchSearch: () -> Unit,
 ): Boolean {
     return when (index) {
-        state.pageFreeformReactionIndex() -> {
+        pageFreeformReactionIndex(pageCount) -> {
             val text = remember { mutableStateOf("") }
             val focusRequester = remember { FocusRequester() }
             val focusManager = LocalFocusManager.current
@@ -121,7 +122,7 @@ internal fun scEmojiPickerPage(
             }
             // Haven: until the emoji categories have loaded there are none, so this page is briefly page 0 (the selected
             // one): don't pop up the keyboard over the picker for that.
-            val isFreeformSelected = selectedIndex == state.pageFreeformReactionIndex() && state.categories.isNotEmpty()
+            val isFreeformSelected = selectedIndex == pageFreeformReactionIndex(pageCount) && pageCount > 0
             LaunchedEffect(isFreeformSelected) {
                 if (isFreeformSelected) {
                     focusRequester.requestFocus()
@@ -131,7 +132,7 @@ internal fun scEmojiPickerPage(
             }
             true
         }
-        state.pageSearchIndex() -> {
+        pageSearchIndex(pageCount) -> {
             // Shouldn't be reachable by clicking the search icon, but still by swiping
             if (selectedIndex == index) {
                 LaunchedEffect(Unit) { launchSearch() }

@@ -16,6 +16,8 @@
 
 package chat.schildi.preferences.tweaks
 
+import androidx.compose.runtime.CompositionLocalProvider
+import io.element.android.libraries.emoji.api.imagepacks.ImagePackService
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import chat.schildi.lib.preferences.ScPref
@@ -50,6 +52,8 @@ class ScTweaksSettingsNode(
     private val scPreferencesStore: ScPreferencesStore,
     @SessionCoroutineScope
     private val sessionCoroutineScope: CoroutineScope,
+    // Haven: Emoji & Stickers' Favorite Packs
+    private val imagePackService: ImagePackService,
 ) : Node(buildContext, plugins = plugins) {
 
     data class Inputs(
@@ -66,13 +70,21 @@ class ScTweaksSettingsNode(
     @Composable
     override fun View(modifier: Modifier) {
         val state = presenter.present()
-        ScTweaksSettingsView(
-            state = state,
-            modifier = modifier,
-            onBackClick = ::navigateUp,
-            onOpenPrefScreen = this::navigateToScTweaks,
-            handleScPrefAction = this::handleScPrefAction,
-        )
+        CompositionLocalProvider(
+            LocalScCustomPrefContent provides { key ->
+                when (key) {
+                    ScPrefs.HAVEN_FAVORITE_PACKS.key -> HavenFavoritePacks(imagePackService)
+                }
+            },
+        ) {
+            ScTweaksSettingsView(
+                state = state,
+                modifier = modifier,
+                onBackClick = ::navigateUp,
+                onOpenPrefScreen = this::navigateToScTweaks,
+                handleScPrefAction = this::handleScPrefAction,
+            )
+        }
     }
 
     private fun navigateToScTweaks(scPrefScreen: ScPrefScreen) {

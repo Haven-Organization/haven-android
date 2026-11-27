@@ -412,6 +412,7 @@ class MessagesNode(
                             state.eventSink(MessagesEvent.ToggleReaction(emoji, uniqueId))
                         },
                         emojiPickerRenderer = emojiPickerRenderer,
+                        roomId = room.roomId,
                     )
                 },
                 composerEmojiPicker = composerEmojiPickerContent(state.composerState, emojiPickerRenderer),

@@ -32,6 +32,10 @@ data class MessageComposerState(
     val resolveAtRoomMentionDisplay: () -> TextDisplay,
     val slashCommandAction: AsyncAction<Unit>,
     val eventSink: (MessageComposerEvent) -> Unit,
+    // Haven: the room, for its image packs (custom emoji and stickers)
+    val roomId: io.element.android.libraries.matrix.api.core.RoomId? = null,
+    // Haven: the emoji picker's place holds the sticker picker instead
+    val isStickerPickerShown: Boolean = false,
 )
 
 sealed interface ComposerEmojiPickerState {

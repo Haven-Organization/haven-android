@@ -14,6 +14,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
@@ -27,6 +28,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.material3.SecondaryScrollableTabRow
 import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.ripple
@@ -52,6 +54,10 @@ import chat.schildi.lib.preferences.ScPrefs
 import chat.schildi.lib.preferences.value
 import io.element.android.compound.tokens.generated.CompoundIcons
 import io.element.android.emojibasebindings.Emoji
+import io.element.android.libraries.emoji.api.imagepacks.ImagePack
+import io.element.android.libraries.emoji.api.imagepacks.PackImage
+import kotlinx.collections.immutable.persistentListOf
+import kotlinx.collections.immutable.toImmutableList
 import io.element.android.libraries.designsystem.preview.ElementPreview
 import io.element.android.libraries.designsystem.preview.PreviewsDayNight
 import io.element.android.libraries.designsystem.text.toSp
@@ -77,12 +83,26 @@ internal fun EmojiPickerView(
     modifier: Modifier = Modifier,
     onBackspace: (() -> Unit)? = null,
     contentDescription: @Composable (emoji: Emoji, isSelected: Boolean) -> String = { emoji, _ -> emoji.unicode },
+    // Haven: custom emoji from image packs
+    packs: ImmutableList<ImagePack> = persistentListOf(),
+    onSelectPackImage: (PackImage) -> Unit = {},
 ) {
     val coroutineScope = rememberCoroutineScope()
 
+    // Haven: the chosen skin tone, applied to the emoji shown
+    val skinTone = ScPrefs.EmojiSkinTone.modifierHex(ScPrefs.HAVEN_EMOJI_SKIN_TONE.value())
+    val pages = remember(state.categories, packs, skinTone) {
+        val categories = if (skinTone == null) {
+            state.categories
+        } else {
+            state.categories.map { category -> category.copy(emojis = category.emojis.map { it.withSkinTone(skinTone) }.toImmutableList()) }
+        }
+        buildPickerPages(categories, packs)
+    }
+
     val pagerState = rememberPagerState(
-        pageCount = state.scEmojiPickerSize().let {{ it }},
-        initialPage = if (ScPrefs.PREFER_FREEFORM_REACTIONS.value()) state.pageFreeformReactionIndex() else 0,
+        pageCount = scEmojiPickerSize(pages.size).let {{ it }},
+        initialPage = if (ScPrefs.PREFER_FREEFORM_REACTIONS.value()) pageFreeformReactionIndex(pages.size) else 0,
     )
 
     var skinPickerEmoji by remember { mutableStateOf<Emoji?>(null) }
@@ -97,8 +117,9 @@ internal fun EmojiPickerView(
             windowInsets = WindowInsets(0, 0, 0, 0),
             placeHolderTitle = stringResource(R.string.emoji_picker_search_placeholder),
         ) { emojis ->
+            val query = state.searchQuery.text.toString()
             EmojiResults(
-                emojis = emojis,
+                emojis = emojis.map { it.withSkinTone(skinTone) }.toImmutableList(),
                 isEmojiSelected = { selectedEmojis.contains(it.unicode) },
                 onSelectEmoji = onSelectEmoji,
                 onLongPress = { skinPickerEmoji = it },
@@ -106,46 +127,68 @@ internal fun EmojiPickerView(
                 onDismissSkinPicker = { skinPickerEmoji = null },
                 selectedEmojis = selectedEmojis,
                 contentDescription = contentDescription,
+                packImages = remember(packs, query) { packs.searchImages(query) },
+                onSelectPackImage = onSelectPackImage,
             )
         }
 
         if (!state.isSearchActive) {
-            SecondaryTabRow(
-                selectedTabIndex = pagerState.currentPage,
-            ) {
-                state.categories.forEachIndexed { index, category ->
+            val tabs: @Composable () -> Unit = {
+                pages.forEachIndexed { index, page ->
                     Tab(
                         icon = {
-                            when (category.icon) {
-                                is IconSource.Resource -> Icon(
-                                    resourceId = category.icon.id,
-                                    contentDescription = stringResource(id = category.titleId)
-                                )
-                                is IconSource.Vector -> Icon(
-                                    imageVector = category.icon.vector,
-                                    contentDescription = stringResource(id = category.titleId)
-                                )
+                            when (page) {
+                                is PickerPage.Pack -> PackTabIcon(page.pack)
+                                is PickerPage.Unicode -> when (val icon = page.category.icon) {
+                                    is IconSource.Resource -> Icon(
+                                        resourceId = icon.id,
+                                        contentDescription = stringResource(id = page.category.titleId)
+                                    )
+                                    is IconSource.Vector -> Icon(
+                                        imageVector = icon.vector,
+                                        contentDescription = stringResource(id = page.category.titleId)
+                                    )
+                                }
                             }
                         },
                         selected = pagerState.currentPage.removeScPickerOffset() == index,
                         onClick = {
-                            coroutineScope.launch { pagerState.animateScrollToPage(index.addScPickerOffset()) }
+                            // Haven: straight to the page, so the packs in between don't all start loading
+                            coroutineScope.launch { pagerState.scrollToPage(index.addScPickerOffset()) }
                         }
                     )
                 }
-                ScEmojiPickerTabsEnd(state, pagerState) { state.eventSink(EmojiPickerEvent.ToggleSearchActive(true)) }
+                ScEmojiPickerTabsEnd(pages.size, pagerState) { state.eventSink(EmojiPickerEvent.ToggleSearchActive(true)) }
                 if (onBackspace != null) {
                     BackspaceTab(onBackspace = onBackspace)
+                }
+            }
+            if (packs.isEmpty()) {
+                SecondaryTabRow(selectedTabIndex = pagerState.currentPage) { tabs() }
+            } else {
+                // Haven: with packs there can be too many to fit, so the rail scrolls. Each tab keeps the width it has
+                // without packs (the row shared out between the stock tabs), so the spacing stays the stock spacing.
+                BoxWithConstraints(Modifier.fillMaxWidth()) {
+                    val stockTabCount = (pages.size - packs.size) + 1 +
+                        (if (ScPrefs.ALWAYS_SHOW_REACTION_SEARCH_BAR.value()) 0 else 1) +
+                        (if (onBackspace != null) 1 else 0)
+                    SecondaryScrollableTabRow(
+                        selectedTabIndex = pagerState.currentPage,
+                        edgePadding = 0.dp,
+                        minTabWidth = maxWidth / stockTabCount.coerceAtLeast(1),
+                    ) { tabs() }
                 }
             }
 
             HorizontalPager(
                 state = pagerState,
+                // Haven: the neighbouring pages load too, so a swipe to the next pack finds it loaded
+                beyondViewportPageCount = 1,
                 modifier = Modifier.fillMaxWidth(),
             ) { scIndex ->
                 val index = scIndex.removeScPickerOffset()
                 if (scEmojiPickerPage(
-                        state,
+                        pages.size,
                         scIndex,
                         pagerState.currentPage,
                         onSelectCustomEmoji
@@ -156,17 +199,19 @@ internal fun EmojiPickerView(
                     return@HorizontalPager
                 }
 
-                val emojis = state.categories[index].emojis
-                EmojiResults(
-                    emojis = emojis,
-                    isEmojiSelected = { selectedEmojis.contains(it.unicode) },
-                    onSelectEmoji = onSelectEmoji,
-                    onLongPress = { skinPickerEmoji = it },
-                    skinPickerEmoji = skinPickerEmoji,
-                    onDismissSkinPicker = { skinPickerEmoji = null },
-                    selectedEmojis = selectedEmojis,
-                    contentDescription = contentDescription,
-                )
+                when (val page = pages[index]) {
+                    is PickerPage.Pack -> PackImageGrid(images = page.pack.images, onSelect = onSelectPackImage)
+                    is PickerPage.Unicode -> EmojiResults(
+                        emojis = page.category.emojis,
+                        isEmojiSelected = { selectedEmojis.contains(it.unicode) },
+                        onSelectEmoji = onSelectEmoji,
+                        onLongPress = { skinPickerEmoji = it },
+                        skinPickerEmoji = skinPickerEmoji,
+                        onDismissSkinPicker = { skinPickerEmoji = null },
+                        selectedEmojis = selectedEmojis,
+                        contentDescription = contentDescription,
+                    )
+                }
             }
         }
     }
@@ -241,6 +286,8 @@ private fun EmojiResults(
     onDismissSkinPicker: () -> Unit,
     selectedEmojis: ImmutableSet<String>,
     contentDescription: @Composable (emoji: Emoji, isSelected: Boolean) -> String,
+    packImages: List<PackImage> = emptyList(),
+    onSelectPackImage: (PackImage) -> Unit = {},
 ) {
     LazyVerticalGrid(
         modifier = Modifier.fillMaxSize(),
@@ -249,6 +296,10 @@ private fun EmojiResults(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
+        // Haven: matching custom emoji first in search results
+        items(packImages, key = { "pack/${it.pack.roomId}/${it.pack.stateKey}/${it.shortcode}" }) { image ->
+            PackImageCell(image = image, imageSize = 32.dp, onClick = onSelectPackImage, modifier = Modifier.aspectRatio(1f))
+        }
         items(emojis, key = { it.unicode }) { item ->
             EmojiItem(
                 modifier = Modifier.aspectRatio(1f),
