@@ -35,6 +35,7 @@ import io.element.android.features.rolesandpermissions.api.ChangeRoomMemberRoles
 import io.element.android.features.rolesandpermissions.api.ChangeRoomMemberRolesListType
 import io.element.android.features.rolesandpermissions.api.RolesAndPermissionsEntryPoint
 import io.element.android.features.roomdetails.api.RoomDetailsEntryPoint
+import io.element.android.features.roomdetails.impl.emojistickers.EmojiStickersNode
 import io.element.android.features.roomdetails.impl.invite.RoomInviteMembersNode
 import io.element.android.features.roomdetails.impl.members.RoomMemberListNode
 import io.element.android.features.roomdetails.impl.members.details.RoomMemberDetailsNode
@@ -135,6 +136,9 @@ class RoomDetailsFlowNode(
         data object Extensions : NavTarget
 
         @Parcelize
+        data object EmojiStickers : NavTarget
+
+        @Parcelize
         data class Widget(val widgetId: String) : NavTarget
 
         @Parcelize
@@ -218,6 +222,10 @@ class RoomDetailsFlowNode(
 
                     override fun navigateToExtensions() {
                         backstack.push(NavTarget.Extensions)
+                    }
+
+                    override fun navigateToEmojiStickers() {
+                        backstack.push(NavTarget.EmojiStickers)
                     }
 
                     override fun navigateToAdminSettings() {
@@ -383,6 +391,14 @@ class RoomDetailsFlowNode(
                 } else {
                     widgetsEntryPoint.createExtensionsNode(this, buildContext, room.roomId, widgetsCallback)
                 }
+            }
+            NavTarget.EmojiStickers -> {
+                val emojiStickersCallback = object : EmojiStickersNode.Callback {
+                    override fun onDone() {
+                        backstack.pop()
+                    }
+                }
+                createNode<EmojiStickersNode>(buildContext, listOf(emojiStickersCallback))
             }
             is NavTarget.MediaGallery -> {
                 val callback = object : MediaGalleryEntryPoint.Callback {

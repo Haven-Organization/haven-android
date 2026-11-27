@@ -57,6 +57,7 @@ class RoomDetailsNode(
         fun navigateToPollHistory()
         fun navigateToMediaGallery()
         fun navigateToExtensions() {} // Haven
+        fun navigateToEmojiStickers() {} // Haven
         fun navigateToAdminSettings()
         fun navigateToPinnedMessagesList()
         fun navigateToKnockRequestsList()
@@ -132,6 +133,7 @@ class RoomDetailsNode(
             openPollHistory = callback::navigateToPollHistory,
             openMediaGallery = callback::navigateToMediaGallery,
             openExtensions = callback::navigateToExtensions, // Haven
+            openEmojiStickers = callback::navigateToEmojiStickers, // Haven
             openAdminSettings = callback::navigateToAdminSettings,
             onJoinCallClick = callback::navigateToRoomCall,
             onPinnedMessagesClick = callback::navigateToPinnedMessagesList,

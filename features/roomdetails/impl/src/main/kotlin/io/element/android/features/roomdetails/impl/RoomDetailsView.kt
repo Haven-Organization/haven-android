@@ -115,6 +115,7 @@ fun RoomDetailsView(
     openPollHistory: () -> Unit,
     openMediaGallery: () -> Unit,
     openExtensions: () -> Unit = {}, // Haven
+    openEmojiStickers: () -> Unit = {}, // Haven
     openAdminSettings: () -> Unit,
     onJoinCallClick: (CallIntent) -> Unit,
     onPinnedMessagesClick: () -> Unit,
@@ -248,6 +249,12 @@ fun RoomDetailsView(
                     content = { Text(stringResource(io.element.android.features.widgets.api.R.string.haven_room_extensions)) },
                     leadingContent = ListItemContent.Icon(IconSource.Vector(CompoundIcons.Extensions())),
                     onClick = openExtensions,
+                )
+                // Haven: the room's custom emoji and sticker packs
+                ListItem(
+                    content = { Text(stringResource(R.string.haven_emoji_stickers_title)) },
+                    leadingContent = ListItemContent.Icon(IconSource.Vector(CompoundIcons.Reaction())),
+                    onClick = openEmojiStickers,
                 )
                 PinnedMessagesItem(
                     pinnedMessagesCount = state.pinnedMessagesCount,

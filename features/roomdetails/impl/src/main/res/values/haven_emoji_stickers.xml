@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Haven: a room's "Emoji & Stickers" settings (MSC2545 image packs), like Haven Desktop -->
+<resources>
+    <string name="haven_emoji_stickers_title">Emoji &amp; Stickers</string>
+    <string name="haven_emoji_stickers_read_only">You can browse this room\'s packs. Only people allowed to change the room\'s settings can edit them.</string>
+    <string name="haven_emoji_stickers_empty">This room has no emoji or sticker packs yet.</string>
+    <string name="haven_emoji_stickers_new_pack">New pack name</string>
+    <string name="haven_emoji_stickers_create">Create</string>
+    <plurals name="haven_emoji_stickers_image_count">
+        <item quantity="one">%1$d image</item>
+        <item quantity="other">%1$d images</item>
+    </plurals>
+    <string name="haven_emoji_stickers_delete_pack_title">Delete pack?</string>
+    <string name="haven_emoji_stickers_delete_pack_message">\"%1$s\" and all its images will be removed from this room for everyone.</string>
+    <string name="haven_emoji_stickers_pack_name">Pack name</string>
+    <string name="haven_emoji_stickers_usage">Used as</string>
+    <string name="haven_emoji_stickers_usage_both">Emoji and stickers</string>
+    <string name="haven_emoji_stickers_usage_emoji">Emoji</string>
+    <string name="haven_emoji_stickers_usage_stickers">Stickers</string>
+    <string name="haven_emoji_stickers_search">Search images</string>
+    <string name="haven_emoji_stickers_no_images">No images in this pack yet.</string>
+    <string name="haven_emoji_stickers_no_match">No images match your search.</string>
+    <string name="haven_emoji_stickers_upload">Upload images</string>
+    <string name="haven_emoji_stickers_add_mxc">Add by mxc:// URL</string>
+    <string name="haven_emoji_stickers_mxc_invalid">Enter an mxc:// URL, like mxc://example.org/abc123</string>
+    <string name="haven_emoji_stickers_change_avatar">Change the pack\'s picture</string>
+    <string name="haven_emoji_stickers_shortcode">Shortcode</string>
+    <string name="haven_emoji_stickers_description">Description</string>
+    <string name="haven_emoji_stickers_remove_image">Remove image</string>
+    <string name="haven_emoji_stickers_unsaved">Unsaved changes</string>
+</resources>
