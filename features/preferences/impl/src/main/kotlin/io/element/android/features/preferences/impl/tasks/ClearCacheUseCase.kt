@@ -9,6 +9,7 @@
 package io.element.android.features.preferences.impl.tasks
 
 import android.content.Context
+import android.content.Intent
 import coil3.SingletonImageLoader
 import dev.zacsweers.metro.ContributesBinding
 import io.element.android.features.invite.api.SeenInvitesStore
@@ -61,7 +62,19 @@ class DefaultClearCacheUseCase(
         // Ensure any error will be displayed again
         pushService.setIgnoreRegistrationError(matrixClient.sessionId, false)
         pushService.resetBatteryOptimizationState()
+        // Haven: restart the whole app process rather than only the session inside it. After the in-process restart
+        // the home room list could stay on its loading placeholders indefinitely, even though the first sync had
+        // finished, until the app was closed and opened again (seen 2026-11-26, ~330 rooms).
+        if (restartProcess()) return@withContext
         // Ensure the app is restarted
         defaultCacheService.onClearedCache(matrixClient.sessionId)
+    }
+
+    /** Haven: relaunches the app in a new task and ends this process. False if there's nothing to launch. */
+    private fun restartProcess(): Boolean {
+        val component = context.packageManager.getLaunchIntentForPackage(context.packageName)?.component ?: return false
+        context.startActivity(Intent.makeRestartActivityTask(component))
+        Runtime.getRuntime().exit(0)
+        return true
     }
 }
