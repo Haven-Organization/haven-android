@@ -8,6 +8,9 @@
 
 package io.element.android.features.roomdetails.impl
 
+import io.element.android.libraries.matrix.ui.formattedname.DisplayNameText
+import io.element.android.libraries.matrix.ui.formattedname.LocalFormattedNamesRoomId
+import io.element.android.libraries.matrix.ui.formattedname.rememberRoomFormattedName
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -514,8 +517,10 @@ private fun RoomHeaderSection(
                 .testTag(TestTags.roomDetailAvatar)
         )
         Spacer(modifier = Modifier.height(24.dp))
-        Text(
-            text = roomName,
+        // Haven: the room's formatted name (MSC4591), when it has one
+        DisplayNameText(
+            name = roomName,
+            formatted = LocalFormattedNamesRoomId.current?.let { rememberRoomFormattedName(it, roomName) },
             style = ElementTheme.typography.fontHeadingLgBold,
             textAlign = TextAlign.Center,
         )

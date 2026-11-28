@@ -63,6 +63,11 @@ class MentionSpan(
     /** Haven: the avatar drawn at the start of a user pill, like Haven Desktop's pills. */
     private var avatar: Bitmap? = null
 
+    /** Haven: the formatted display name (MSC4589) drawn instead of [displayText], when it fits. */
+    private var formattedRuns: List<PillTextRun>? = null
+    private val runPaint = TextPaint(Paint.ANTI_ALIAS_FLAG)
+    private val emojiPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+
     /**
      * Updates the visual properties of this span.
      */
@@ -103,6 +108,11 @@ class MentionSpan(
         this.trailingText = trailingText
     }
 
+    /** Haven: sets the formatted display name to draw instead of the display text, or none. */
+    fun updateFormattedName(runs: List<PillTextRun>?) {
+        formattedRuns = runs
+    }
+
     /** Haven: sets the avatar drawn at the start of the pill, or none. */
     fun updateAvatar(avatar: Bitmap?) {
         if (avatar === this.avatar) return
@@ -139,6 +149,14 @@ class MentionSpan(
         } else {
             (maxWidth - leading - endPadding - trailingWidth).coerceAtLeast(0f)
         }
+        // Haven: the formatted name, truncated like the plain name when it doesn't fit
+        formattedRuns?.let { runs ->
+            val fitted = fitRuns(runs, availableForText)
+            if (fitted != null) {
+                val formattedWidth = fitted.sumOf { measureRun(it).toDouble() }.toFloat()
+                return Measurements(displayText, formattedWidth, trailing, trailingWidth, leading, avatarSize, fitted)
+            }
+        }
         val fullTextWidth = textPaint.measureText(displayText, 0, displayText.length)
         return if (fullTextWidth <= availableForText) {
             Measurements(displayText, fullTextWidth, trailing, trailingWidth, leading, avatarSize)
@@ -156,6 +174,8 @@ class MentionSpan(
         /** What comes before the text: the start padding, or the avatar and the space around it. */
         val leading: Float,
         val avatarSize: Float,
+        /** The formatted name to draw instead of [text], if any. */
+        val runs: List<PillTextRun>? = null,
     ) {
         val width: Float get() = leading + textWidth + trailingWidth + endPadding
     }
@@ -191,11 +211,78 @@ class MentionSpan(
         textPaint.color = textColor
         textPaint.typeface = typeface
 
-        canvas.drawText(measurements.text, 0, measurements.text.length, x + measurements.leading, y.toFloat(), textPaint)
+        val runs = measurements.runs
+        if (runs != null) {
+            drawRuns(canvas, runs, x + measurements.leading, y)
+        } else {
+            canvas.drawText(measurements.text, 0, measurements.text.length, x + measurements.leading, y.toFloat(), textPaint)
+        }
         measurements.trailing?.let { trailing ->
             canvas.drawText(trailing, x + measurements.leading + measurements.textWidth, y.toFloat(), textPaint)
         }
         avatar?.let { drawAvatar(canvas, it, x + startPadding / 2f, y, measurements.avatarSize) }
+    }
+
+    /** Haven: [runPaint] set up for [run], from [textPaint] (which has the pill's size, colour and typeface). */
+    private fun paintFor(run: PillTextRun): TextPaint {
+        runPaint.set(textPaint)
+        val style = (if (run.bold) Typeface.BOLD else 0) or (if (run.italic) Typeface.ITALIC else 0)
+        if (style != 0) runPaint.typeface = Typeface.create(textPaint.typeface, style)
+        runPaint.isUnderlineText = run.underline
+        runPaint.isStrikeThruText = run.strikethrough
+        return runPaint
+    }
+
+    /** The height (and width) of a custom emoji: the text's. */
+    private fun emojiSize(): Float = textPaint.fontMetrics.let { it.descent - it.ascent }
+
+    private fun measureRun(run: PillTextRun): Float = if (run.isEmoji) emojiSize() else paintFor(run).measureText(run.text)
+
+    /**
+     * Haven: [runs] cut down to [available] pixels with an ellipsis at the end, or [runs] themselves when they fit; null
+     * when not even the ellipsis fits. An emoji is kept only whole.
+     */
+    private fun fitRuns(runs: List<PillTextRun>, available: Float): List<PillTextRun>? {
+        if (runs.sumOf { measureRun(it).toDouble() } <= available) return runs
+        val fitted = mutableListOf<PillTextRun>()
+        var left = available
+        for (run in runs) {
+            // Whatever comes next, the ellipsis after it has to fit too, in this run's style
+            val ellipsis = run.copy(text = ELLIPSIS, isEmoji = false, emoji = null)
+            val ellipsisWidth = measureRun(ellipsis)
+            val width = measureRun(run)
+            if (width + ellipsisWidth <= left) {
+                fitted += run
+                left -= width
+                continue
+            }
+            if (!run.isEmoji && left > ellipsisWidth) {
+                val count = paintFor(run).breakText(run.text, true, left - ellipsisWidth, null)
+                run.text.take(count).trimEnd().takeIf { it.isNotEmpty() }?.let { fitted += run.copy(text = it) }
+            }
+            if (ellipsisWidth > left) return null
+            fitted += ellipsis
+            return fitted
+        }
+        return fitted
+    }
+
+    private fun drawRuns(canvas: Canvas, runs: List<PillTextRun>, start: Float, y: Int) {
+        var left = start
+        val fontMetrics = textPaint.fontMetrics
+        val centerY = y + (fontMetrics.ascent + fontMetrics.descent) / 2f
+        for (run in runs) {
+            if (run.isEmoji) {
+                val size = emojiSize()
+                // Not loaded yet: its space is kept, so the pill doesn't change size when it comes in
+                run.emoji?.let { canvas.drawBitmap(it, null, RectF(left, centerY - size / 2f, left + size, centerY + size / 2f), emojiPaint) }
+                left += size
+            } else {
+                val paint = paintFor(run)
+                canvas.drawText(run.text, left, y.toFloat(), paint)
+                left += paint.measureText(run.text)
+            }
+        }
     }
 
     /** Haven: draws [bitmap] as a circle [size] wide from [left], centred on the text of the line with baseline [y]. */
@@ -212,8 +299,20 @@ class MentionSpan(
 
     companion object {
         const val NO_MAX_WIDTH = Int.MAX_VALUE
+        private const val ELLIPSIS = "\u2026"
     }
 }
+
+/** Haven: part of a pill's formatted display name (MSC4589): styled text, or a custom emoji ([emoji] once loaded). */
+data class PillTextRun(
+    val text: String,
+    val bold: Boolean = false,
+    val italic: Boolean = false,
+    val underline: Boolean = false,
+    val strikethrough: Boolean = false,
+    val isEmoji: Boolean = false,
+    val emoji: Bitmap? = null,
+)
 
 /**
  * Sealed interface representing different types of mentions.

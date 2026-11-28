@@ -8,6 +8,7 @@
 
 package io.element.android.features.roomdetails.impl.members
 
+import io.element.android.libraries.matrix.ui.formattedname.rememberMemberFormattedName
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -301,6 +302,8 @@ private fun RoomMemberListItem(
     MatrixUserRow(
         modifier = modifier.clickable(onClick = onClick),
         matrixUser = roomMemberWithIdentity.roomMember.toMatrixUser(),
+        // Haven: their formatted display name (MSC4589), while they're joined
+        formattedName = rememberMemberFormattedName(member.userId, member.displayName),
         avatarSize = AvatarSize.UserListItem,
         trailingContent = {
             Row(

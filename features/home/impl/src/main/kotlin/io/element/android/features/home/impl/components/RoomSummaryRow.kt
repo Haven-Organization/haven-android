@@ -8,6 +8,8 @@
 
 package io.element.android.features.home.impl.components
 
+import io.element.android.libraries.matrix.ui.formattedname.FormattedName
+import io.element.android.libraries.matrix.ui.formattedname.rememberRoomFormattedName
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -131,6 +133,8 @@ internal fun RoomSummaryRow(
                         timestamp = room.timestamp,
                         isHighlighted = room.isHighlighted,
                         dmUserStatus = room.dmUserStatus,
+                        // Haven: the room's formatted name (MSC4591), when it has one (not for invites)
+                        formattedName = rememberRoomFormattedName(room.roomId, room.name),
                     )
                     MessagePreviewAndIndicatorRow(room = room, showUnreadCount = showUnreadCount, showAllActivity = showAllActivity)
                 }
@@ -224,7 +228,8 @@ private fun NameAndTimestampRow(
     timestamp: String?,
     isHighlighted: Boolean,
     dmUserStatus: DisplayedStatus?,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    formattedName: FormattedName? = null,
 ) {
     Row(
         modifier = modifier.fillMaxWidth(),
@@ -238,6 +243,7 @@ private fun NameAndTimestampRow(
             style = ElementTheme.typography.fontBodyLgMedium,
             nameColor = ElementTheme.colors.roomListRoomName,
             nameFontStyle = FontStyle.Italic.takeIf { name == null },
+            formatted = formattedName,
         )
         // Timestamp
         Text(

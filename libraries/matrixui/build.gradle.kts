@@ -27,6 +27,7 @@ setupDependencyInjection(generateNodeFactories = false)
 
 dependencies {
     implementation(projects.libraries.di)
+    implementation(projects.schildi.lib) // Haven: the formatted display names setting
     implementation(projects.libraries.architecture)
     implementation(projects.libraries.androidutils)
     implementation(projects.libraries.matrix.api)
@@ -36,6 +37,9 @@ dependencies {
     implementation(projects.libraries.uiStrings)
     implementation(projects.libraries.testtags)
     implementation(libs.coil.compose)
+    // Haven: global profiles' formatted display names
+    implementation(platform(libs.network.okhttp.bom))
+    implementation(libs.network.okhttp)
     implementation(libs.matrix.richtexteditor)
     implementation(projects.libraries.previewutils)
 

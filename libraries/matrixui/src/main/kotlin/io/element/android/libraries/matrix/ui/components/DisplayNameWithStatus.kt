@@ -7,6 +7,9 @@
 
 package io.element.android.libraries.matrix.ui.components
 
+import io.element.android.libraries.matrix.ui.formattedname.DisplayNameText
+import io.element.android.libraries.matrix.ui.formattedname.FormattedName
+
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
@@ -35,21 +38,23 @@ fun DisplayNameWithStatus(
     modifier: Modifier = Modifier,
     nameColor: Color = Color.Unspecified,
     nameFontStyle: FontStyle? = null,
+    // Haven: the formatted display name (MSC4589) to show instead of [name], if any
+    formatted: FormattedName? = null,
 ) {
     Row(
         modifier = modifier,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            text = name,
+        DisplayNameText(
+            name = name,
+            formatted = formatted,
             modifier = Modifier
                 .weight(1f, fill = false)
                 .clipToBounds(),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            style = style,
+            style = if (nameFontStyle != null) style.copy(fontStyle = nameFontStyle) else style,
             color = nameColor,
-            fontStyle = nameFontStyle,
         )
         if (status != null) {
             Spacer(Modifier.width(4.dp))

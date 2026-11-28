@@ -8,6 +8,8 @@
 
 package io.element.android.features.userprofile.shared
 
+import io.element.android.libraries.matrix.ui.formattedname.DisplayNameText
+import io.element.android.libraries.matrix.ui.formattedname.rememberUserFormattedName
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -86,13 +88,15 @@ fun UserProfileHeaderSection(
         )
         Spacer(modifier = Modifier.height(24.dp))
         if (userName != null) {
-            Text(
+            // Haven: their formatted display name (MSC4589): the room's, or their global profile's outside the room
+            DisplayNameText(
                 modifier = Modifier
                     .clipToBounds()
                     .semantics {
                         heading()
                     },
-                text = userName,
+                name = userName,
+                formatted = rememberUserFormattedName(userId, userName),
                 style = ElementTheme.typography.fontHeadingLgBold,
                 textAlign = TextAlign.Center,
             )

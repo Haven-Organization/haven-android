@@ -312,7 +312,12 @@ class JoinedRoomLoadedFlowNode(
     override fun View(modifier: Modifier) {
         currentActivity = LocalActivity.current
 
-        BackstackView()
+        // Haven: formatted display names come from this room's member events (in the timeline, member list...)
+        androidx.compose.runtime.CompositionLocalProvider(
+            io.element.android.libraries.matrix.ui.formattedname.LocalFormattedNamesRoomId provides inputs.room.roomId,
+        ) {
+            BackstackView()
+        }
     }
 }
 

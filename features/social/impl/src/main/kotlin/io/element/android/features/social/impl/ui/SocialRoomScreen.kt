@@ -6,6 +6,8 @@
 
 package io.element.android.features.social.impl.ui
 
+import io.element.android.libraries.matrix.ui.formattedname.DisplayNameText
+import io.element.android.libraries.matrix.ui.formattedname.rememberRoomFormattedName
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -235,7 +237,13 @@ fun SocialRoomContent(
                         }
                     }
                     Column(Modifier.padding(horizontal = 16.dp).offset(y = (-24).dp)) {
-                        Text(name, style = ElementTheme.typography.fontHeadingMdBold, color = ElementTheme.colors.textPrimary)
+                        // Haven: the room's formatted name (MSC4591), when it has one
+                        DisplayNameText(
+                            name = name,
+                            formatted = rememberRoomFormattedName(roomId, name),
+                            style = ElementTheme.typography.fontHeadingMdBold,
+                            color = ElementTheme.colors.textPrimary,
+                        )
                         val identifier = if (isProfile) owner else roomInfo?.canonicalAlias?.value ?: preview?.canonicalAlias?.value
                         identifier?.let {
                             Text(it, style = ElementTheme.typography.fontBodyMdRegular, color = ElementTheme.colors.textSecondary)
@@ -362,8 +370,12 @@ fun SocialRoomRow(
         )
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            Text(
-                text = name ?: roomId,
+            // Haven: the room's formatted name (MSC4591), when it has one
+            val formattedName = remember(roomId) { runCatching { RoomId(roomId) }.getOrNull() }
+                ?.let { rememberRoomFormattedName(it, name) }
+            DisplayNameText(
+                name = name ?: roomId,
+                formatted = formattedName,
                 style = ElementTheme.typography.fontBodyLgMedium,
                 color = ElementTheme.colors.textPrimary,
                 maxLines = 1,

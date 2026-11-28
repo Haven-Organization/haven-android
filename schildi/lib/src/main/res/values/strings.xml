@@ -13,6 +13,9 @@
     <!-- Haven -->
     <string name="haven_pref_advanced_title">Advanced</string>
     <string name="haven_pref_labs_title">Labs</string>
+    <string name="haven_pref_category_profiles">Names</string>
+    <string name="haven_formatted_display_names_title">Formatted names</string>
+    <string name="haven_formatted_display_names_summary">Show display names and room names with bold, italics and custom emoji when they have them (MSC4589, MSC4591).</string>
     <string name="haven_pref_notification_alerts_title">Notification alerts</string>
     <string name="haven_pref_category_apps">Apps</string>
     <string name="haven_apps_enabled_title">Enable apps</string>

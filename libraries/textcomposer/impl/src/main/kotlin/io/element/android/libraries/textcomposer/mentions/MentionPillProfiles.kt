@@ -19,10 +19,13 @@ import io.element.android.libraries.di.SessionScope
 import io.element.android.libraries.di.annotations.ApplicationContext
 import io.element.android.libraries.di.annotations.SessionCoroutineScope
 import io.element.android.libraries.matrix.api.MatrixClient
+import io.element.android.libraries.matrix.api.core.RoomId
 import io.element.android.libraries.matrix.api.core.UserId
 import io.element.android.libraries.matrix.api.media.MediaSource
 import io.element.android.libraries.matrix.api.room.RoomMember
 import io.element.android.libraries.matrix.api.user.MatrixUser
+import io.element.android.libraries.matrix.ui.formattedname.FormattedDisplayNames
+import io.element.android.libraries.matrix.ui.formattedname.FormattedName
 import io.element.android.libraries.matrixmedia.api.ImageLoaderHolder
 import io.element.android.libraries.matrixmedia.api.InitialsAvatarBitmapGenerator
 import io.element.android.libraries.matrixmedia.api.MediaRequestData
@@ -67,6 +70,21 @@ interface MentionPillProfiles {
 
     /** The bitmap for [key], loaded on first use, so null until it has. */
     fun avatar(key: PillAvatarKey): Bitmap?
+
+    /** The custom emoji images loaded so far, by mxc:// URL (for formatted display names). */
+    val emojis: StateFlow<Map<String, Bitmap>>
+
+    /** The custom emoji image at [url], loaded on first use, so null until it has. */
+    fun emoji(url: String): Bitmap?
+
+    /** Changes whenever new formatted display names may be available (see [formattedName]). */
+    val formattedNamesUpdates: StateFlow<Int>
+
+    /**
+     * The formatted display name (MSC4589) of [userId] shown as [displayName]: from [roomId]'s member event, or their
+     * global profile when they aren't in the room; null when there's none or formatted display names are turned off.
+     */
+    fun formattedName(roomId: RoomId?, userId: UserId, displayName: String): FormattedName?
 }
 
 /** No lookups: pills keep what the room has, without avatars. */
@@ -75,6 +93,10 @@ object NoMentionPillProfiles : MentionPillProfiles {
     override val avatars: StateFlow<Map<PillAvatarKey, Bitmap>> = MutableStateFlow(emptyMap())
     override fun fallbackProfile(userId: UserId, members: Map<UserId, RoomMember>): MatrixUser? = null
     override fun avatar(key: PillAvatarKey): Bitmap? = null
+    override val emojis: StateFlow<Map<String, Bitmap>> = MutableStateFlow(emptyMap())
+    override fun emoji(url: String): Bitmap? = null
+    override val formattedNamesUpdates: StateFlow<Int> = MutableStateFlow(0)
+    override fun formattedName(roomId: RoomId?, userId: UserId, displayName: String): FormattedName? = null
 }
 
 @ContributesBinding(SessionScope::class)
@@ -85,12 +107,22 @@ class DefaultMentionPillProfiles(
     @SessionCoroutineScope private val sessionScope: CoroutineScope,
     private val imageLoaderHolder: ImageLoaderHolder,
     private val initialsAvatarBitmapGenerator: InitialsAvatarBitmapGenerator,
+    private val formattedDisplayNames: FormattedDisplayNames,
 ) : MentionPillProfiles {
+    override val formattedNamesUpdates: StateFlow<Int> = formattedDisplayNames.updates
+
+    override fun formattedName(roomId: RoomId?, userId: UserId, displayName: String): FormattedName? =
+        formattedDisplayNames.memberElseProfile(roomId, userId, displayName)
+
     private val _profiles = MutableStateFlow<Map<UserId, MatrixUser>>(emptyMap())
     override val profiles: StateFlow<Map<UserId, MatrixUser>> = _profiles.asStateFlow()
 
     private val _avatars = MutableStateFlow<Map<PillAvatarKey, Bitmap>>(emptyMap())
     override val avatars: StateFlow<Map<PillAvatarKey, Bitmap>> = _avatars.asStateFlow()
+
+    private val _emojis = MutableStateFlow<Map<String, Bitmap>>(emptyMap())
+    override val emojis: StateFlow<Map<String, Bitmap>> = _emojis.asStateFlow()
+    private val requestedEmojis = ConcurrentHashMap.newKeySet<String>()
 
     private val requestedProfiles = ConcurrentHashMap.newKeySet<UserId>()
     private val requestedAvatars = ConcurrentHashMap.newKeySet<PillAvatarKey>()
@@ -119,6 +151,16 @@ class DefaultMentionPillProfiles(
             sessionScope.launch {
                 val bitmap = key.url?.let { url -> lookups.withPermit { loadPicture(url) } } ?: initials(key)
                 if (bitmap != null) _avatars.update { it + (key to bitmap) }
+            }
+        }
+        return null
+    }
+
+    override fun emoji(url: String): Bitmap? {
+        _emojis.value[url]?.let { return it }
+        if (requestedEmojis.add(url)) {
+            sessionScope.launch {
+                lookups.withPermit { loadPicture(url) }?.let { bitmap -> _emojis.update { it + (url to bitmap) } }
             }
         }
         return null

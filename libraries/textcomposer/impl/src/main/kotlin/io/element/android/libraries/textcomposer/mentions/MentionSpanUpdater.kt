@@ -17,7 +17,11 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import dev.zacsweers.metro.ContributesBinding
 import io.element.android.compound.theme.ElementTheme
 import io.element.android.libraries.di.RoomScope
+import io.element.android.libraries.matrix.api.core.RoomId
 import io.element.android.libraries.matrix.api.core.UserId
+import io.element.android.libraries.matrix.ui.formattedname.FormattedNameRun
+import io.element.android.libraries.matrix.ui.formattedname.LocalFormattedNamesRoomId
+import io.element.android.libraries.matrix.ui.formattedname.formattedDisplayNamesEnabled
 import io.element.android.libraries.matrix.ui.messages.RoomMemberProfilesCache
 import io.element.android.libraries.matrix.ui.messages.RoomNamesCache
 import io.element.android.libraries.matrix.ui.model.toEmojiText
@@ -37,6 +41,9 @@ class DefaultMentionSpanUpdater(
     private val roomNamesCache: RoomNamesCache,
     private val pillProfiles: MentionPillProfiles,
 ) : MentionSpanUpdater {
+    // Haven: the room the pills are in, for its members' formatted display names (set while composing)
+    private var roomId: RoomId? = null
+
     @Composable
     override fun rememberMentionSpans(text: CharSequence): CharSequence {
         val isLightTheme = ElementTheme.isLightTheme
@@ -45,7 +52,11 @@ class DefaultMentionSpanUpdater(
         // Haven: global profiles and avatars as they come in
         val profiles by pillProfiles.profiles.collectAsState()
         val avatars by pillProfiles.avatars.collectAsState()
-        return remember(text, roomNames, roomMembers, isLightTheme, profiles, avatars) {
+        val emojis by pillProfiles.emojis.collectAsState()
+        val formattedNamesEnabled = formattedDisplayNamesEnabled()
+        val formattedNamesUpdates by pillProfiles.formattedNamesUpdates.collectAsState()
+        roomId = LocalFormattedNamesRoomId.current
+        return remember(text, roomNames, roomMembers, isLightTheme, profiles, avatars, emojis, formattedNamesEnabled, formattedNamesUpdates) {
             updateMentionSpans(text)
             text
         }
@@ -63,8 +74,21 @@ class DefaultMentionSpanUpdater(
                 }
             )
             mentionSpan.updateAvatar((mentionSpan.type as? MentionType.User)?.let { avatarFor(it.userId) })
+            mentionSpan.updateFormattedName((mentionSpan.type as? MentionType.User)?.let { formattedNameFor(it.userId, mentionSpan.displayText) })
         }
         return text
+    }
+
+    /** Haven: the formatted display name (MSC4589) of the pill for [userId] showing [displayText], if it has one. */
+    private fun formattedNameFor(userId: UserId, displayText: CharSequence): List<PillTextRun>? {
+        val name = displayText.toString().takeIf { it.startsWith("@") && it != userId.value }?.removePrefix("@") ?: return null
+        val formatted = pillProfiles.formattedName(roomId, userId, name) ?: return null
+        return listOf(PillTextRun("@")) + formatted.runs.map { run ->
+            when (run) {
+                is FormattedNameRun.Emoji -> PillTextRun(run.text, isEmoji = true, emoji = pillProfiles.emoji(run.url))
+                is FormattedNameRun.Text -> PillTextRun(run.text, run.bold, run.italic, run.underline, run.strikethrough)
+            }
+        }
     }
 
     /** Haven: the user's avatar from the room, or else from their global profile, like Haven Desktop's pills. */

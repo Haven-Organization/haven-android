@@ -27,6 +27,9 @@ import io.element.android.libraries.designsystem.preview.PreviewsDayNight
 import io.element.android.libraries.designsystem.theme.components.Text
 import io.element.android.libraries.matrix.api.core.UserId
 import io.element.android.libraries.matrix.api.timeline.item.event.ProfileDetails
+import io.element.android.libraries.matrix.ui.formattedname.DisplayNameText
+import io.element.android.libraries.matrix.ui.formattedname.FormattedName
+import io.element.android.libraries.matrix.ui.formattedname.rememberMemberFormattedName
 import io.element.android.libraries.matrix.ui.model.toEmojiText
 
 // https://www.figma.com/file/Ni6Ii8YKtmXCKYNE90cC67/Timeline-(new)?type=design&node-id=917-80169&mode=design&t=A0CJCBbMqR8NOwUQ-0
@@ -53,7 +56,8 @@ fun SenderName(
                 if (displayName.isNullOrEmpty()) {
                     MainText(text = senderId.value, mode = senderNameMode)
                 } else {
-                    MainText(text = displayName, mode = senderNameMode)
+                    // Haven: their formatted display name (MSC4589), when they have one matching this name
+                    MainText(text = displayName, mode = senderNameMode, formatted = rememberMemberFormattedName(senderId, displayName))
                     if (senderProfile.displayNameAmbiguous) {
                         SecondaryText(text = senderId.value, mode = senderNameMode)
                     }
@@ -80,6 +84,7 @@ fun SenderName(
 private fun RowScope.MainText(
     text: String,
     mode: SenderNameMode,
+    formatted: FormattedName? = null,
 ) {
     val style = when (mode) {
         is SenderNameMode.Timeline -> ElementTheme.typography.fontBodyMdMedium
@@ -97,11 +102,12 @@ private fun RowScope.MainText(
         SenderNameMode.ActionList,
         SenderNameMode.Reply -> ElementTheme.colors.textPrimary
     }
-    Text(
+    DisplayNameText(
         modifier = modifier
             .clipToBounds()
             .weight(1f, fill = false),
-        text = text,
+        name = text,
+        formatted = formatted,
         style = style,
         color = color,
         maxLines = 1,

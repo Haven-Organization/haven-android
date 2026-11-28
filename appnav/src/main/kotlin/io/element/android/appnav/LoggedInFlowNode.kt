@@ -161,6 +161,8 @@ class LoggedInFlowNode(
     private val activeLiveLocationShareManager: ActiveLiveLocationShareManager,
     private val locationService: LocationService,
     private val loggedInEventProcessorFactory: LoggedInEventProcessor.Factory,
+    // Haven: MSC4589 formatted display names
+    private val formattedDisplayNames: io.element.android.libraries.matrix.ui.formattedname.FormattedDisplayNames,
 ) : BaseFlowNode<LoggedInFlowNode.NavTarget>(
     backstack = BackStack(
         initialElement = NavTarget.Placeholder,
@@ -766,7 +768,10 @@ class LoggedInFlowNode(
             compoundDark = colors.dark,
             buildMeta = buildMeta,
         ) {
-            CompositionLocalProvider(LocalMapTilerConfig provides mapTilerConfig) {
+            CompositionLocalProvider(
+                LocalMapTilerConfig provides mapTilerConfig,
+                io.element.android.libraries.matrix.ui.formattedname.LocalFormattedDisplayNames provides formattedDisplayNames, // Haven
+            ) {
                 val isOnline by syncService.isOnline.collectAsState()
                 // Outside the connectivity indicator so the two strips stack rather than fight: an
                 // offline banner during a call belongs under the call bar, not over it.

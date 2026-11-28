@@ -8,6 +8,8 @@
 
 package io.element.android.features.messages.impl.topbars
 
+import io.element.android.libraries.matrix.ui.formattedname.LocalFormattedNamesRoomId
+import io.element.android.libraries.matrix.ui.formattedname.rememberRoomFormattedName
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -179,6 +181,8 @@ private fun RoomAvatarAndNameRow(
             style = ElementTheme.typography.fontBodyLgMedium,
             nameColor = ElementTheme.colors.textPrimary,
             nameFontStyle = FontStyle.Italic.takeIf { roomName == null },
+            // Haven: the room's formatted name (MSC4591), when it has one
+            formatted = LocalFormattedNamesRoomId.current?.let { rememberRoomFormattedName(it, roomName) },
         )
     }
 }

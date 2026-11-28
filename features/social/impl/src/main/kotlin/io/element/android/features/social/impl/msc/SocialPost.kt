@@ -6,6 +6,8 @@
 
 package io.element.android.features.social.impl.msc
 
+import io.element.android.libraries.matrix.ui.formattedname.FormattedName
+import io.element.android.libraries.matrix.ui.formattedname.formattedDisplayNameIn
 import android.net.Uri
 import org.json.JSONArray
 import org.json.JSONObject
@@ -30,6 +32,8 @@ data class PerMessageProfile(
     val avatarUrl: String?,
     /** `avatar_url` set to "": explicitly no avatar. */
     val avatarRemoved: Boolean,
+    /** Haven: the MSC4589 formatted display name, if it has one (checked against [displayname] where it's shown). */
+    val formattedDisplayname: FormattedName? = null,
 )
 
 data class PostMedia(
@@ -252,6 +256,7 @@ object SocialPostParser {
             displayname = raw.optStringOrNull("displayname")?.takeIf { it.isNotEmpty() },
             avatarUrl = avatar?.takeIf { it.startsWith("mxc://") },
             avatarRemoved = avatar == "",
+            formattedDisplayname = formattedDisplayNameIn(raw, raw.optStringOrNull("displayname")),
         )
     }
 

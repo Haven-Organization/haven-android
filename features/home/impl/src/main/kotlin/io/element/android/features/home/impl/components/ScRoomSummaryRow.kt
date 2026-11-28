@@ -17,6 +17,8 @@
 
 package io.element.android.features.home.impl.components
 
+import io.element.android.libraries.matrix.ui.formattedname.DisplayNameText
+import io.element.android.libraries.matrix.ui.formattedname.rememberRoomFormattedName
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -191,25 +193,30 @@ private fun RowScope.ScNameAndTimestampRow(room: RoomListRoomSummary) {
         null
     }
 
+    // Haven: the room's formatted name (MSC4591), when it has one; not for a name the user gave the room themselves
+    val formattedName = rememberRoomFormattedName(room.roomId, room.name)
+
     // Name
-    Text(
+    DisplayNameText(
         modifier = Modifier
             .thenIf(secondaryName == null) {
                 weight(1f)
             },
         style = ElementTheme.typography.fontBodyLgMedium,
-        text = primaryName,
+        name = primaryName,
+        formatted = formattedName.takeIf { room.privateRoomName == null },
         color = ElementTheme.colors.roomListRoomName,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis
     )
     if (secondaryName != null) {
-        Text(
+        DisplayNameText(
             modifier = Modifier
                 .padding(start = 8.dp)
                 .weight(1f),
             style = ElementTheme.typography.fontBodyLgMedium,
-            text = secondaryName,
+            name = secondaryName,
+            formatted = formattedName,
             color = ElementTheme.colors.textSecondary,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,

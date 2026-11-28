@@ -18,6 +18,7 @@ import io.element.android.libraries.designsystem.components.avatar.AvatarSize
 import io.element.android.libraries.designsystem.preview.ElementPreview
 import io.element.android.libraries.designsystem.preview.PreviewsDayNight
 import io.element.android.libraries.matrix.api.user.MatrixUser
+import io.element.android.libraries.matrix.ui.formattedname.FormattedName
 import io.element.android.libraries.matrix.ui.model.getAvatarData
 import io.element.android.libraries.matrix.ui.model.getBestName
 
@@ -28,11 +29,14 @@ fun MatrixUserRow(
     avatarSize: AvatarSize = AvatarSize.UserListItem,
     verticalSpaceWidth: Dp = 12.dp,
     trailingContent: @Composable (() -> Unit)? = null,
+    // Haven: the formatted display name (MSC4589) to show, if any
+    formattedName: FormattedName? = null,
 ) = UserRow(
     avatarData = matrixUser.getAvatarData(avatarSize),
     nameContent = {
         DisplayNameWithStatus(
             name = matrixUser.getBestName(),
+            formatted = formattedName,
             status = matrixUser.displayedStatus,
             nameColor = ElementTheme.colors.textPrimary,
             style = ElementTheme.typography.fontBodyLgRegular,

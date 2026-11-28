@@ -6,6 +6,9 @@
 
 package io.element.android.features.social.impl.ui
 
+import io.element.android.libraries.matrix.ui.formattedname.DisplayNameText
+import io.element.android.libraries.matrix.ui.formattedname.rememberMemberThenProfileFormattedName
+import io.element.android.libraries.matrix.ui.formattedname.rememberProfileFormattedName
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -209,8 +212,10 @@ private fun PostHeader(post: FeedPost, focused: Boolean, callbacks: PostCallback
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.clickable { callbacks.onOpenUser(post.sender) },
             ) {
-                Text(
-                    text = nameOf(post),
+                // Haven: the author's formatted display name (MSC4589): theirs in the room, else their profile's
+                DisplayNameText(
+                    name = nameOf(post),
+                    formatted = rememberMemberThenProfileFormattedName(post.roomId, post.sender, post.senderName),
                     style = ElementTheme.typography.fontBodyMdMedium,
                     color = ElementTheme.colors.textPrimary,
                     maxLines = 1,
@@ -446,8 +451,19 @@ private fun EmbeddedPost(relation: PostRelation, deps: SocialDeps, callbacks: Po
                 forcedAvatarSize = 24.dp,
             )
             Spacer(Modifier.width(8.dp))
-            Text(
-                text = name,
+            // Haven: the formatted display name (MSC4589) of the per-message profile, else of the author's profile
+            val profileFormatted = if (perMessage == null && relation.sender.startsWith("@")) {
+                rememberProfileFormattedName(UserId(relation.sender), name)
+            } else {
+                null
+            }
+            DisplayNameText(
+                name = name,
+                formatted = if (perMessage != null) {
+                    perMessage.formattedDisplayname?.takeIf { it.matches(perMessage.displayname) }
+                } else {
+                    profileFormatted
+                },
                 style = ElementTheme.typography.fontBodySmMedium,
                 color = ElementTheme.colors.textPrimary,
                 maxLines = 1,

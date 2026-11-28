@@ -139,6 +139,14 @@ object ScPrefs {
 
     // Haven: Labs, which also holds Element's lab features (drawn by the settings screen) and SchildiChat's experimental ones
     val HAVEN_ELEMENT_LABS = ScCustomPref("HAVEN_ELEMENT_LABS", R.string.haven_pref_labs_title)
+    /** Haven: MSC4589 formatted display names, like Haven Desktop's `feature_msc4589_formatted_displaynames` lab. */
+    val HAVEN_FORMATTED_DISPLAY_NAMES = ScBoolPref(
+        "HAVEN_FORMATTED_DISPLAY_NAMES",
+        false,
+        R.string.haven_formatted_display_names_title,
+        R.string.haven_formatted_display_names_summary,
+        upstreamChoice = false,
+    )
 
     // Haven: the Apps framework (Apps button, pinned apps, Social, widget apps) can be turned off entirely
     val HAVEN_APPS_ENABLED = ScBoolPref("HAVEN_APPS_ENABLED", true, R.string.haven_apps_enabled_title, R.string.haven_apps_enabled_summary, upstreamChoice = false)
@@ -321,6 +329,9 @@ object ScPrefs {
         // Haven: "Labs", with Element's lab features too (instead of a separate Labs entry)
         ScPrefScreen(R.string.haven_pref_labs_title, R.string.sc_pref_screen_experimental_summary, listOf(
             HAVEN_ELEMENT_LABS,
+            ScPrefCategory(R.string.haven_pref_category_profiles, null, listOf(
+                HAVEN_FORMATTED_DISPLAY_NAMES,
+            )),
             ScPrefCategory(R.string.sc_pref_category_unread_counts, null, listOf(
                 INDICATE_UNREAD_COUNT_UNDERESTIMATES,
             )),
