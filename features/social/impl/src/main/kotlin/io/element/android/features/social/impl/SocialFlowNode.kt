@@ -6,6 +6,9 @@
 
 package io.element.android.features.social.impl
 
+import io.element.android.libraries.architecture.BackstackWithOverlayBox
+import io.element.android.libraries.architecture.overlay.operation.hide
+import io.element.android.libraries.architecture.overlay.operation.show
 import android.os.Parcelable
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -38,7 +41,6 @@ import io.element.android.features.social.impl.ui.SocialHomeScreen
 import io.element.android.features.social.impl.ui.SocialRoomScreen
 import io.element.android.features.social.impl.ui.SocialThreadScreen
 import io.element.android.features.social.impl.ui.SocialUserScreen
-import io.element.android.libraries.architecture.BackstackView
 import io.element.android.libraries.architecture.BaseFlowNode
 import io.element.android.libraries.architecture.callback
 import io.element.android.libraries.di.SessionScope
@@ -90,6 +92,19 @@ class SocialDeps(
     val polls: io.element.android.features.social.impl.data.SocialPolls,
 )
 
+/** What the post action sheet ([SocialNavigator.openPostActions]) leaves to Social, for its post. */
+class PostActionHandlers(
+    /** Whether the sheet offers "Edit" (the user's own text posts). */
+    val canEdit: Boolean,
+    val onReply: () -> Unit,
+    val onEdit: () -> Unit,
+    val onRemove: () -> Unit,
+    val onPollEnded: () -> Unit,
+    val onToggleReaction: (emoji: String) -> Unit,
+    val onCustomReaction: () -> Unit,
+    val onViewInRoom: () -> Unit,
+)
+
 /** Navigation between Social screens, and out to stock Element X screens. */
 interface SocialNavigator {
     fun back()
@@ -98,6 +113,12 @@ interface SocialNavigator {
 
     /** A post's event source (Settings' "View source" / developer mode). */
     fun openSource(roomId: RoomId, eventId: String)
+
+    /**
+     * Element X's message action sheet for [post] (a post in a followed room), over the current screen; what it leaves to
+     * Social goes to [handlers].
+     */
+    fun openPostActions(post: io.element.android.features.social.impl.data.FeedPost, handlers: PostActionHandlers)
 
     /** The post composer screen, for a new post, a reply or a quote post. */
     fun openComposer(mode: io.element.android.features.social.impl.ui.ComposeMode)
@@ -152,10 +173,15 @@ class SocialFlowNode(
         } ?: NavTarget.Home,
         savedStateMap = buildContext.savedStateMap,
     ),
+    // Shown over the screens: the post action sheet
+    overlay = io.element.android.libraries.architecture.overlay.Overlay(savedStateMap = null),
     buildContext = buildContext,
     plugins = plugins,
 ) {
     private val callback: SocialEntryPoint.Callback = callback()
+
+    /** What the open post action sheet leaves to Social (not saved: the sheet isn't restored either). */
+    private var postActionHandlers: PostActionHandlers? = null
 
     override fun onBuilt() {
         super.onBuilt()
@@ -175,6 +201,12 @@ class SocialFlowNode(
         override fun openThread(roomId: RoomId, eventId: String, via: List<String>) = backstack.push(NavTarget.Thread(roomId, eventId, via))
 
         override fun openSource(roomId: RoomId, eventId: String) = backstack.push(NavTarget.Source(roomId, eventId))
+
+        override fun openPostActions(post: io.element.android.features.social.impl.data.FeedPost, handlers: PostActionHandlers) {
+            val eventId = post.eventId ?: return
+            postActionHandlers = handlers
+            overlay.show(NavTarget.PostActions(post.roomId, eventId))
+        }
 
         override fun openComposer(mode: io.element.android.features.social.impl.ui.ComposeMode) {
             val target = when (mode) {
@@ -306,6 +338,7 @@ class SocialFlowNode(
                 )
             }
         }
+        is NavTarget.PostActions -> postActionsNode(navTarget, buildContext)
         is NavTarget.Follow -> joinRoomEntryPoint.createNode(
             parentNode = this,
             buildContext = buildContext,
@@ -354,7 +387,7 @@ class SocialFlowNode(
             }
         }
         CompositionLocalProvider(LocalUriHandler provides uriHandler) {
-            BackstackView()
+            BackstackWithOverlayBox()
         }
     }
 
@@ -409,6 +442,9 @@ class SocialFlowNode(
         data class Follow(val roomId: RoomId, val eventId: String?, val via: List<String>) : NavTarget
 
         @Parcelize
+        data class PostActions(val roomId: RoomId, val eventId: EventId) : NavTarget
+
+        @Parcelize
         data class User(val userId: UserId) : NavTarget
 
         @Parcelize
@@ -433,6 +469,40 @@ class SocialFlowNode(
     }
 
     enum class ComposeKind { Post, Reply, Quote, Edit }
+
+    /** Element X's message action sheet for a post (HavenEventActionsNode, in the post's room's scope). */
+    private fun postActionsNode(target: NavTarget.PostActions, buildContext: BuildContext): Node {
+        val handlers = postActionHandlers
+        fun close() {
+            overlay.hide()
+            postActionHandlers = null
+        }
+        // After a restore there's nothing to act on: nothing to show
+        if (handlers == null) return node(buildContext) { LaunchedEffect(Unit) { close() } }
+        val callback = object : io.element.android.features.messages.impl.haven.HavenEventActionsNode.Callback {
+            override fun onDone() = close()
+            override fun onReply() = handlers.onReply()
+            override fun onEdit() = handlers.onEdit()
+            override fun onRemove() = handlers.onRemove()
+            override fun onPollEnded() = handlers.onPollEnded()
+            override fun onToggleReaction(emoji: String) = handlers.onToggleReaction(emoji)
+            override fun onCustomReaction() = handlers.onCustomReaction()
+            override fun onViewInTimeline() = handlers.onViewInRoom()
+        }
+        return SocialRoomScopeNode(
+            buildContext = buildContext,
+            roomId = target.roomId,
+            loadRoom = { deps.timelineStore.joinedRoom(it) },
+            roomGraphFactory = roomGraphFactory,
+            onUnavailable = { close() },
+            child = { parent, childBuildContext ->
+                parent.createNode<io.element.android.features.messages.impl.haven.HavenEventActionsNode>(
+                    childBuildContext,
+                    listOf(io.element.android.features.messages.impl.haven.HavenEventActionsNode.Inputs(target.eventId, handlers.canEdit), callback),
+                )
+            },
+        )
+    }
 
     /**
      * The post composer: Element X's message composer for [Compose.roomId] (HavenPostComposerNode, in that room's scope,

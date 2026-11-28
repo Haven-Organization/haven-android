@@ -6,6 +6,7 @@
 
 package io.element.android.features.social.impl.ui
 
+import io.element.android.features.social.impl.PostActionHandlers
 import io.element.android.features.messages.impl.timeline.components.reactionsummary.ReactionSummaryEvent
 import io.element.android.features.messages.impl.timeline.components.reactionsummary.ReactionSummaryState
 import io.element.android.features.messages.impl.timeline.components.reactionsummary.ReactionSummaryView
@@ -112,7 +113,8 @@ fun rememberPostCallbacks(deps: SocialDeps, navigator: SocialNavigator, state: P
                 state.error = error.message ?: error.toString()
             }
         }
-        PostCallbacks(
+        lateinit var callbacks: PostCallbacks
+        callbacks = PostCallbacks(
             onOpenPost = { post ->
                 post.eventId?.let {
                     // The post screen shows it right away instead of waiting for its thread to load.
@@ -157,8 +159,41 @@ fun rememberPostCallbacks(deps: SocialDeps, navigator: SocialNavigator, state: P
                     navigator.openThread(RoomId(relation.roomId), relation.eventId, relation.via)
                 }
             },
+            // Element X's message action sheet (forwarding, reporting, copying, pinning...), for a post in a followed room;
+            // what it leaves to Social is done as from the post's own buttons
+            onShowActions = { post ->
+                if (post.peeked || post.eventId == null) {
+                    false
+                } else {
+                    navigator.openPostActions(
+                        post,
+                        PostActionHandlers(
+                            canEdit = canEdit(post),
+                            onReply = { callbacks.onReply(post) },
+                            onEdit = { navigator.openComposer(ComposeMode.Edit(post)) },
+                            onRemove = { callbacks.onDelete(post) },
+                            onPollEnded = { post.eventId?.let { deps.polls.refresh(post.roomId, it) } },
+                            onToggleReaction = { emoji -> callbacks.onToggleReaction(post, emoji) },
+                            onCustomReaction = { callbacks.onReact(post) },
+                            onViewInRoom = { callbacks.onViewInRoom(post) },
+                        ),
+                    )
+                    true
+                }
+            },
         )
+        callbacks
     }
+}
+
+/**
+ * Whether the user can edit [post] (like Haven Desktop): their own, sent, text post; not one with media, a poll, or a plain
+ * repost (which has no text of its own).
+ */
+private fun canEdit(post: FeedPost): Boolean {
+    val social = post.post
+    return post.isOwn && post.eventId != null && !social.isPlainRepost && social.content.media == null &&
+        social.eventType != "m.poll.start" && social.eventType != "org.matrix.msc3381.poll.start" && social.eventType != "m.sticker"
 }
 
 private fun CoroutineScope.runAction(onError: (Throwable) -> Unit, action: suspend () -> Result<Unit>) {

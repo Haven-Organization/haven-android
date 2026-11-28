@@ -70,8 +70,6 @@ import io.element.android.libraries.designsystem.components.blurhash.BlurHashAsy
 import io.element.android.libraries.designsystem.components.avatar.AvatarData
 import io.element.android.libraries.designsystem.components.avatar.AvatarSize
 import io.element.android.libraries.designsystem.components.avatar.AvatarType
-import io.element.android.libraries.designsystem.theme.components.DropdownMenu
-import io.element.android.libraries.designsystem.theme.components.DropdownMenuItem
 import io.element.android.libraries.designsystem.theme.components.HorizontalDivider
 import io.element.android.libraries.designsystem.theme.components.Icon
 import io.element.android.libraries.designsystem.theme.components.IconButton
@@ -110,6 +108,11 @@ class PostCallbacks(
     val onViewInRoom: (FeedPost) -> Unit,
     /** The post's event source (the stock "View source" screen), when that setting (developer mode) is on. */
     val onViewSource: (FeedPost) -> Unit = {},
+    /**
+     * Element X's message action sheet for the post, like a long press on a message; false when it can't have one (e.g.
+     * a post in a room that isn't followed), and the post's own menu shows instead.
+     */
+    val onShowActions: (FeedPost) -> Boolean = { false },
     val onOpenMedia: (FeedPost, PostMedia) -> Unit = { _, _ -> },
     /** The media of the post a post reposts, quotes or replies to (shown in its card), from the tile's post. */
     val onOpenEmbeddedMedia: (FeedPost, PostRelation, PostMedia) -> Unit = { _, _, _ -> },
@@ -263,36 +266,20 @@ private fun PostHeader(post: FeedPost, focused: Boolean, callbacks: PostCallback
             )
         }
         Box {
-            IconButton(onClick = { showMenu = true }, modifier = Modifier.size(32.dp)) {
+            IconButton(onClick = { if (!callbacks.onShowActions(post)) showMenu = true }, modifier = Modifier.size(32.dp)) {
                 Icon(CompoundIcons.OverflowHorizontal(), contentDescription = stringResource(R.string.social_more), modifier = Modifier.size(20.dp))
             }
-            DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.social_view_in_room)) },
-                    onClick = {
-                        showMenu = false
-                        callbacks.onViewInRoom(post)
-                    },
+            // A post that can't have the stock message action sheet (one in a room that isn't followed): the same
+            // look, with what can be done
+            if (showMenu) {
+                PostActionsSheet(
+                    post = post,
+                    showViewSource = showViewSource,
+                    onDismiss = { showMenu = false },
+                    onViewInRoom = { callbacks.onViewInRoom(post) },
+                    onViewSource = { callbacks.onViewSource(post) },
+                    onDelete = { callbacks.onDelete(post) },
                 )
-                // Like messages in rooms: with Settings' "View source" (developer mode) on.
-                if (showViewSource && post.eventId != null) {
-                    DropdownMenuItem(
-                        text = { Text(stringResource(io.element.android.libraries.ui.strings.CommonStrings.action_view_source)) },
-                        onClick = {
-                            showMenu = false
-                            callbacks.onViewSource(post)
-                        },
-                    )
-                }
-                if (post.isOwn) {
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.social_delete_post), color = ElementTheme.colors.textCriticalPrimary) },
-                        onClick = {
-                            showMenu = false
-                            callbacks.onDelete(post)
-                        },
-                    )
-                }
             }
         }
     }
