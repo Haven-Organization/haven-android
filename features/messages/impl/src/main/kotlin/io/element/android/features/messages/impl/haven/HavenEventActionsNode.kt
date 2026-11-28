@@ -30,6 +30,7 @@ import dev.zacsweers.metro.Assisted
 import dev.zacsweers.metro.AssistedInject
 import io.element.android.annotations.ContributesNode
 import io.element.android.features.forward.api.ForwardEntryPoint
+import io.element.android.features.messages.api.timeline.HtmlConverterProvider
 import io.element.android.features.poll.api.actions.EndPollAction
 import io.element.android.features.messages.impl.R
 import io.element.android.features.messages.impl.UserEventPermissions
@@ -94,6 +95,7 @@ class HavenEventActionsNode(
     actionListPresenterFactory: ActionListPresenter.Factory,
     private val forwardEntryPoint: ForwardEntryPoint,
     private val endPollAction: EndPollAction,
+    private val htmlConverterProvider: HtmlConverterProvider,
     private val clipboardHelper: ClipboardHelper,
     private val toastHelper: ToastHelper,
     @ApplicationContext private val context: Context,
@@ -151,20 +153,6 @@ class HavenEventActionsNode(
     override fun onBuilt() {
         super.onBuilt()
         lifecycle.subscribe(onDestroy = { timeline?.close() })
-        // The event, as the room's timeline has it
-        lifecycleScope.launch {
-            val focused = room.createTimeline(CreateTimelineParams.Focused(inputs.eventId)).getOrElse {
-                Timber.w(it, "Couldn't load %s for its actions", inputs.eventId)
-                toastHelper.show(CommonStrings.common_error)
-                close()
-                return@launch
-            }
-            timeline = focused
-            launch { focused.timelineItems.collect { timelineItemsFactory.replaceWith(it) } }
-            timelineItemsFactory.timelineItems.collect { items ->
-                items.filterIsInstance<TimelineItem.Event>().firstOrNull { it.eventId == inputs.eventId }?.let { event.value = it }
-            }
-        }
         // Not there after a while (e.g. the server can't find it): nothing to show
         lifecycleScope.launch {
             delay(LOAD_TIMEOUT)
@@ -182,6 +170,30 @@ class HavenEventActionsNode(
                 .collect { away ->
                     if (away) wentAway = true else if (wentAway) close()
                 }
+        }
+    }
+
+    private var loadStarted = false
+
+    /**
+     * Loads the event, as the room's timeline has it. Only once the HTML converter is set up ([View]): the timeline items
+     * factory needs it for formatted messages.
+     */
+    private fun load() {
+        if (loadStarted) return
+        loadStarted = true
+        lifecycleScope.launch {
+            val focused = room.createTimeline(CreateTimelineParams.Focused(inputs.eventId)).getOrElse {
+                Timber.w(it, "Couldn't load %s for its actions", inputs.eventId)
+                toastHelper.show(CommonStrings.common_error)
+                close()
+                return@launch
+            }
+            timeline = focused
+            launch { focused.timelineItems.collect { timelineItemsFactory.replaceWith(it) } }
+            timelineItemsFactory.timelineItems.collect { items ->
+                items.filterIsInstance<TimelineItem.Event>().firstOrNull { it.eventId == inputs.eventId }?.let { event.value = it }
+            }
         }
     }
 
@@ -329,6 +341,9 @@ class HavenEventActionsNode(
 
     @Composable
     override fun View(modifier: Modifier) {
+        // Like the room's screen: the HTML converter, for the event's formatted text, then the event
+        htmlConverterProvider.Update()
+        LaunchedEffect(Unit) { load() }
         BackstackView(modifier)
     }
 
