@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Haven -->
+<resources>
+    <!-- The Social profile a user's profile links to (Haven Desktop's View Profile) -->
+    <string name="haven_action_view_social_profile">Profile</string>
+</resources>

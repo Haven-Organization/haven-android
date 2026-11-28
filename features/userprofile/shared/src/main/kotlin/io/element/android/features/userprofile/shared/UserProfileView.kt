@@ -8,6 +8,10 @@
 
 package io.element.android.features.userprofile.shared
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
+import io.element.android.features.social.api.LocalSocialProfileOpener
+import io.element.android.features.social.api.SocialEntryPoint
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.consumeWindowInsets
@@ -85,12 +89,18 @@ fun UserProfileView(
                 },
                 withdrawVerificationClick = { state.eventSink(UserProfileEvent.WithdrawVerification) },
             )
+            // Haven: like Haven Desktop's View Profile button, when their profile links a Social profile room
+            val socialProfileOpener = LocalSocialProfileOpener.current
+            val socialProfile by produceState<SocialEntryPoint.InitialTarget?>(null, state.userId, socialProfileOpener) {
+                value = socialProfileOpener?.links?.profileOf(state.userId)
+            }
             UserProfileMainActionsSection(
                 isCurrentUser = state.isCurrentUser,
                 canCall = state.canCall,
                 onShareUser = onShareUser,
                 onStartDM = { state.eventSink(UserProfileEvent.StartDM) },
-                onCall = { intent -> state.dmRoomId?.let { onStartCall(it, intent) } }
+                onCall = { intent -> state.dmRoomId?.let { onStartCall(it, intent) } },
+                onViewSocialProfile = socialProfile?.let { target -> { socialProfileOpener?.open?.invoke(target) } },
             )
             Spacer(modifier = Modifier.height(26.dp))
             if (!state.isCurrentUser) {

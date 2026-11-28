@@ -163,6 +163,8 @@ class LoggedInFlowNode(
     private val loggedInEventProcessorFactory: LoggedInEventProcessor.Factory,
     // Haven: MSC4589 formatted display names
     private val formattedDisplayNames: io.element.android.libraries.matrix.ui.formattedname.FormattedDisplayNames,
+    // Haven: user and member pages' View Profile button
+    socialProfileLinks: io.element.android.features.social.api.SocialProfileLinks,
 ) : BaseFlowNode<LoggedInFlowNode.NavTarget>(
     backstack = BackStack(
         initialElement = NavTarget.Placeholder,
@@ -686,6 +688,11 @@ class LoggedInFlowNode(
         }
     }
 
+    /** Haven: opens Social at a user's profile, from the View Profile button of user and member pages. */
+    private val socialProfileOpener = io.element.android.features.social.api.SocialProfileOpener(socialProfileLinks) { target ->
+        backstack.push(NavTarget.Social(target))
+    }
+
     /** Haven: Social at the link's profile/group page or post, when the link points into Social; else null. */
     private suspend fun socialTargetOf(link: PermalinkData.RoomLink): NavTarget.Social? {
         val roomId = socialPermalinkResolver.socialRoomId(link.roomIdOrAlias, link.viaParameters) ?: return null
@@ -771,6 +778,7 @@ class LoggedInFlowNode(
             CompositionLocalProvider(
                 LocalMapTilerConfig provides mapTilerConfig,
                 io.element.android.libraries.matrix.ui.formattedname.LocalFormattedDisplayNames provides formattedDisplayNames, // Haven
+                io.element.android.features.social.api.LocalSocialProfileOpener provides socialProfileOpener, // Haven
             ) {
                 val isOnline by syncService.isOnline.collectAsState()
                 // Outside the connectivity indicator so the two strips stack rather than fight: an

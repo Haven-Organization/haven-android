@@ -34,6 +34,7 @@ dependencies {
     api(projects.features.userprofile.api)
     implementation(libs.coil.compose)
     implementation(projects.features.startchat.api)
+    implementation(projects.features.social.api) // Haven: View Profile
 
     testCommonDependencies(libs, true)
     testImplementation(projects.libraries.matrix.test)
