@@ -69,6 +69,8 @@ import io.element.android.libraries.matrix.ui.media.contentvalidation.NotFoundCo
 import io.element.android.libraries.matrix.ui.media.contentvalidation.collectOverallState
 import io.element.android.libraries.matrix.ui.media.contentvalidation.rememberEventContentValidationState
 import io.element.android.libraries.textcomposer.ElementRichTextEditorStyle
+import io.element.android.libraries.textcomposer.mentions.LocalMentionSpanUpdater
+import io.element.android.libraries.textcomposer.mentions.limitMentionPillWidth
 import io.element.android.libraries.ui.common.layout.ContentAvoidingLayout
 import io.element.android.libraries.ui.common.layout.ContentAvoidingLayoutData
 import io.element.android.libraries.voiceplayer.api.VoiceMessageState
@@ -314,19 +316,24 @@ private fun CaptionView(
         } else {
             formattedCaption ?: SpannedString(caption)
         }
+        // Haven: resolve the caption's pills (names, avatars) and keep them within the bubble, like a text message's
+        val captionWithMentions = SpannedString.valueOf(LocalMentionSpanUpdater.current.rememberMentionSpans(caption))
         CompositionLocalProvider(
             LocalContentColor provides ElementTheme.colors.textPrimary,
             LocalTextStyle provides ElementTheme.typography.fontBodyLgRegular
         ) {
-            EditorStyledText(
-                modifier = modifier,
-                text = caption,
-                style = ElementRichTextEditorStyle.textStyle(),
-                onLinkClickedListener = onLinkClick,
-                onLinkLongClickedListener = onLinkLongClick,
-                releaseOnDetach = false,
-                onTextLayout = ContentAvoidingLayout.measureLegacyLastTextLine(onContentLayoutChange = onContentLayoutChange),
-            )
+            // Haven: in a Box, like a text message's, so a caption narrower than the media starts at the bubble's start
+            // edge (measured at the media's width, the text view alone would be centred)
+            Box(modifier.limitMentionPillWidth(captionWithMentions)) {
+                EditorStyledText(
+                    text = captionWithMentions,
+                    style = ElementRichTextEditorStyle.textStyle(),
+                    onLinkClickedListener = onLinkClick,
+                    onLinkLongClickedListener = onLinkLongClick,
+                    releaseOnDetach = false,
+                    onTextLayout = ContentAvoidingLayout.measureLegacyLastTextLine(onContentLayoutChange = onContentLayoutChange),
+                )
+            }
         }
     }
 }
