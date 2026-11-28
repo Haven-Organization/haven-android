@@ -101,6 +101,8 @@ class PostCallbacks(
     /** The post's event source (the stock "View source" screen), when that setting (developer mode) is on. */
     val onViewSource: (FeedPost) -> Unit = {},
     val onOpenMedia: (FeedPost, PostMedia) -> Unit = { _, _ -> },
+    /** The media of the post a post reposts, quotes or replies to (shown in its card), from the tile's post. */
+    val onOpenEmbeddedMedia: (FeedPost, PostRelation, PostMedia) -> Unit = { _, _, _ -> },
     /** Open a post by id in a room (e.g. the post a reply replies to). */
     val onOpenEvent: (io.element.android.libraries.matrix.api.core.RoomId, String) -> Unit = { _, _ -> },
 )
@@ -172,10 +174,10 @@ fun PostTile(
         val content = @Composable {
             if (social.isPlainRepost && relation != null) {
                 // A plain repost shows only the original post.
-                EmbeddedPost(relation, deps, callbacks)
+                EmbeddedPost(post, relation, deps, callbacks)
             } else {
                 PostBody(social.content, deps, onOpenMedia = { media -> callbacks.onOpenMedia(post, media) })
-                if (relation != null) EmbeddedPost(relation, deps, callbacks)
+                if (relation != null) EmbeddedPost(post, relation, deps, callbacks)
             }
             if (showActions) ReactionsShelf(post, deps, callbacks)
         }
@@ -419,7 +421,7 @@ private fun PostMediaView(media: PostMedia, onOpen: ((PostMedia) -> Unit)?) {
 
 /** The quoted / reposted / replied-to post embedded in a post (MSC4501 `relates_to.content`). */
 @Composable
-private fun EmbeddedPost(relation: PostRelation, deps: SocialDeps, callbacks: PostCallbacks) {
+private fun EmbeddedPost(post: FeedPost, relation: PostRelation, deps: SocialDeps, callbacks: PostCallbacks) {
     Column(
         modifier = Modifier
             .padding(top = 8.dp)
@@ -472,7 +474,13 @@ private fun EmbeddedPost(relation: PostRelation, deps: SocialDeps, callbacks: Po
         }
         val content = relation.content
         if (content != null) {
-            PostBody(content, deps, maxLines = 12)
+            // Its image or video opens in the viewer, like the post's own; the rest of the card opens the post
+            PostBody(
+                content,
+                deps,
+                maxLines = 12,
+                onOpenMedia = { media -> callbacks.onOpenEmbeddedMedia(post, relation, media) },
+            )
         } else {
             Text(
                 text = stringResource(R.string.social_view_original),

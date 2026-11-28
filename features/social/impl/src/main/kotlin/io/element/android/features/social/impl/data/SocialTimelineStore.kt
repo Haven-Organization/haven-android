@@ -180,6 +180,9 @@ class SocialTimelineStore(
     /** The room if its timeline is already open (no waiting). */
     fun cachedJoinedRoom(roomId: RoomId): JoinedRoom? = rooms[roomId]
 
+    /** Any room whose timeline is open, e.g. for a screen that needs a room to run in but not a particular one. */
+    fun anyCachedJoinedRoom(): JoinedRoom? = rooms.values.firstOrNull()
+
     /** Drops a room's timeline, e.g. after leaving it. */
     suspend fun forget(roomId: RoomId) = lockOf(roomId).withLock {
         socialTimelines.remove(roomId)?.let { runCatching { it.close() } }

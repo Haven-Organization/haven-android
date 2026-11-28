@@ -146,9 +146,12 @@ fun rememberPostCallbacks(deps: SocialDeps, navigator: SocialNavigator, state: P
             },
             onOpenEvent = { roomId, eventId -> navigator.openThread(roomId, eventId) },
             onOpenMedia = { post, media ->
-                // The stock viewer needs the room open; for peeked posts, following comes first.
-                if (!navigator.openMedia(post, media) && !requireFollow(post)) {
-                    state.error = "Couldn't open this media"
+                navigator.openMedia(post, media) { state.error = "Couldn't open this media" }
+            },
+            // Else the original post
+            onOpenEmbeddedMedia = { post, relation, media ->
+                navigator.openMedia(post, media, embeddedIn = relation) {
+                    navigator.openThread(RoomId(relation.roomId), relation.eventId, relation.via)
                 }
             },
         )

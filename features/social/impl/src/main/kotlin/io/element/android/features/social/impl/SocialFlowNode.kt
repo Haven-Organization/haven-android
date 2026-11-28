@@ -52,12 +52,12 @@ import io.element.android.libraries.matrix.api.core.UserId
 import io.element.android.libraries.matrix.api.permalink.PermalinkParser
 import kotlinx.parcelize.Parcelize
 import androidx.compose.runtime.LaunchedEffect
-import io.element.android.features.social.impl.ui.toMediaInfo
+import io.element.android.features.social.impl.ui.toGalleryInfo
+import io.element.android.features.social.impl.ui.toGalleryItem
 import io.element.android.libraries.architecture.createNode
 import io.element.android.libraries.matrix.api.core.EventId
-import io.element.android.libraries.matrix.api.media.MediaSource
-import io.element.android.libraries.matrix.api.timeline.Timeline
-import io.element.android.libraries.mediaviewer.api.MediaInfo
+import io.element.android.libraries.mediaviewer.api.GalleryInfo
+import io.element.android.libraries.mediaviewer.api.GalleryItemData
 import io.element.android.libraries.mediaviewer.api.MediaViewerEntryPoint
 import androidx.lifecycle.lifecycleScope
 import im.vector.app.features.analytics.plan.JoinedRoom
@@ -67,6 +67,9 @@ import io.element.android.libraries.matrix.api.room.CurrentUserMembership
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.util.Optional
+
+/** How many of the user's rooms [SocialFlowNode] tries when it needs any joined room. */
+private const val MAX_ROOMS_TRIED = 5
 
 /** Everything the Social screens use, injected once into [SocialFlowNode]. */
 @Inject
@@ -104,8 +107,16 @@ interface SocialNavigator {
      */
     fun openFollow(roomId: RoomId, eventId: String?, via: List<String>)
 
-    /** Element X's full-screen media viewer for a post's image or video (posts in followed rooms). */
-    fun openMedia(post: io.element.android.features.social.impl.data.FeedPost, media: io.element.android.features.social.impl.msc.PostMedia): Boolean
+    /**
+     * Element X's full-screen media viewer for a post's image or video, or for [media] of the post [post] reposts, quotes
+     * or replies to ([embeddedIn]); [onFailed] when it can't be opened.
+     */
+    fun openMedia(
+        post: io.element.android.features.social.impl.data.FeedPost,
+        media: io.element.android.features.social.impl.msc.PostMedia,
+        embeddedIn: io.element.android.features.social.impl.msc.PostRelation? = null,
+        onFailed: () -> Unit,
+    )
     fun openUser(userId: UserId)
     fun createRoom(kind: SocialRoomKind)
     fun openRoomDetails(roomId: RoomId)
@@ -229,22 +240,30 @@ class SocialFlowNode(
         override fun openMedia(
             post: io.element.android.features.social.impl.data.FeedPost,
             media: io.element.android.features.social.impl.msc.PostMedia,
-        ): Boolean {
-            val url = media.url ?: return false
-            if (deps.timelineStore.cachedJoinedRoom(post.roomId) == null) return false
-            backstack.push(
-                NavTarget.Media(
-                    roomId = post.roomId,
-                    eventId = post.eventId,
-                    mediaInfo = media.toMediaInfo(post),
-                    mediaSource = MediaSource(url, media.encryptedFileJson),
-                    thumbnailSource = (media.thumbnailUrl ?: media.thumbnailFileJson?.let { json ->
-                        runCatching { org.json.JSONObject(json).optString("url") }.getOrNull()
-                    })?.let { MediaSource(it, media.thumbnailFileJson) },
-                    blurHash = media.blurhash,
+            embeddedIn: io.element.android.features.social.impl.msc.PostRelation?,
+            onFailed: () -> Unit,
+        ) {
+            val item = media.toGalleryItem() ?: return onFailed()
+            lifecycleScope.launch {
+                // The viewer needs a room to run in. It shows just this media, with nothing that acts on the room, so for a
+                // post in a room that isn't followed (a peeked post, or a repost's original) any joined room will do.
+                val ownRoom = deps.timelineStore.joinedRoom(post.roomId)
+                val room = ownRoom ?: deps.timelineStore.anyCachedJoinedRoom() ?: anyJoinedRoom()
+                if (room == null) {
+                    onFailed()
+                    return@launch
+                }
+                backstack.push(
+                    NavTarget.Media(
+                        roomId = room.roomId,
+                        // Only the post's own media in its own room: anything else isn't an event of the room the viewer is
+                        // in, so the viewer's event actions mustn't act on it there
+                        eventId = if (embeddedIn == null && ownRoom != null) post.eventId else null,
+                        galleryInfo = if (embeddedIn == null) media.toGalleryInfo(post) else media.toGalleryInfo(embeddedIn),
+                        item = item,
+                    )
                 )
-            )
-            return true
+            }
         }
     }
 
@@ -268,13 +287,12 @@ class SocialFlowNode(
                     plugins = listOf(
                         SocialMediaViewerNode.Inputs(
                             joinedRoom = room,
-                            params = MediaViewerEntryPoint.Params.RoomMedia(
-                                mode = MediaViewerEntryPoint.MediaViewerMode.TimelineImagesAndVideos(Timeline.Mode.Live),
+                            // Just this post's media: the room's media timeline doesn't have Social posts' media (or, for
+                            // reposts, the original's), so the viewer would lose it
+                            params = MediaViewerEntryPoint.Params.EventGallery(
                                 eventId = navTarget.eventId,
-                                mediaInfo = navTarget.mediaInfo,
-                                mediaSource = navTarget.mediaSource,
-                                thumbnailSource = navTarget.thumbnailSource,
-                                blurHash = navTarget.blurHash,
+                                galleryInfo = navTarget.galleryInfo,
+                                galleryItems = listOf(navTarget.item),
                             ),
                             onDone = { backstack.pop() },
                         )
@@ -334,6 +352,15 @@ class SocialFlowNode(
         }
     }
 
+    /** One of the user's joined rooms (opened in [SocialTimelineStore]), for a screen that needs some room to run in. */
+    private suspend fun anyJoinedRoom(): io.element.android.libraries.matrix.api.room.JoinedRoom? {
+        for (id in deps.httpApi.joinedRooms().getOrNull().orEmpty().take(MAX_ROOMS_TRIED)) {
+            val roomId = runCatching { RoomId(id) }.getOrNull() ?: continue
+            deps.timelineStore.joinedRoom(roomId)?.let { return it }
+        }
+        return null
+    }
+
     /** Takes a link to a room (true), opening it in Social when it's a profile or group room, else as before. */
     private fun openSocialLink(uri: String, fallback: UriHandler): Boolean {
         val link = deps.permalinkParser.parse(uri) as? PermalinkData.RoomLink ?: return false
@@ -362,10 +389,8 @@ class SocialFlowNode(
         data class Media(
             val roomId: RoomId,
             val eventId: EventId?,
-            val mediaInfo: MediaInfo,
-            val mediaSource: MediaSource,
-            val thumbnailSource: MediaSource?,
-            val blurHash: String?,
+            val galleryInfo: GalleryInfo,
+            val item: GalleryItemData,
         ) : NavTarget
 
         @Parcelize
