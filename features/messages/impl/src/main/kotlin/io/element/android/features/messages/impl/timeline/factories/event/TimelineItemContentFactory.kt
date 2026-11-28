@@ -60,7 +60,10 @@ class TimelineItemContentFactory(
 ) {
     suspend fun create(eventTimelineItem: EventTimelineItem): TimelineItemEventContent {
         return create(
-            itemContent = eventTimelineItem.content,
+            // Haven: an MSC4501 post with its own event type is a message (the SDK doesn't know the type)
+            itemContent = eventTimelineItem.content.let { content ->
+                if (content is UnknownContent) HavenSocialPostContent.messageContent(eventTimelineItem) ?: content else content
+            },
             eventId = eventTimelineItem.eventId,
             isEditable = eventTimelineItem.isEditable,
             sender = eventTimelineItem.sender,
