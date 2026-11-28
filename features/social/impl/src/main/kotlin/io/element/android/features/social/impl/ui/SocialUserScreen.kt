@@ -6,7 +6,14 @@
 
 package io.element.android.features.social.impl.ui
 
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -27,7 +34,13 @@ import io.element.android.libraries.designsystem.components.avatar.AvatarData
 import io.element.android.libraries.designsystem.components.avatar.AvatarSize
 import io.element.android.libraries.designsystem.components.avatar.AvatarType
 import io.element.android.libraries.designsystem.components.button.BackButton
+import io.element.android.compound.theme.ElementTheme
+import io.element.android.libraries.designsystem.theme.components.ButtonSize
+import io.element.android.libraries.designsystem.theme.components.HorizontalDivider
 import io.element.android.libraries.designsystem.theme.components.OutlinedButton
+import io.element.android.libraries.designsystem.theme.components.Text
+import io.element.android.libraries.matrix.ui.formattedname.DisplayNameText
+import io.element.android.libraries.matrix.ui.formattedname.rememberProfileFormattedName
 import io.element.android.libraries.designsystem.theme.components.Scaffold
 import io.element.android.libraries.designsystem.theme.components.TopAppBar
 import io.element.android.libraries.matrix.api.core.UserId
@@ -93,18 +106,54 @@ fun SocialUserScreen(
     PostInteractionOverlays(deps, interactions)
 }
 
+/**
+ * In place of a profile room the user doesn't have (or that couldn't be loaded), like Haven Desktop's
+ * SocialUserProfileView: a profile page's header (banner, avatar, name, user id) from their Matrix profile, with no
+ * posts, and [text] saying why.
+ */
 @Composable
 private fun UserFallback(user: MatrixUser, text: String, onOpenUser: () -> Unit) {
-    Column(
-        modifier = Modifier.fillMaxSize().padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Avatar(
-            avatarData = AvatarData(user.userId.value, user.displayName, user.avatarUrl, AvatarSize.RoomDetailsHeader),
-            avatarType = AvatarType.User,
+    val name = user.displayName?.takeIf { it.isNotBlank() } ?: user.userId.value
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+        // An empty banner, like a profile room without one
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(120.dp)
+                .background(ElementTheme.colors.bgSubtleSecondary),
         )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.Bottom,
+        ) {
+            Box(Modifier.offset(y = (-36).dp)) {
+                Avatar(
+                    avatarData = AvatarData(user.userId.value, name, user.avatarUrl, AvatarSize.RoomDetailsHeader),
+                    avatarType = AvatarType.User,
+                    forcedAvatarSize = 80.dp,
+                )
+            }
+            Spacer(Modifier.weight(1f))
+            OutlinedButton(
+                text = stringResource(R.string.social_view_user),
+                onClick = onOpenUser,
+                size = ButtonSize.Medium,
+            )
+        }
+        Column(Modifier.padding(horizontal = 16.dp).offset(y = (-24).dp)) {
+            DisplayNameText(
+                name = name,
+                formatted = rememberProfileFormattedName(user.userId, user.displayName),
+                style = ElementTheme.typography.fontHeadingMdBold,
+                color = ElementTheme.colors.textPrimary,
+            )
+            if (name != user.userId.value) {
+                Text(user.userId.value, style = ElementTheme.typography.fontBodyMdRegular, color = ElementTheme.colors.textSecondary)
+            }
+        }
+        HorizontalDivider()
         EmptyStateInline(text)
-        OutlinedButton(text = stringResource(R.string.social_view_user), onClick = onOpenUser)
     }
 }

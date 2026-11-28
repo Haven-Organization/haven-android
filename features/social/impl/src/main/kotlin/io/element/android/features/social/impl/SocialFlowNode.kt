@@ -363,7 +363,13 @@ class SocialFlowNode(
 
     /** Takes a link to a room (true), opening it in Social when it's a profile or group room, else as before. */
     private fun openSocialLink(uri: String, fallback: UriHandler): Boolean {
-        val link = deps.permalinkParser.parse(uri) as? PermalinkData.RoomLink ?: return false
+        val parsed = deps.permalinkParser.parse(uri)
+        // A user's link (or pill) opens their Social profile, or the placeholder page when they have none
+        if (parsed is PermalinkData.UserLink) {
+            backstack.push(NavTarget.User(parsed.userId))
+            return true
+        }
+        val link = parsed as? PermalinkData.RoomLink ?: return false
         lifecycleScope.launch {
             val roomId = socialPermalinkResolver.socialRoomId(link.roomIdOrAlias, link.viaParameters)
             when {

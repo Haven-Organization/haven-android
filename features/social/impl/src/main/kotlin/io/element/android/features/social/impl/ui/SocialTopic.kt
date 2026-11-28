@@ -62,6 +62,7 @@ internal fun SocialTopicText(topic: String, deps: SocialDeps, modifier: Modifier
             node = documentNode,
             currentUserId = deps.matrixClient.sessionId,
             onLinkClick = { url, _ -> runCatching { uriHandler.openUri(url) } },
+            onMentionClick = { mention -> openMention(mention, uriHandler) },
             modifier = modifier.padding(top = 8.dp),
         )
     } else {

@@ -6,6 +6,8 @@
 
 package io.element.android.features.social.impl.ui
 
+import io.element.android.libraries.htmlrenderer.api.MentionNodeContent
+import androidx.compose.ui.platform.UriHandler
 import io.element.android.libraries.matrix.ui.formattedname.DisplayNameText
 import io.element.android.libraries.matrix.ui.formattedname.rememberMemberThenProfileFormattedName
 import io.element.android.libraries.matrix.ui.formattedname.rememberProfileFormattedName
@@ -322,6 +324,7 @@ fun PostBody(content: PostContent, deps: SocialDeps, maxLines: Int = Int.MAX_VAL
                 node = documentNode,
                 currentUserId = deps.matrixClient.sessionId,
                 onLinkClick = { url, _ -> runCatching { uriHandler.openUri(url) } },
+                onMentionClick = { mention -> openMention(mention, uriHandler) },
                 modifier = Modifier
                     .padding(top = 4.dp)
                     .then(if (maxLines == Int.MAX_VALUE) Modifier else Modifier.heightIn(max = lineHeight * maxLines).clipToBounds()),
@@ -338,6 +341,19 @@ fun PostBody(content: PostContent, deps: SocialDeps, maxLines: Int = Int.MAX_VAL
         }
     }
     if (media != null) PostMediaView(media, onOpenMedia)
+}
+
+/**
+ * A tapped pill, through Social's link handling ([uriHandler]): a user's opens their Social profile, a room's its
+ * Social page (or the room, when it isn't a Social room).
+ */
+fun openMention(mention: MentionNodeContent, uriHandler: UriHandler) {
+    val url = when (mention) {
+        is MentionNodeContent.User -> mention.permalinkUrl
+        is MentionNodeContent.Room -> mention.permalinkUrl
+        is MentionNodeContent.Everyone, is MentionNodeContent.CustomEmoji -> return
+    }
+    runCatching { uriHandler.openUri(url) }
 }
 
 /** Images and videos like Element X's timeline: blurhash placeholder, aspect ratio, video thumbnail with play button. */
