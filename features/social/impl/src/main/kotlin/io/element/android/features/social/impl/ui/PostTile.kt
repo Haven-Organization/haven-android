@@ -6,6 +6,9 @@
 
 package io.element.android.features.social.impl.ui
 
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import io.element.android.libraries.htmlrenderer.api.MentionNodeContent
 import androidx.compose.ui.platform.UriHandler
 import io.element.android.libraries.matrix.ui.formattedname.DisplayNameText
@@ -144,10 +147,29 @@ fun PostTile(
     val developerMode by developerModeFlow.collectAsState(initial = false)
     val social = post.post
     val indent = if (wide) 0.dp else 52.dp
+    // The post's menu: Element X's message action sheet, or its own when it can't have that one. Opened by "...", or by
+    // holding the post, like a message.
+    var showMenu by remember { mutableStateOf(false) }
+    fun openMenu() {
+        if (!callbacks.onShowActions(post)) showMenu = true
+    }
+    val haptics = LocalHapticFeedback.current
+    val canOpen = !focused && post.eventId != null
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .clickable(enabled = !focused && post.eventId != null) { callbacks.onOpenPost(post) }
+            .combinedClickable(
+                enabled = canOpen || showActions,
+                onClick = { if (canOpen) callbacks.onOpenPost(post) },
+                onLongClick = if (showActions) {
+                    {
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                        openMenu()
+                    }
+                } else {
+                    null
+                },
+            )
             .padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
         if (roomName != null) {
@@ -203,7 +225,7 @@ fun PostTile(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 avatar()
                 Spacer(Modifier.width(12.dp))
-                Box(Modifier.weight(1f)) { PostHeader(post, focused, callbacks, showViewSource = developerMode) }
+                Box(Modifier.weight(1f)) { PostHeader(post, focused, callbacks, showViewSource = developerMode, showMenu = showMenu, onOpenMenu = ::openMenu, onDismissMenu = { showMenu = false }) }
             }
             Column(Modifier.padding(top = 4.dp)) { content() }
             if (showActions) ActionBar(deps.actions.optimistic.applyTo(post), callbacks, large = true)
@@ -212,7 +234,7 @@ fun PostTile(
                 avatar()
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
-                    PostHeader(post, focused, callbacks, showViewSource = developerMode)
+                    PostHeader(post, focused, callbacks, showViewSource = developerMode, showMenu = showMenu, onOpenMenu = ::openMenu, onDismissMenu = { showMenu = false })
                     content()
                     if (showActions) ActionBar(deps.actions.optimistic.applyTo(post), callbacks)
                 }
@@ -223,8 +245,15 @@ fun PostTile(
 }
 
 @Composable
-private fun PostHeader(post: FeedPost, focused: Boolean, callbacks: PostCallbacks, showViewSource: Boolean) {
-    var showMenu by remember { mutableStateOf(false) }
+private fun PostHeader(
+    post: FeedPost,
+    focused: Boolean,
+    callbacks: PostCallbacks,
+    showViewSource: Boolean,
+    showMenu: Boolean,
+    onOpenMenu: () -> Unit,
+    onDismissMenu: () -> Unit,
+) {
     Row(verticalAlignment = Alignment.Top) {
         // Only the name and ID open the profile: the empty space beside them opens the post, like the rest of the tile.
         Column(Modifier.weight(1f)) {
@@ -266,7 +295,7 @@ private fun PostHeader(post: FeedPost, focused: Boolean, callbacks: PostCallback
             )
         }
         Box {
-            IconButton(onClick = { if (!callbacks.onShowActions(post)) showMenu = true }, modifier = Modifier.size(32.dp)) {
+            IconButton(onClick = onOpenMenu, modifier = Modifier.size(32.dp)) {
                 Icon(CompoundIcons.OverflowHorizontal(), contentDescription = stringResource(R.string.social_more), modifier = Modifier.size(20.dp))
             }
             // A post that can't have the stock message action sheet (one in a room that isn't followed): the same
@@ -275,7 +304,7 @@ private fun PostHeader(post: FeedPost, focused: Boolean, callbacks: PostCallback
                 PostActionsSheet(
                     post = post,
                     showViewSource = showViewSource,
-                    onDismiss = { showMenu = false },
+                    onDismiss = onDismissMenu,
                     onViewInRoom = { callbacks.onViewInRoom(post) },
                     onViewSource = { callbacks.onViewSource(post) },
                     onDelete = { callbacks.onDelete(post) },
