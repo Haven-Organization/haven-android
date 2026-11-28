@@ -9,6 +9,8 @@
 package io.element.android.libraries.textcomposer.mentions
 
 import android.graphics.Bitmap
+import android.text.SpannableString
+import android.text.Spanned
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -58,7 +60,10 @@ class DefaultMentionSpanUpdater(
         roomId = LocalFormattedNamesRoomId.current
         return remember(text, roomNames, roomMembers, isLightTheme, profiles, avatars, emojis, formattedNamesEnabled, formattedNamesUpdates) {
             updateMentionSpans(text)
-            text
+            // Haven: a copy (with the same, updated spans) that doesn't equal the last one, so the text view is given new
+            // text and lays out and draws the pills again. Equal text is skipped, as a copy alone would be (Spanned text
+            // equals another with the same characters and span objects), leaving e.g. an avatar that came in undrawn.
+            if (text is Spanned) SpannableString(text).apply { setSpan(PillsUpdate(), 0, 0, Spanned.SPAN_MARK_MARK) } else text
         }
     }
 
@@ -101,6 +106,9 @@ class DefaultMentionSpanUpdater(
         return pillProfiles.avatar(PillAvatarKey(userId, url, name.takeIf { url == null }, theme.isDark.takeIf { url == null } ?: false))
     }
 }
+
+/** Haven: an empty marker span, a new one each time pills change, so that the text differs (see rememberMentionSpans). */
+private class PillsUpdate
 
 private object NoOpMentionSpanUpdater : MentionSpanUpdater {
     override fun updateMentionSpans(text: CharSequence): CharSequence {
