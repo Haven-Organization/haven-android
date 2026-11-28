@@ -40,8 +40,10 @@ class SocialRoomScopeNode(
     private val roomGraphFactory: RoomGraphFactory,
     private val onUnavailable: () -> Unit,
     private val child: (parent: Node, buildContext: BuildContext) -> Node,
+    /** The room, when it's already loaded: the child shows straight away, with no loading step. */
+    private val loadedRoom: JoinedRoom? = null,
 ) : BaseFlowNode<SocialRoomScopeNode.Target>(
-    backstack = BackStack(initialElement = Target.Loading, savedStateMap = buildContext.savedStateMap),
+    backstack = BackStack(initialElement = if (loadedRoom != null) Target.Content else Target.Loading, savedStateMap = buildContext.savedStateMap),
     buildContext = buildContext,
     plugins = emptyList(),
 ), DependencyInjectionGraphOwner {
@@ -53,7 +55,7 @@ class SocialRoomScopeNode(
         data object Content : Target
     }
 
-    private var roomGraph: Any? = null
+    private var roomGraph: Any? = loadedRoom?.let { roomGraphFactory.create(it) }
 
     // Nothing to offer until the room is loaded (lookups then go on to the session's graph).
     override val graph: Any get() = roomGraph ?: Unit
@@ -61,7 +63,8 @@ class SocialRoomScopeNode(
     override fun onBuilt() {
         super.onBuilt()
         lifecycle.subscribe(onCreate = {
-            lifecycleScope.launch {
+            // Already loaded: nothing to wait for
+            if (roomGraph == null) lifecycleScope.launch {
                 val room = loadRoom(roomId)
                 if (room == null) {
                     onUnavailable()

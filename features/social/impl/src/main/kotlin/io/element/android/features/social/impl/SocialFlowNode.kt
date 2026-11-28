@@ -183,6 +183,9 @@ class SocialFlowNode(
     /** What the open post action sheet leaves to Social (not saved: the sheet isn't restored either). */
     private var postActionHandlers: PostActionHandlers? = null
 
+    /** The open post action sheet's post, as its room's open timeline has it, if it does (the sheet then shows at once). */
+    private var postActionItem: io.element.android.libraries.matrix.api.timeline.MatrixTimelineItem.Event? = null
+
     override fun onBuilt() {
         super.onBuilt()
         // The rooms' timelines stay open while Social is, and are closed once it's left (see SocialTimelineStore.release).
@@ -204,8 +207,11 @@ class SocialFlowNode(
 
         override fun openPostActions(post: io.element.android.features.social.impl.data.FeedPost, handlers: PostActionHandlers) {
             val eventId = post.eventId ?: return
-            postActionHandlers = handlers
-            overlay.show(NavTarget.PostActions(post.roomId, eventId))
+            lifecycleScope.launch {
+                postActionHandlers = handlers
+                postActionItem = deps.timelineStore.loadedTimelineEvent(post.roomId, eventId)
+                overlay.show(NavTarget.PostActions(post.roomId, eventId))
+            }
         }
 
         override fun openComposer(mode: io.element.android.features.social.impl.ui.ComposeMode) {
@@ -473,9 +479,11 @@ class SocialFlowNode(
     /** Element X's message action sheet for a post (HavenEventActionsNode, in the post's room's scope). */
     private fun postActionsNode(target: NavTarget.PostActions, buildContext: BuildContext): Node {
         val handlers = postActionHandlers
+        val item = postActionItem
         fun close() {
             overlay.hide()
             postActionHandlers = null
+            postActionItem = null
         }
         // After a restore there's nothing to act on: nothing to show
         if (handlers == null) return node(buildContext) { LaunchedEffect(Unit) { close() } }
@@ -498,9 +506,14 @@ class SocialFlowNode(
             child = { parent, childBuildContext ->
                 parent.createNode<io.element.android.features.messages.impl.haven.HavenEventActionsNode>(
                     childBuildContext,
-                    listOf(io.element.android.features.messages.impl.haven.HavenEventActionsNode.Inputs(target.eventId, handlers.canEdit), callback),
+                    listOf(
+                        io.element.android.features.messages.impl.haven.HavenEventActionsNode.Inputs(target.eventId, handlers.canEdit, item),
+                        callback,
+                    ),
                 )
             },
+            // Usually open already (the feed's rooms are): no loading step
+            loadedRoom = deps.timelineStore.cachedJoinedRoom(target.roomId),
         )
     }
 

@@ -6,6 +6,7 @@
 
 package io.element.android.features.social.impl.data
 
+import kotlinx.coroutines.flow.first
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import io.element.android.features.social.impl.msc.SocialPost
@@ -179,6 +180,16 @@ class SocialTimelineStore(
 
     /** The room if its timeline is already open (no waiting). */
     fun cachedJoinedRoom(roomId: RoomId): JoinedRoom? = rooms[roomId]
+
+    /**
+     * The SDK's item for [eventId], when [roomId]'s timeline is open and has it loaded (nothing is loaded for this): e.g.
+     * for a screen that can then show the post at once.
+     */
+    suspend fun loadedTimelineEvent(roomId: RoomId, eventId: EventId): MatrixTimelineItem.Event? {
+        val timeline = socialTimelines[roomId] ?: return null
+        val items = kotlinx.coroutines.withTimeoutOrNull(500) { timeline.timelineItems.first() } ?: return null
+        return items.firstNotNullOfOrNull { (it as? MatrixTimelineItem.Event)?.takeIf { item -> item.eventId == eventId } }
+    }
 
     /** Any room whose timeline is open, e.g. for a screen that needs a room to run in but not a particular one. */
     fun anyCachedJoinedRoom(): JoinedRoom? = rooms.values.firstOrNull()

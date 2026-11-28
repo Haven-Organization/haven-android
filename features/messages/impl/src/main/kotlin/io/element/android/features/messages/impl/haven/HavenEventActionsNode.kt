@@ -64,6 +64,7 @@ import io.element.android.libraries.matrix.api.core.UserId
 import io.element.android.libraries.matrix.api.room.CreateTimelineParams
 import io.element.android.libraries.matrix.api.room.JoinedRoom
 import io.element.android.libraries.matrix.api.room.powerlevels.permissionsAsState
+import io.element.android.libraries.matrix.api.timeline.MatrixTimelineItem
 import io.element.android.libraries.matrix.api.timeline.Timeline
 import io.element.android.libraries.matrix.api.timeline.item.TimelineItemDebugInfo
 import io.element.android.libraries.ui.strings.CommonStrings
@@ -104,8 +105,12 @@ class HavenEventActionsNode(
     buildContext = buildContext,
     plugins = plugins,
 ) {
-    /** [canEdit]: whether "Edit" is offered (editing is done where the event is shown, see [Callback.onEdit]). */
-    data class Inputs(val eventId: EventId, val canEdit: Boolean = false) : NodeInputs
+    /**
+     * [canEdit]: whether "Edit" is offered (editing is done where the event is shown, see [Callback.onEdit]). [item]: the
+     * event as an open timeline already has it, if the caller has one: the sheet then shows at once, instead of after
+     * the event has been loaded from the server.
+     */
+    data class Inputs(val eventId: EventId, val canEdit: Boolean = false, val item: MatrixTimelineItem.Event? = null) : NodeInputs
 
     interface Callback : Plugin {
         /** Finished: the sheet was dismissed, or its action is done. */
@@ -183,6 +188,19 @@ class HavenEventActionsNode(
         if (loadStarted) return
         loadStarted = true
         lifecycleScope.launch {
+            // Set once: the sheet is shown for it (a later copy would recompute the actions and hide the sheet meanwhile)
+            launch {
+                timelineItemsFactory.timelineItems.collect { items ->
+                    if (event.value == null) {
+                        items.filterIsInstance<TimelineItem.Event>().firstOrNull { it.eventId == inputs.eventId }?.let { event.value = it }
+                    }
+                }
+            }
+            // The item the caller has: nothing to wait for
+            inputs.item?.let { item ->
+                timelineItemsFactory.replaceWith(listOf(item))
+                return@launch
+            }
             val focused = room.createTimeline(CreateTimelineParams.Focused(inputs.eventId)).getOrElse {
                 Timber.w(it, "Couldn't load %s for its actions", inputs.eventId)
                 toastHelper.show(CommonStrings.common_error)
@@ -190,10 +208,7 @@ class HavenEventActionsNode(
                 return@launch
             }
             timeline = focused
-            launch { focused.timelineItems.collect { timelineItemsFactory.replaceWith(it) } }
-            timelineItemsFactory.timelineItems.collect { items ->
-                items.filterIsInstance<TimelineItem.Event>().firstOrNull { it.eventId == inputs.eventId }?.let { event.value = it }
-            }
+            focused.timelineItems.collect { timelineItemsFactory.replaceWith(it) }
         }
     }
 
@@ -312,11 +327,12 @@ class HavenEventActionsNode(
         }
     }
 
+    // Pinning and ending a poll act on the room, by event id: its live timeline does, whether or not it has the event loaded
     private fun pin(eventId: EventId?, pin: Boolean) {
-        val focused = timeline
-        if (eventId == null || focused == null) return close()
+        if (eventId == null) return close()
+        val live = room.liveTimeline
         lifecycleScope.launch {
-            (if (pin) focused.pinEvent(eventId) else focused.unpinEvent(eventId))
+            (if (pin) live.pinEvent(eventId) else live.unpinEvent(eventId))
                 .onFailure {
                     Timber.w(it, "Couldn't (un)pin %s", eventId)
                     toastHelper.show(CommonStrings.common_error)
@@ -326,10 +342,9 @@ class HavenEventActionsNode(
     }
 
     private fun endPoll(eventId: EventId?) {
-        val focused = timeline
-        if (eventId == null || focused == null) return close()
+        if (eventId == null) return close()
         lifecycleScope.launch {
-            endPollAction.execute(focused, eventId)
+            endPollAction.execute(room.liveTimeline, eventId)
                 .onSuccess { callback.onPollEnded() }
                 .onFailure {
                     Timber.w(it, "Couldn't end the poll %s", eventId)
