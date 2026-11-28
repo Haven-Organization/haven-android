@@ -440,12 +440,16 @@ class SocialTimelineStore(
     }
 
     private fun parse(uniqueId: String, event: EventTimelineItem): ParsedPost? {
-        val cacheKey = uniqueId + "|" + event.content.hashCode()
+        // The event id too: a post being sent keeps its item's id and content once the server has it, but only then has
+        // the event JSON a post is read from
+        val cacheKey = uniqueId + "|" + event.eventId?.value + "|" + event.content.hashCode()
         synchronized(parseCache) { parseCache[cacheKey]?.let { return it } }
         val debugInfo = runCatching { event.timelineItemDebugInfoProvider() }
             .onFailure { Timber.tag(SocialRepository.LOG_TAG).w(it, "No debug info for %s", event.eventId) }
             .getOrNull() ?: return null
         val result = ParsedPost.of(debugInfo.originalJson, debugInfo.latestEditedJson)
+        // Without its JSON (not sent yet) it's read again later, not remembered as not being a post
+        if (debugInfo.originalJson == null) return result
         synchronized(parseCache) {
             if (parseCache.size > 5000) parseCache.clear()
             parseCache[cacheKey] = result
