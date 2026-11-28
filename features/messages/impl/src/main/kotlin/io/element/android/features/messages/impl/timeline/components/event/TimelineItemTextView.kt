@@ -8,6 +8,10 @@
 
 package io.element.android.features.messages.impl.timeline.components.event
 
+import io.element.android.libraries.htmlrenderer.api.ui.isEmojiOnly
+import io.element.android.libraries.htmlrenderer.api.ui.LocalCustomEmojiScale
+import io.element.android.libraries.htmlrenderer.api.ui.EMOJI_ONLY_CUSTOM_EMOJI_SCALE
+import io.element.android.libraries.htmlrenderer.api.ui.CUSTOM_EMOJI_SCALE
 import android.text.SpannedString
 import androidx.annotation.VisibleForTesting
 import androidx.compose.foundation.layout.Box
@@ -71,31 +75,38 @@ fun TimelineItemTextView(
     // natively with Compose. Otherwise fall back to the legacy rich text editor view below.
     val messageTree = content.messageTree
     if (LocalTimelineEventRendererConfig.current.isComposeRendererEnabled && messageTree != null) {
+        // Haven: a message of only custom and/or Unicode emoji is shown large, like an emoji-only plain text message
+        val emojiOnly = remember(messageTree) { messageTree.isEmojiOnly { it.containsOnlyEmojis() } }
         Box(modifier.semantics { contentDescription = content.plainText }) {
-            HtmlMessageContent(
-                node = messageTree,
-                currentUserId = LocalTimelineEventRendererConfig.current.currentUserId,
-                onLinkClick = { url, text -> onLinkClick(Link(url = url, text = text)) },
-                onLinkLongClick = { url, text -> onLinkLongClick(Link(url = url, text = text)) },
-                onMentionClick = { mention ->
-                    when (mention) {
-                        is MentionNodeContent.Room -> onLinkClick(Link(url = mention.permalinkUrl, text = mention.displayText))
-                        is MentionNodeContent.User -> onLinkClick(Link(url = mention.permalinkUrl, text = mention.displayText))
-                        is MentionNodeContent.Everyone -> { /* No action for @room mentions */ }
-                        is MentionNodeContent.CustomEmoji -> Unit
-                    }
-                },
-                onContentLayoutChange = { data ->
-                    onContentLayoutChange(
-                        ContentAvoidingLayoutData(
-                            contentWidth = data.contentWidth,
-                            contentHeight = data.contentHeight,
-                            nonOverlappingContentWidth = data.nonOverlappingContentWidth,
-                            nonOverlappingContentHeight = data.nonOverlappingContentHeight,
+            CompositionLocalProvider(
+                LocalTextStyle provides if (emojiOnly) ElementTheme.typography.fontHeadingXlRegular else LocalTextStyle.current,
+                LocalCustomEmojiScale provides if (emojiOnly) EMOJI_ONLY_CUSTOM_EMOJI_SCALE else CUSTOM_EMOJI_SCALE,
+            ) {
+                HtmlMessageContent(
+                    node = messageTree,
+                    currentUserId = LocalTimelineEventRendererConfig.current.currentUserId,
+                    onLinkClick = { url, text -> onLinkClick(Link(url = url, text = text)) },
+                    onLinkLongClick = { url, text -> onLinkLongClick(Link(url = url, text = text)) },
+                    onMentionClick = { mention ->
+                        when (mention) {
+                            is MentionNodeContent.Room -> onLinkClick(Link(url = mention.permalinkUrl, text = mention.displayText))
+                            is MentionNodeContent.User -> onLinkClick(Link(url = mention.permalinkUrl, text = mention.displayText))
+                            is MentionNodeContent.Everyone -> { /* No action for @room mentions */ }
+                            is MentionNodeContent.CustomEmoji -> Unit
+                        }
+                    },
+                    onContentLayoutChange = { data ->
+                        onContentLayoutChange(
+                            ContentAvoidingLayoutData(
+                                contentWidth = data.contentWidth,
+                                contentHeight = data.contentHeight,
+                                nonOverlappingContentWidth = data.nonOverlappingContentWidth,
+                                nonOverlappingContentHeight = data.nonOverlappingContentHeight,
+                            )
                         )
-                    )
-                },
-            )
+                    },
+                )
+            }
         }
         return
     }

@@ -6,6 +6,13 @@
 
 package io.element.android.features.social.impl.ui
 
+import androidx.compose.material3.LocalTextStyle
+import androidx.compose.runtime.CompositionLocalProvider
+import chat.schildi.matrixsdk.containsOnlyEmojis
+import io.element.android.libraries.htmlrenderer.api.ui.CUSTOM_EMOJI_SCALE
+import io.element.android.libraries.htmlrenderer.api.ui.EMOJI_ONLY_CUSTOM_EMOJI_SCALE
+import io.element.android.libraries.htmlrenderer.api.ui.LocalCustomEmojiScale
+import io.element.android.libraries.htmlrenderer.api.ui.isEmojiOnly
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -353,23 +360,35 @@ fun PostBody(
             }
         }
         val uriHandler = LocalUriHandler.current
+        // Haven: a post of only custom and/or Unicode emoji is shown large, like an emoji-only message (not in the cut-off
+        // copies of repost, quote and reply cards)
+        val onlyEmoji = remember(documentNode, content.body) {
+            documentNode?.isEmojiOnly { it.containsOnlyEmojis(MAX_EMOJI_ONLY) }
+                ?: content.body.filterNot { it.isWhitespace() }.let { it.isNotEmpty() && it.containsOnlyEmojis(MAX_EMOJI_ONLY) }
+        }
+        val emojiOnly = onlyEmoji && maxLines == Int.MAX_VALUE
         if (documentNode != null) {
             // Embedded posts (reposts, quotes, replied-to cards) render the same formatting and custom emoji, cut off
             // at about [maxLines] lines
             val lineHeight = with(LocalDensity.current) { ElementTheme.typography.fontBodyLgRegular.lineHeight.toDp() }
-            HtmlMessageContent(
-                node = documentNode,
-                currentUserId = deps.matrixClient.sessionId,
-                onLinkClick = { url, _ -> runCatching { uriHandler.openUri(url) } },
-                onMentionClick = { mention -> openMention(mention, uriHandler) },
-                modifier = Modifier
-                    .padding(top = 4.dp)
-                    .then(if (maxLines == Int.MAX_VALUE) Modifier else Modifier.heightIn(max = lineHeight * maxLines).clipToBounds()),
-            )
+            CompositionLocalProvider(
+                LocalTextStyle provides if (emojiOnly) ElementTheme.typography.fontHeadingXlRegular else LocalTextStyle.current,
+                LocalCustomEmojiScale provides if (emojiOnly) EMOJI_ONLY_CUSTOM_EMOJI_SCALE else CUSTOM_EMOJI_SCALE,
+            ) {
+                HtmlMessageContent(
+                    node = documentNode,
+                    currentUserId = deps.matrixClient.sessionId,
+                    onLinkClick = { url, _ -> runCatching { uriHandler.openUri(url) } },
+                    onMentionClick = { mention -> openMention(mention, uriHandler) },
+                    modifier = Modifier
+                        .padding(top = 4.dp)
+                        .then(if (maxLines == Int.MAX_VALUE) Modifier else Modifier.heightIn(max = lineHeight * maxLines).clipToBounds()),
+                )
+            }
         } else {
             Text(
                 text = content.body,
-                style = ElementTheme.typography.fontBodyLgRegular,
+                style = if (emojiOnly) ElementTheme.typography.fontHeadingXlRegular else ElementTheme.typography.fontBodyLgRegular,
                 color = ElementTheme.colors.textPrimary,
                 maxLines = maxLines,
                 overflow = TextOverflow.Ellipsis,
@@ -430,6 +449,9 @@ fun openMention(mention: MentionNodeContent, uriHandler: UriHandler) {
     }
     runCatching { uriHandler.openUri(url) }
 }
+
+/** Haven: the most emoji a post can have and still be shown large. */
+private const val MAX_EMOJI_ONLY = 50
 
 /** Images and videos like Element X's timeline: blurhash placeholder, aspect ratio, video thumbnail with play button. */
 @Composable

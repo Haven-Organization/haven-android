@@ -1,14 +1,13 @@
 package io.element.android.features.messages.impl.timeline.components.event
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
+import coil3.compose.AsyncImage
+import androidx.compose.ui.unit.isSpecified
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -31,9 +30,6 @@ import chat.schildi.theme.scBubbleFont
 import coil3.request.ImageRequest
 import coil3.request.SuccessResult
 import coil3.size.Size
-import coil3.compose.AsyncImagePainter
-import coil3.compose.SubcomposeAsyncImage
-import coil3.compose.SubcomposeAsyncImageContent
 import com.beeper.android.messageformat.InlineImageInfo
 import com.beeper.android.messageformat.MatrixBodyAnnotations
 import com.beeper.android.messageformat.MatrixBodyParseResult
@@ -115,7 +111,8 @@ fun ScTimelineItemTextView(
     modifier: Modifier = Modifier,
     onContentLayoutChange: (ContentAvoidingLayoutData) -> Unit = {},
 ) {
-    val emojiOnly = containsOnlyEmojisOrEmotes(content.text, content.inlineImages)
+    // Haven: custom emoji count as emoji, so a message of only custom and/or Unicode emoji is shown large
+    val emojiOnly = remember(content.text, content.inlineImages) { havenContainsOnlyEmojis(content.text, content.inlineImages) }
     val textStyle = when {
         emojiOnly -> ElementTheme.typography.fontHeadingXlRegular
         else -> ElementTheme.typography.scBubbleFont
@@ -151,9 +148,13 @@ fun ScTimelineItemTextView(
             )
         },
         inlineContent = { result ->
-            result.inlineImages.toInlineContent(
-                density = LocalDensity.current,
-                defaultHeight = textStyle.lineHeight,
+            // Haven: custom emoji as tall as the line in an emoji-only message (like Unicode emoji there), and a little taller
+            // than the line among text; other images as before
+            val lineHeight = textStyle.lineHeight.takeIf { it.isSpecified } ?: (textStyle.fontSize * 1.4f)
+            val emoteHeight = if (emojiOnly) lineHeight else lineHeight * INLINE_EMOTE_SCALE
+            fun Map<String, InlineImageInfo>.inline(defaultHeight: TextUnit) = toInlineContent(
+                density = density,
+                defaultHeight = defaultHeight,
                 minWidth = MIN_IMAGE_WIDTH.dp,
                 maxWidth = MAX_IMAGE_WIDTH.dp,
                 minHeight = MIN_IMAGE_HEIGHT.dp,
@@ -168,6 +169,9 @@ fun ScTimelineItemTextView(
                     onPainterSuccess = { result -> actualImageSizes[info.uri] = IntSize(result.image.width, result.image.height) },
                 )
             }
+            val (emotes, images) = result.inlineImages.entries.partition { it.value.isHavenEmote() }
+            emotes.associate { it.key to it.value.copy(isEmote = true) }.inline(emoteHeight) +
+                images.associate { it.key to it.value }.inline(lineHeight)
         },
         onLinkLongPress = { link ->
             (link as? LinkAnnotation.Url)?.url?.let { url ->
@@ -199,42 +203,59 @@ private fun InlineImage(
             data
         }
     }
-    SubcomposeAsyncImage(
-        modifier = modifier,
-        model = model,
-        contentScale = ContentScale.Fit,
-        alignment = Alignment.Center,
-        contentDescription = info.alt ?: info.title,
-    ) {
-        val painterState = painter.state.collectAsState().value
-        AnimatedContent(
-            painterState,
-            transitionSpec = {
-                fadeIn(
-                    animationSpec = tween(50)
-                ) togetherWith fadeOut(
-                    animationSpec = tween(50)
-                )
-            },
-        ) { state ->
-            when (state) {
-                is AsyncImagePainter.State.Success -> {
-                    SubcomposeAsyncImageContent(Modifier)
-                    LaunchedEffect(state.result) {
-                        onPainterSuccess(state.result)
-                    }
-                }
-                else -> {
-                    Text(
-                        info.alt ?: info.title ?: "\uFFFD",
-                        modifier,
-                        style = textStyle,
-                        color = textColor,
-                    )
-                }
-            }
+    // Haven: drawn with a plain AsyncImage, which plays animated images (GIF, WebP, APNG); the fallback text shows until
+    // the image is in
+    var loaded by remember(info) { mutableStateOf(false) }
+    Box(modifier, contentAlignment = Alignment.Center) {
+        if (!loaded) {
+            Text(
+                info.alt ?: info.title ?: "\uFFFD",
+                style = textStyle,
+                color = textColor,
+            )
         }
+        AsyncImage(
+            model = model,
+            contentDescription = info.alt ?: info.title,
+            contentScale = ContentScale.Fit,
+            alignment = Alignment.Center,
+            modifier = Modifier.matchParentSize(),
+            onSuccess = { state ->
+                loaded = true
+                onPainterSuccess(state.result)
+            },
+        )
     }
+}
+
+/** Haven: how much taller than the line a custom emoji among text is. */
+private const val INLINE_EMOTE_SCALE = 1.2f
+
+/** Haven: a custom emoji: marked as one (`data-mx-emoticon`), or named by a `:shortcode:` as Matrix clients do. */
+private fun InlineImageInfo.isHavenEmote(): Boolean =
+    isEmote || listOfNotNull(alt, title).any { SHORTCODE.matches(it) }
+
+private val SHORTCODE = Regex("^:[^\\s:]+:$")
+
+/** The annotation Compose's appendInlineContent puts on inline content. */
+private const val INLINE_CONTENT_TAG = "androidx.compose.foundation.text.inlineContent"
+
+/**
+ * Haven: whether [text] is only emoji (at most 50): Unicode emoji and custom emoji, the inline images in [inlineImages]
+ * that are custom emoji; any other image means it isn't. Whitespace and zero-width characters don't count.
+ */
+internal fun havenContainsOnlyEmojis(text: AnnotatedString, inlineImages: Map<String, InlineImageInfo>): Boolean {
+    if (inlineImages.values.any { !it.isHavenEmote() }) return false
+    val imageRanges = text.getStringAnnotations(MatrixBodyAnnotations.INLINE_IMAGE, 0, text.length)
+    val contentRanges = text.getStringAnnotations(INLINE_CONTENT_TAG, 0, text.length)
+    val ranges = (imageRanges + contentRanges).map { it.start until it.end }
+    // Each custom emoji has both annotations; count it once
+    val emotes = maxOf(imageRanges.size, contentRanges.size)
+    val rest = StringBuilder()
+    text.text.forEachIndexed { index, char -> if (ranges.none { index in it }) rest.append(char) }
+    val remaining = rest.toString().filterNot { it.isWhitespace() || it == '\u200B' || it == '\uFEFF' || it == '\u2060' }
+    if (remaining.isEmpty()) return emotes > 0
+    return remaining.containsOnlyEmojis(50 - emotes)
 }
 
 @Composable

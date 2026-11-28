@@ -7,6 +7,7 @@
 
 package io.element.android.libraries.htmlrenderer.api.ui
 
+import androidx.compose.runtime.compositionLocalOf
 import android.content.ClipData
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
@@ -476,13 +477,14 @@ private fun rememberMentionInlineContent(
     val density = LocalDensity.current
     val layoutDirection = LocalLayoutDirection.current
     val mentionDisplayNames = LocalMentionDisplayNames.current
+    val emojiScale = LocalCustomEmojiScale.current
     // Only the display texts of these mentions matter: since `derivedStateOf` only notifies its readers when its value changes,
     // unrelated display name changes won't recompose this text nor trigger a new measure pass
     val displayTexts by remember(mentions, mentionDisplayNames) {
         derivedStateOf { mentions.mapValues { (_, mention) -> mentionDisplayNames.pillTextFor(mention) } }
     }
-    return remember(mentions, displayTexts, context, textMeasurer, pillTextStyle, density, layoutDirection) {
-        buildMentionInlineContent(mentions, displayTexts, context, textMeasurer, pillTextStyle, density, layoutDirection)
+    return remember(mentions, displayTexts, context, textMeasurer, pillTextStyle, density, layoutDirection, emojiScale) {
+        buildMentionInlineContent(mentions, displayTexts, context, textMeasurer, pillTextStyle, density, layoutDirection, emojiScale)
     }
 }
 
@@ -494,9 +496,10 @@ private fun buildMentionInlineContent(
     pillTextStyle: TextStyle,
     density: Density,
     layoutDirection: LayoutDirection,
+    emojiScale: Float,
 ): ImmutableMap<String, InlineTextContent> {
     return mentions.mapValues { (id, mention) ->
-        if (mention is MentionNodeContent.CustomEmoji) return@mapValues customEmojiInlineContent(mention)
+        if (mention is MentionNodeContent.CustomEmoji) return@mapValues customEmojiInlineContent(mention, emojiScale)
         val displayText = displayTexts[id] ?: mention.displayText
         val textSize = PillTextSizeCache.getOrMeasure(displayText, pillTextStyle, density, layoutDirection, textMeasurer)
         val width = with(density) { textSize.width.toDp() + PillPaddingHorizontal * 2 }
@@ -517,12 +520,51 @@ private fun buildMentionInlineContent(
     }.toImmutableMap()
 }
 
-/** Haven: a custom emoji drawn inline, a little taller than the text around it (like Haven Desktop's 1.25em). */
-private fun customEmojiInlineContent(emoji: MentionNodeContent.CustomEmoji) = InlineTextContent(
-    placeholder = Placeholder(width = 1.25.em, height = 1.25.em, placeholderVerticalAlign = PlaceholderVerticalAlign.TextCenter),
+/**
+ * Haven: how tall a custom emoji is, relative to the text's font size ([CUSTOM_EMOJI_SCALE] among text). An emoji-only
+ * message sets it lower: its text is already large, and its custom emoji then match its Unicode ones.
+ */
+val LocalCustomEmojiScale = compositionLocalOf { CUSTOM_EMOJI_SCALE }
+
+/** Haven: a custom emoji among text: a little taller than the text, so it reads as an emoji. */
+const val CUSTOM_EMOJI_SCALE = 1.4f
+
+/** Haven: a custom emoji in an emoji-only message, about as tall as its (large) Unicode emoji. */
+const val EMOJI_ONLY_CUSTOM_EMOJI_SCALE = 1.2f
+
+/**
+ * Haven: whether [node] is only emoji (at most [MAX_EMOJI_ONLY]): custom emoji and Unicode emoji, with nothing else but
+ * whitespace, in plain paragraphs. Such a message is shown large, like Element's emoji-only messages.
+ */
+fun DocumentNode.isEmojiOnly(isUnicodeEmojiOnly: (String) -> Boolean): Boolean {
+    var emoji = 0
+    val rest = StringBuilder()
+    for (block in children) {
+        val paragraph = block as? ParagraphNode ?: return false
+        if (paragraph.inlineContent.values.any { it !is MentionNodeContent.CustomEmoji }) return false
+        val ranges = paragraph.text.getStringAnnotations(INLINE_CONTENT_TAG, 0, paragraph.text.length).map { it.start until it.end }
+        emoji += ranges.size
+        paragraph.text.text.forEachIndexed { index, char -> if (ranges.none { index in it }) rest.append(char) }
+    }
+    val remaining = rest.toString().filterNot { it.isWhitespace() || it == '\u200B' || it == '\uFEFF' || it == '\u2060' }
+    if (remaining.isEmpty()) return emoji in 1..MAX_EMOJI_ONLY
+    return emoji < MAX_EMOJI_ONLY && isUnicodeEmojiOnly(remaining)
+}
+
+private const val MAX_EMOJI_ONLY = 50
+
+/** The annotation Compose's appendInlineContent puts on inline content. */
+private const val INLINE_CONTENT_TAG = "androidx.compose.foundation.text.inlineContent"
+
+/**
+ * Haven: a custom emoji drawn inline, [scale] times the text's size ([LocalCustomEmojiScale]). The image itself is loaded,
+ * not a server thumbnail (a still frame), so animated emoji play.
+ */
+private fun customEmojiInlineContent(emoji: MentionNodeContent.CustomEmoji, scale: Float) = InlineTextContent(
+    placeholder = Placeholder(width = scale.em, height = scale.em, placeholderVerticalAlign = PlaceholderVerticalAlign.TextCenter),
 ) {
     AsyncImage(
-        model = MediaRequestData(MediaSource(emoji.url), MediaRequestData.Kind.Thumbnail(96L)),
+        model = MediaRequestData(MediaSource(emoji.url), MediaRequestData.Kind.Content),
         contentDescription = emoji.displayText,
         contentScale = ContentScale.Fit,
         modifier = Modifier.fillMaxSize(),

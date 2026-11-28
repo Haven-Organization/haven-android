@@ -32,6 +32,8 @@ dependencies {
     implementation(projects.libraries.uiStrings)
     implementation(projects.libraries.emoji.api)
     implementation(projects.libraries.htmlrenderer.api)
+    // Haven: emoji-only posts (its Unicode emoji check)
+    implementation(projects.schildi.matrixsdk)
     // The stock message reaction pills and reaction summary sheet, reused for posts' reactions shelf (like Haven Desktop).
     implementation(projects.features.messages.impl)
     // Element X's poll card, for posts that are polls.
