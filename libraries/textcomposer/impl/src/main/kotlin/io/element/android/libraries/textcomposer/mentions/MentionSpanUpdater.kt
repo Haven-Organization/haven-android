@@ -8,6 +8,7 @@
 
 package io.element.android.libraries.textcomposer.mentions
 
+import android.graphics.Bitmap
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -16,6 +17,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import dev.zacsweers.metro.ContributesBinding
 import io.element.android.compound.theme.ElementTheme
 import io.element.android.libraries.di.RoomScope
+import io.element.android.libraries.matrix.api.core.UserId
 import io.element.android.libraries.matrix.ui.messages.RoomMemberProfilesCache
 import io.element.android.libraries.matrix.ui.messages.RoomNamesCache
 import io.element.android.libraries.matrix.ui.model.toEmojiText
@@ -33,13 +35,17 @@ class DefaultMentionSpanUpdater(
     private val theme: MentionSpanTheme,
     private val roomMemberProfilesCache: RoomMemberProfilesCache,
     private val roomNamesCache: RoomNamesCache,
+    private val pillProfiles: MentionPillProfiles,
 ) : MentionSpanUpdater {
     @Composable
     override fun rememberMentionSpans(text: CharSequence): CharSequence {
         val isLightTheme = ElementTheme.isLightTheme
         val roomNames by roomNamesCache.displayNames.collectAsState()
         val roomMembers by roomMemberProfilesCache.membersFlow.collectAsState()
-        return remember(text, roomNames, roomMembers, isLightTheme) {
+        // Haven: global profiles and avatars as they come in
+        val profiles by pillProfiles.profiles.collectAsState()
+        val avatars by pillProfiles.avatars.collectAsState()
+        return remember(text, roomNames, roomMembers, isLightTheme, profiles, avatars) {
             updateMentionSpans(text)
             text
         }
@@ -56,8 +62,19 @@ class DefaultMentionSpanUpdater(
                     null
                 }
             )
+            mentionSpan.updateAvatar((mentionSpan.type as? MentionType.User)?.let { avatarFor(it.userId) })
         }
         return text
+    }
+
+    /** Haven: the user's avatar from the room, or else from their global profile, like Haven Desktop's pills. */
+    private fun avatarFor(userId: UserId): Bitmap? {
+        val members = roomMemberProfilesCache.membersFlow.value
+        val member = members[userId]
+        val profile = pillProfiles.fallbackProfile(userId, members)
+        val url = profile?.avatarUrl ?: member?.avatarUrl
+        val name = profile?.displayName ?: member?.displayName
+        return pillProfiles.avatar(PillAvatarKey(userId, url, name.takeIf { url == null }, theme.isDark.takeIf { url == null } ?: false))
     }
 }
 

@@ -20,6 +20,7 @@ import io.element.android.libraries.matrix.ui.messages.RoomMemberProfilesCache
 import io.element.android.libraries.matrix.ui.messages.RoomNamesCache
 import io.element.android.libraries.textcomposer.mentions.DefaultMentionSpanFormatter
 import io.element.android.libraries.textcomposer.mentions.MentionType
+import io.element.android.libraries.textcomposer.mentions.NoMentionPillProfiles
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 
@@ -29,6 +30,7 @@ class MentionSpanFormatterTest {
     private val formatter = DefaultMentionSpanFormatter(
         roomMemberProfilesCache = roomMemberProfilesCache,
         roomNamesCache = roomNamesCache,
+        pillProfiles = NoMentionPillProfiles,
     )
 
     @Test

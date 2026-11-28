@@ -31,6 +31,7 @@ interface MentionSpanFormatter {
 class DefaultMentionSpanFormatter(
     private val roomMemberProfilesCache: RoomMemberProfilesCache,
     private val roomNamesCache: RoomNamesCache,
+    private val pillProfiles: MentionPillProfiles,
 ) : MentionSpanFormatter {
     /**
      * Format the display text for a mention span.
@@ -49,7 +50,10 @@ class DefaultMentionSpanFormatter(
 
     private fun formatUserMention(userId: UserId): String {
         // Try to get the display name from cache, fallback to userId
-        val displayName = roomMemberProfilesCache.getDisplayName(userId)
+        // Haven: or from the user's global profile when the room has no name for them, like Haven Desktop
+        val members = roomMemberProfilesCache.membersFlow.value
+        val displayName = pillProfiles.fallbackProfile(userId, members)?.displayName?.takeIf { it.isNotBlank() }
+            ?: members[userId]?.takeIf { it.displayName != null }?.disambiguatedDisplayName
         return if (displayName != null) {
             "@$displayName"
         } else {

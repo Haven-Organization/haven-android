@@ -35,6 +35,7 @@ import io.element.android.libraries.textcomposer.mentions.MentionSpan
 import io.element.android.libraries.textcomposer.mentions.MentionSpanTheme
 import io.element.android.libraries.textcomposer.mentions.MentionSpanUpdater
 import io.element.android.libraries.textcomposer.mentions.MentionType
+import io.element.android.libraries.textcomposer.mentions.NoMentionPillProfiles
 import io.element.android.libraries.textcomposer.mentions.getMentionSpans
 import io.element.android.tests.testutils.lambda.assert
 import io.element.android.tests.testutils.lambda.lambdaRecorder
@@ -151,6 +152,7 @@ class TimelineTextViewTest : RobolectricTest() {
             theme = mentionSpanTheme,
             roomMemberProfilesCache = RoomMemberProfilesCache(),
             roomNamesCache = RoomNamesCache(),
+            pillProfiles = NoMentionPillProfiles,
         )
     }
 

@@ -72,6 +72,10 @@ class MentionSpanTheme(val currentUserId: UserId) {
     internal var otherBackgroundColor: Int = Color.WHITE
         private set
 
+    /** Haven: whether the dark theme is on, for the initials avatars of user pills. */
+    internal var isDark: Boolean = false
+        private set
+
     private val paddingValues = PaddingValues(start = 4.dp, end = 6.dp)
     internal val paddingValuesPx = mutableStateOf(0 to 0)
     internal val typeface = mutableStateOf(Typeface.DEFAULT)
@@ -86,6 +90,7 @@ class MentionSpanTheme(val currentUserId: UserId) {
         currentUserBackgroundColor = ScTheme.exposures.mentionBgLegacy?.toArgb() ?: ElementTheme.colors.bgBadgeAccent.toArgb()
         otherTextColor = ElementTheme.colors.textOnSolidPrimary.toArgb()
         otherBackgroundColor = ScTheme.exposures.mentionBgOtherLegacy?.toArgb() ?: ElementTheme.colors.bgBadgePrimary.toArgb()
+        isDark = !ElementTheme.isLightTheme
 
         typeface.value = ElementTheme.typography.fontBodyLgMedium.rememberTypeface().value
         val density = LocalDensity.current

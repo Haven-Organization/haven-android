@@ -8,9 +8,13 @@
 
 package io.element.android.libraries.textcomposer.mentions
 
+import android.graphics.Bitmap
+import android.graphics.BitmapShader
 import android.graphics.Canvas
+import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.RectF
+import android.graphics.Shader
 import android.graphics.Typeface
 import android.text.TextPaint
 import android.text.TextUtils
@@ -33,6 +37,8 @@ class MentionSpan(
 ) : ReplacementSpan() {
     private val backgroundPaint = Paint()
     private val textPaint = TextPaint(Paint.ANTI_ALIAS_FLAG)
+    private val avatarPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+    private val avatarMatrix = Matrix()
 
     private var backgroundColor: Int = 0
     private var textColor: Int = 0
@@ -53,6 +59,9 @@ class MentionSpan(
 
     var trailingText: String? = null
         private set
+
+    /** Haven: the avatar drawn at the start of a user pill, like Haven Desktop's pills. */
+    private var avatar: Bitmap? = null
 
     /**
      * Updates the visual properties of this span.
@@ -94,6 +103,13 @@ class MentionSpan(
         this.trailingText = trailingText
     }
 
+    /** Haven: sets the avatar drawn at the start of the pill, or none. */
+    fun updateAvatar(avatar: Bitmap?) {
+        if (avatar === this.avatar) return
+        this.avatar = avatar
+        avatarPaint.shader = avatar?.let { BitmapShader(it, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP) }
+    }
+
     /**
      * Sets the widest this pill may be. Pass [NO_MAX_WIDTH] to leave it unbounded.
      */
@@ -115,17 +131,20 @@ class MentionSpan(
         textPaint.typeface = typeface
         val trailing = trailingText?.let { " $it" }
         val trailingWidth = trailing?.let { textPaint.measureText(it) } ?: 0f
+        // Haven: the avatar is as tall as the text, a little in from the pill's rounded start
+        val avatarSize = if (avatar != null) textPaint.fontMetrics.let { it.descent - it.ascent } else 0f
+        val leading = if (avatar != null) startPadding / 2f + avatarSize + startPadding else startPadding.toFloat()
         val availableForText = if (maxWidth == NO_MAX_WIDTH) {
             Float.MAX_VALUE
         } else {
-            (maxWidth - startPadding - endPadding - trailingWidth).coerceAtLeast(0f)
+            (maxWidth - leading - endPadding - trailingWidth).coerceAtLeast(0f)
         }
         val fullTextWidth = textPaint.measureText(displayText, 0, displayText.length)
         return if (fullTextWidth <= availableForText) {
-            Measurements(displayText, fullTextWidth, trailing, trailingWidth)
+            Measurements(displayText, fullTextWidth, trailing, trailingWidth, leading, avatarSize)
         } else {
             val truncated = TextUtils.ellipsize(displayText, textPaint, availableForText, TextUtils.TruncateAt.END)
-            Measurements(truncated, textPaint.measureText(truncated, 0, truncated.length), trailing, trailingWidth)
+            Measurements(truncated, textPaint.measureText(truncated, 0, truncated.length), trailing, trailingWidth, leading, avatarSize)
         }
     }
 
@@ -134,8 +153,11 @@ class MentionSpan(
         val textWidth: Float,
         val trailing: String?,
         val trailingWidth: Float,
+        /** What comes before the text: the start padding, or the avatar and the space around it. */
+        val leading: Float,
+        val avatarSize: Float,
     ) {
-        val width: Float get() = textWidth + trailingWidth + startPadding + endPadding
+        val width: Float get() = leading + textWidth + trailingWidth + endPadding
     }
 
     override fun getSize(
@@ -169,10 +191,23 @@ class MentionSpan(
         textPaint.color = textColor
         textPaint.typeface = typeface
 
-        canvas.drawText(measurements.text, 0, measurements.text.length, x + startPadding, y.toFloat(), textPaint)
+        canvas.drawText(measurements.text, 0, measurements.text.length, x + measurements.leading, y.toFloat(), textPaint)
         measurements.trailing?.let { trailing ->
-            canvas.drawText(trailing, x + startPadding + measurements.textWidth, y.toFloat(), textPaint)
+            canvas.drawText(trailing, x + measurements.leading + measurements.textWidth, y.toFloat(), textPaint)
         }
+        avatar?.let { drawAvatar(canvas, it, x + startPadding / 2f, y, measurements.avatarSize) }
+    }
+
+    /** Haven: draws [bitmap] as a circle [size] wide from [left], centred on the text of the line with baseline [y]. */
+    private fun drawAvatar(canvas: Canvas, bitmap: Bitmap, left: Float, y: Int, size: Float) {
+        if (size <= 0f || bitmap.width <= 0 || bitmap.height <= 0) return
+        val fontMetrics = textPaint.fontMetrics
+        val centerY = y + (fontMetrics.ascent + fontMetrics.descent) / 2f
+        val top = centerY - size / 2f
+        avatarMatrix.setScale(size / bitmap.width, size / bitmap.height)
+        avatarMatrix.postTranslate(left, top)
+        avatarPaint.shader?.setLocalMatrix(avatarMatrix)
+        canvas.drawCircle(left + size / 2f, centerY, size / 2f, avatarPaint)
     }
 
     companion object {
