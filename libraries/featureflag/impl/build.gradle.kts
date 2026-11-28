@@ -25,6 +25,8 @@ dependencies {
     implementation(libs.androidx.datastore.preferences)
     implementation(projects.libraries.core)
     implementation(projects.libraries.preferences.api)
+    // Haven: the "Message renderer" setting
+    implementation(projects.schildi.lib)
     implementation(libs.coroutines.core)
 
     testCommonDependencies(libs)

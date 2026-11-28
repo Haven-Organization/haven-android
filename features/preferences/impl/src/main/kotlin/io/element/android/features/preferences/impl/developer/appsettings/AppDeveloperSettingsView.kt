@@ -63,6 +63,8 @@ fun AppDeveloperSettingsView(
             title = "Feature flags",
             showTopDivider = false,
         ) {
+            // Haven: which renderer draws formatted messages
+            HavenMessageRendererPreference()
             FeatureListContent(state)
         }
         ElementCallCategory(state = state)

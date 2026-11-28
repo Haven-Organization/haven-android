@@ -24,9 +24,12 @@ object FeatureFlagBindingContainer {
     @ElementsIntoSet
     fun providesFeatureFlagProvider(
         mutableFeatureFlagProvider: PreferencesFeatureFlagProvider,
+        havenRendererFeatureFlagProvider: io.element.android.libraries.featureflag.impl.HavenRendererFeatureFlagProvider,
     ): Set<FeatureFlagProvider> {
         return buildSet {
             add(mutableFeatureFlagProvider)
+            // Haven: the renderer flag follows the "Message renderer" setting
+            add(havenRendererFeatureFlagProvider)
         }
     }
 }

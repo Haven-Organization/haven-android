@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
+    <string-array name="haven_message_renderer_names">
+        <item>@string/haven_message_renderer_element</item>
+        <item>@string/haven_message_renderer_schildi</item>
+        <item>@string/haven_message_renderer_legacy</item>
+    </string-array>
     <string-array name="sc_space_unread_counts_names">
         <item>@string/sc_space_unread_counts_mode_messages</item>
         <item>@string/sc_space_unread_counts_mode_chats</item>

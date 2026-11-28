@@ -7,6 +7,7 @@
 
 package io.element.android.features.preferences.impl.developer.appsettings
 
+import io.element.android.libraries.featureflag.api.FeatureFlags
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -77,6 +78,8 @@ class AppDeveloperSettingsPresenter(
 
         LaunchedEffect(Unit) {
             featureFlagService.getAvailableFeatures()
+                // Haven: chosen with "Message renderer" instead
+                .filter { it.key != FeatureFlags.NewTimelineEventRenderer.key }
                 .forEach { feature ->
                     enabledFeatures.add(EnabledFeature(feature, featureFlagService.isFeatureEnabled(feature)))
                 }

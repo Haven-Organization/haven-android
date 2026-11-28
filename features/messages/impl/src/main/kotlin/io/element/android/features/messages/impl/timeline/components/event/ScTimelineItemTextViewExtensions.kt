@@ -66,7 +66,7 @@ fun scRenderTimelineItemCaption(
     modifier: Modifier = Modifier,
     onContentLayoutChange: (ContentAvoidingLayoutData) -> Unit = {},
 ): Boolean {
-    if (ScPrefs.LEGACY_MESSAGE_RENDERING.value() || content !is TimelineItemEventContentWithAttachment) {
+    if (ScPrefs.HAVEN_MESSAGE_RENDERER.value() != ScPrefs.MessageRenderer.SCHILDI || content !is TimelineItemEventContentWithAttachment) {
         return false
     }
     ScTimelineItemTextView(

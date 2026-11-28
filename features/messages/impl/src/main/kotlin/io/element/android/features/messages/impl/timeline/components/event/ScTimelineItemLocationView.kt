@@ -72,7 +72,7 @@ fun ScTimelineItemLocationView(
             LocalTextStyle provides if (ScPrefs.EL_TYPOGRAPHY.value()) ElementTheme.typography.fontBodyLgRegular else ElementTheme.typography.fontBodyMdRegular
         ) {
             Box(modifier.semantics { contentDescription = text }) {
-                if (!ScPrefs.LEGACY_MESSAGE_RENDERING.value()) {
+                if (ScPrefs.HAVEN_MESSAGE_RENDERER.value() == ScPrefs.MessageRenderer.SCHILDI) {
                     ScTimelineItemTextView(
                         content = MatrixBodyParseResult(text),
                         onLinkLongClick = {},

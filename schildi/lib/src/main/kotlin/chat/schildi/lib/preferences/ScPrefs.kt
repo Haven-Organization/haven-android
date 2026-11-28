@@ -12,6 +12,17 @@ object ScPrefs {
     }
 
     /** Haven: how 🔫 is drawn (same values as Haven Desktop's `Haven.gunEmojiStyle`). */
+    /**
+     * Haven: how formatted messages are drawn (Developer options' "Message renderer"): Element's Compose renderer,
+     * SchildiChat's, or Element's legacy one (its rich text editor view).
+     */
+    object MessageRenderer {
+        const val ELEMENT = "element"
+        const val SCHILDI = "schildi"
+        const val LEGACY = "legacy"
+        val ALL = arrayOf(ELEMENT, SCHILDI, LEGACY)
+    }
+
     object GunEmojiStyle {
         const val REVOLVER = "revolver"
         const val HANDGUN = "handgun"
@@ -193,7 +204,16 @@ object ScPrefs {
     val VIEW_HIDDEN_EVENTS = ScBoolPref("VIEW_HIDDEN_EVENTS", false, R.string.sc_pref_view_hidden_events_title, authorsChoice = false, upstreamChoice = false)
     val VIEW_REDACTIONS = ScBoolPref("VIEW_REDACTIONS", true, R.string.sc_pref_view_redactions_title, R.string.sc_pref_view_redactions_summary, dependencies = listOf(VIEW_HIDDEN_EVENTS.toDependency(expect = false)), disabledValue = true, upstreamChoice = true)
     val VIEW_MEMBERSHIP_EVENTS_IN_PUBLIC_ROOMS = ScBoolPref("VIEW_MEMBERSHIP_EVENTS_IN_PUBLIC_ROOMS", true, R.string.sc_pref_view_membership_events_in_public_rooms_title, R.string.sc_pref_view_membership_events_in_public_rooms_summary, dependencies = listOf(VIEW_HIDDEN_EVENTS.toDependency(expect = false)), disabledValue = true, upstreamChoice = false, authorsChoice = true) // Haven: default true (SC: false)
-    val LEGACY_MESSAGE_RENDERING = ScBoolPref("LEGACY_MESSAGE_RENDERING", true, R.string.sc_pref_legacy_message_rendering_title, R.string.sc_pref_legacy_message_rendering_summary, authorsChoice = false, upstreamChoice = true, dependencies = SC_DANGER_ZONE.asDependencies()) // Haven: default true (SC: false)
+    // Haven: one setting for the three renderers, in Developer options (instead of SchildiChat's "Legacy message renderer"
+    // and Element's "New timeline event renderer" flag); Element's Compose renderer by default
+    val HAVEN_MESSAGE_RENDERER = ScStringListPref(
+        "HAVEN_MESSAGE_RENDERER",
+        MessageRenderer.ELEMENT,
+        MessageRenderer.ALL,
+        R.array.haven_message_renderer_names,
+        null,
+        R.string.haven_message_renderer_title,
+    )
     val VERBOSE_CONVERSATION_ICONS = ScBoolPref("VERBOSE_CONVERSATION_ICONS", true, R.string.sc_pref_verbose_room_title_icons_title, R.string.sc_pref_verbose_room_title_icons_summary, authorsChoice = false, upstreamChoice = true) // Haven: default true (SC: false)
 
     // Advanced theming options - Light theme
@@ -357,7 +377,6 @@ object ScPrefs {
             SC_DANGER_ZONE,
             ScPrefScreen(R.string.sc_pref_chamber_of_secrets_title, null, listOf(
                 ScDisclaimerPref("SC_CHAMBER_OF_SECRETS_DISCLAIMER", R.string.sc_pref_chamber_of_secrets_summary),
-                LEGACY_MESSAGE_RENDERING,
                 EL_THEME,
                 CLIENT_GENERATED_UNREAD_COUNTS,
             ), dependencies = SC_DANGER_ZONE.asDependencies()),
@@ -436,7 +455,6 @@ object ScPrefs {
         PINNED_MESSAGE_OVERLAY.copy(titleRes = R.string.sc_pref_pinned_message_overlay_title_short),
         PINNED_MESSAGE_TOOLBAR_ACTION.copy(titleRes = R.string.sc_pref_pinned_message_toolbar_title_short),
         //RENDER_INLINE_IMAGES,
-        LEGACY_MESSAGE_RENDERING,
         MESSAGE_CONTEXT_MENU_TEXT_SELECTABLE.copy(titleRes = R.string.sc_pref_message_context_menu_text_selectable_title_short),
         ScPrefCategory(R.string.sc_pref_category_reactions, null, listOf(
             PREFER_FREEFORM_REACTIONS,

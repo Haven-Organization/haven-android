@@ -54,7 +54,7 @@ fun TimelineItemTextView(
     modifier: Modifier = Modifier,
     onContentLayoutChange: (ContentAvoidingLayoutData) -> Unit = {},
 ) {
-    if (!ScPrefs.LEGACY_MESSAGE_RENDERING.value()) {
+    if (ScPrefs.HAVEN_MESSAGE_RENDERER.value() == ScPrefs.MessageRenderer.SCHILDI) {
         ScTimelineItemTextView(
             content = content,
             onLinkLongClick = onLinkLongClick,
