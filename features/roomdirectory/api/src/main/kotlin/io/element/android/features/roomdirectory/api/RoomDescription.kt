@@ -8,6 +8,7 @@
 
 package io.element.android.features.roomdirectory.api
 
+import io.element.android.libraries.designsystem.text.topicPlainText
 import android.os.Parcelable
 import io.element.android.libraries.designsystem.components.avatar.AvatarData
 import io.element.android.libraries.designsystem.components.avatar.AvatarSize
@@ -42,7 +43,8 @@ data class RoomDescription(
     val computedDescription: String
         get() {
             return when {
-                topic != null -> topic
+                // Haven: one line of text when it's HTML (e.g. a bridged profile's bio)
+                topic != null -> topicPlainText(topic)
                 name != null && alias != null -> alias.value
                 name == null && alias == null -> ""
                 else -> roomId.value

@@ -8,6 +8,7 @@
 
 package io.element.android.features.space.impl.root
 
+import io.element.android.libraries.designsystem.text.rememberTopicText
 import androidx.activity.compose.BackHandler
 import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedVisibility
@@ -235,8 +236,9 @@ private fun TopicViewerBottomSheet(
         onDismiss = onDismiss,
         modifier = modifier
     ) {
+        // Haven: formatted when it's HTML (e.g. a bridged group's description)
         ClickableLinkText(
-            text = topicViewerState.topic,
+            annotatedString = rememberTopicText(topicViewerState.topic),
             interactionSource = remember { MutableInteractionSource() },
             style = ElementTheme.typography.fontBodyMdRegular,
             color = ElementTheme.colors.textSecondary,

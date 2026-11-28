@@ -8,6 +8,7 @@
 
 package io.element.android.libraries.designsystem.atomic.atoms
 
+import io.element.android.libraries.designsystem.text.rememberTopicText
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
@@ -23,7 +24,8 @@ fun RoomPreviewDescriptionAtom(
 ) {
     Text(
         modifier = modifier,
-        text = description,
+        // Haven: formatted when it's HTML (e.g. a bridged profile's bio)
+        text = rememberTopicText(description),
         style = ElementTheme.typography.fontBodyMdRegular,
         textAlign = TextAlign.Center,
         color = ElementTheme.colors.textPrimary,

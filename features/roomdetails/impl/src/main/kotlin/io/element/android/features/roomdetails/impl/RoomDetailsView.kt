@@ -8,6 +8,7 @@
 
 package io.element.android.features.roomdetails.impl
 
+import io.element.android.libraries.designsystem.text.rememberTopicText
 import io.element.android.libraries.matrix.ui.formattedname.DisplayNameText
 import io.element.android.libraries.matrix.ui.formattedname.LocalFormattedNamesRoomId
 import io.element.android.libraries.matrix.ui.formattedname.rememberRoomFormattedName
@@ -689,8 +690,9 @@ private fun TopicSection(
                 },
             )
         } else if (roomTopic is RoomTopicState.ExistingTopic) {
+            // Haven: formatted when it's HTML (e.g. a bridged profile's bio)
             ClickableLinkText(
-                text = roomTopic.topic,
+                annotatedString = rememberTopicText(roomTopic.topic),
                 modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 12.dp),
                 interactionSource = remember { MutableInteractionSource() },
                 style = MaterialTheme.typography.bodyMedium.copy(
