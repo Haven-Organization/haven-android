@@ -33,6 +33,7 @@ import com.bumble.appyx.core.plugin.plugins
 import dev.zacsweers.metro.Assisted
 import dev.zacsweers.metro.AssistedInject
 import io.element.android.annotations.ContributesNode
+import io.element.android.features.preferences.impl.labs.LabsPresenter
 import io.element.android.libraries.architecture.NodeInputs
 import io.element.android.libraries.architecture.inputs
 import io.element.android.libraries.di.SessionScope
@@ -54,6 +55,8 @@ class ScTweaksSettingsNode(
     private val sessionCoroutineScope: CoroutineScope,
     // Haven: Emoji & Stickers' Favorite Packs
     private val imagePackService: ImagePackService,
+    // Haven: Element's lab features, in Haven's Labs screen
+    private val labsPresenter: LabsPresenter,
 ) : Node(buildContext, plugins = plugins) {
 
     data class Inputs(
@@ -74,6 +77,7 @@ class ScTweaksSettingsNode(
             LocalScCustomPrefContent provides { key ->
                 when (key) {
                     ScPrefs.HAVEN_FAVORITE_PACKS.key -> HavenFavoritePacks(imagePackService)
+                    ScPrefs.HAVEN_ELEMENT_LABS.key -> HavenElementLabs(labsPresenter)
                 }
             },
         ) {

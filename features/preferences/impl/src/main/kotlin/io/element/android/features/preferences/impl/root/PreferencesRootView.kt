@@ -278,13 +278,7 @@ private fun ColumnScope.GeneralSection(
             onClick = onOpenAnalytics,
         )
     }
-    if (state.showLabsItem) {
-        ListItem(
-            content = { Text(stringResource(id = R.string.screen_labs_title)) },
-            leadingContent = ListItemContent.Icon(IconSource.Vector(CompoundIcons.Labs())),
-            onClick = onOpenLabs,
-        )
-    }
+    // Haven: no separate Labs entry: Element's lab features are in Haven's Labs screen (see HavenElementLabs)
     ListItem(
         content = { Text(stringResource(id = CommonStrings.common_about)) },
         leadingContent = ListItemContent.Icon(IconSource.Vector(Icons.Outlined.Info)),
