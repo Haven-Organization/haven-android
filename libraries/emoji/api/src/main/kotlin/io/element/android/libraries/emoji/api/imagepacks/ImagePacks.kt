@@ -128,10 +128,35 @@ object CustomEmojiHtml {
             "$PLACEHOLDER${images.size - 1}$PLACEHOLDER_END"
         }
         if (images.isEmpty()) return null
-        val html = runCatching { havenMarkdown.toHtml(placeholderText) }.getOrNull() ?: return null
+        // No HTML from markdown when the text has no formatting: then it's the plain text, escaped, with its line breaks
+        val html = runCatching { havenMarkdown.toHtml(placeholderText) }.getOrNull()
+            ?: escape(placeholderText).replace("\n", "<br />")
         return PLACEHOLDER_REGEX.replace(html) { match ->
             images.getOrNull(match.groupValues[1].toInt())?.let(::imgTag) ?: match.value
         }
+    }
+
+    /**
+     * [html] (a rich text message's) with the `:shortcode:`s of custom emoji in [shortcodes] in its text replaced by their
+     * images; null when it has none. Only text between tags is changed, never a tag or its attributes.
+     */
+    fun htmlWithCustomEmoji(html: String, shortcodes: Map<String, PackImage>): String? {
+        if (shortcodes.isEmpty()) return null
+        var changed = false
+        fun convert(text: String) = SHORTCODE_REGEX.replace(text) { match ->
+            val image = shortcodes[match.groupValues[1]] ?: return@replace match.value
+            changed = true
+            imgTag(image)
+        }
+        // The text between the tags, the tags as they are
+        val result = StringBuilder()
+        var last = 0
+        for (tag in TAG_REGEX.findAll(html)) {
+            result.append(convert(html.substring(last, tag.range.first))).append(tag.value)
+            last = tag.range.last + 1
+        }
+        result.append(convert(html.substring(last)))
+        return result.toString().takeIf { changed }
     }
 
     private fun escape(text: String) = text
@@ -139,6 +164,8 @@ object CustomEmojiHtml {
         .replace("<", "&lt;")
         .replace(">", "&gt;")
         .replace("\"", "&quot;")
+
+    private val TAG_REGEX = Regex("<[^>]*>")
 
     // Letters and digits only, so markdown leaves them alone
     private const val PLACEHOLDER = "HAVENCUSTOMEMOJI"

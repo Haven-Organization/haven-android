@@ -60,12 +60,12 @@ class SocialActions(
     }
 
     /** MSC4501 "Cross-posted reply": best effort, never fails the reply itself (already sent). */
-    suspend fun crossPostReply(parent: FeedPost, body: String) {
+    suspend fun crossPostReply(parent: FeedPost, body: String, html: String? = null) {
         val profileRoomId = (repository.ownProfile.value as? OwnProfileState.Linked)?.link?.roomId
         if (crossPostReplies && profileRoomId != null && profileRoomId != parent.roomId) {
             runCatching {
                 val profileRoom = timelineStore.joinedRoom(profileRoomId) ?: return@runCatching
-                val content = SocialContentBuilder.crossPostedReply(body, reference(parent))
+                val content = SocialContentBuilder.crossPostedReply(body, reference(parent), html)
                 profileRoom.sendRaw(SocialContentBuilder.POST_EVENT_TYPE, content.toString()).getOrThrow()
             }.onFailure { Timber.w(it, "Couldn't cross-post reply to profile") }
         }
@@ -77,8 +77,8 @@ class SocialActions(
      * A quote post from the post composer, to the user's profile. With an attachment, the media message is built here
      * (it has to carry MSC4501's `relates_to` too), which needs a plain upload: only possible in unencrypted rooms.
      */
-    suspend fun publishQuote(original: FeedPost, markdown: String, attachment: PostAttachment?): Result<Unit> {
-        if (attachment == null) return quotePost(original, markdown)
+    suspend fun publishQuote(original: FeedPost, markdown: String, html: String?, attachment: PostAttachment?): Result<Unit> {
+        if (attachment == null) return quotePost(original, markdown, html = html)
         return runCatching {
             val roomId = ownProfileRoomId()
             val room = timelineStore.joinedRoom(roomId) ?: throw SocialActionException("Not a member of this room")
@@ -89,7 +89,7 @@ class SocialActions(
             try {
                 val config = mediaOptimizationConfigProviderFactory.create(matrixClient).get()
                 val info = sender.preProcessMedia(attachment.uri, attachment.mimeType, config).getOrThrow()
-                val content = uploadedMediaContent(info, markdown)
+                val content = uploadedMediaContent(info, markdown, html)
                 content.put(Msc4501.RELATES_TO, SocialContentBuilder.quotePost("", reference(original)).getJSONObject(Msc4501.RELATES_TO))
                 room.sendRaw(SocialContentBuilder.POST_EVENT_TYPE, content.toString()).getOrThrow()
             } finally {
@@ -101,7 +101,7 @@ class SocialActions(
 
 
     /** A media message's content for pre-processed media, uploaded unencrypted (see [publishQuote]). */
-    private suspend fun uploadedMediaContent(info: MediaUploadInfo, caption: String): JSONObject {
+    private suspend fun uploadedMediaContent(info: MediaUploadInfo, caption: String, captionHtml: String?): JSONObject {
         suspend fun upload(file: java.io.File, mimeType: String?): String =
             matrixClient.uploadMedia(mimeType ?: "application/octet-stream", file.readBytes()).getOrThrow()
         val infoJson = JSONObject()
@@ -149,6 +149,10 @@ class SocialActions(
             .put("filename", filename)
             .put("url", upload(info.file, mimeType))
             .put("info", infoJson)
+            .apply {
+                // The caption's formatting and custom emoji
+                if (caption.isNotBlank() && captionHtml != null) put("format", "org.matrix.custom.html").put("formatted_body", captionHtml)
+            }
     }
 
     /** Likes and reposts shown before the server confirms them. */
@@ -165,10 +169,10 @@ class SocialActions(
     }
 
     /** A quote post: [commentary] plus the embedded original, posted to [targetRoomId] (the user's profile by default). */
-    suspend fun quotePost(original: FeedPost, commentary: String, targetRoomId: RoomId? = null): Result<Unit> = runCatching {
+    suspend fun quotePost(original: FeedPost, commentary: String, targetRoomId: RoomId? = null, html: String? = null): Result<Unit> = runCatching {
         val roomId = targetRoomId ?: ownProfileRoomId()
         val room = timelineStore.joinedRoom(roomId) ?: throw SocialActionException("Not a member of this room")
-        room.sendRaw(SocialContentBuilder.POST_EVENT_TYPE, SocialContentBuilder.quotePost(commentary, reference(original)).toString()).getOrThrow()
+        room.sendRaw(SocialContentBuilder.POST_EVENT_TYPE, SocialContentBuilder.quotePost(commentary, reference(original), html).toString()).getOrThrow()
         sendRepostReaction(original)
     }
 
@@ -177,7 +181,7 @@ class SocialActions(
      * event type, whose `m.new_content` is the post's content with the new text, keeping the rest (its msgtype, what it
      * quotes or reposts).
      */
-    suspend fun editPost(post: FeedPost, text: String): Result<Unit> = runCatching {
+    suspend fun editPost(post: FeedPost, text: String, html: String? = null): Result<Unit> = runCatching {
         val eventId = post.eventId ?: throw SocialActionException("This post isn't sent yet")
         val room = timelineStore.joinedRoom(post.roomId) ?: throw followRequired(post)
         val newContent = post.contentJson?.let { runCatching { JSONObject(it) }.getOrNull() } ?: JSONObject().put("msgtype", "m.text")
@@ -186,11 +190,15 @@ class SocialActions(
         if (newContent.has(Msc4501.BODY)) {
             // The post's own text is its MSC4501 body (its body is a fallback, e.g. a link)
             newContent.put(Msc4501.BODY, text)
-            newContent.remove(Msc4501.FORMATTED_BODY)
+            if (html != null) newContent.put(Msc4501.FORMATTED_BODY, html) else newContent.remove(Msc4501.FORMATTED_BODY)
         } else {
             newContent.put("body", text)
-            newContent.remove("format")
-            newContent.remove("formatted_body")
+            if (html != null) {
+                newContent.put("format", "org.matrix.custom.html").put("formatted_body", html)
+            } else {
+                newContent.remove("format")
+                newContent.remove("formatted_body")
+            }
         }
         if (!newContent.has("msgtype")) newContent.put("msgtype", "m.text")
         val edit = JSONObject()

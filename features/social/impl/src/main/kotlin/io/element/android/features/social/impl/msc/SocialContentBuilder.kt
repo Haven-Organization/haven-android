@@ -29,9 +29,11 @@ object SocialContentBuilder {
     /** MSC4501 phase 1: post as `m.room.message`. */
     const val POST_EVENT_TYPE = "m.room.message"
 
-    fun post(body: String): JSONObject = JSONObject()
+    /** A text post; [html] its formatting and custom emoji, when it has any. */
+    fun post(body: String, html: String? = null): JSONObject = JSONObject()
         .put("msgtype", "m.text")
         .put("body", body)
+        .apply { if (html != null) put("format", "org.matrix.custom.html").put("formatted_body", html) }
 
     /** A reply: an `m.thread` relation to the thread root, with `m.in_reply_to` the post being replied to (MSC4501 "Posts"). */
     fun reply(body: String, threadRootId: String, parentId: String): JSONObject = post(body)
@@ -45,7 +47,7 @@ object SocialContentBuilder {
         )
 
     /** MSC4501 "Cross-posted reply": a copy of a reply, posted to the replier's own profile for their followers. */
-    fun crossPostedReply(body: String, parent: PostReference): JSONObject = post(body)
+    fun crossPostedReply(body: String, parent: PostReference, html: String? = null): JSONObject = post(body, html)
         .put(Msc4501.RELATES_TO, relatesTo(Msc4501.REL_TYPE_REPLY, parent))
 
     /**
@@ -56,7 +58,7 @@ object SocialContentBuilder {
         .put(Msc4501.RELATES_TO, relatesTo(Msc4501.REL_TYPE_REPOST, original))
 
     /** MSC4501 "Quote Posts": the outer body is the commentary, the original is embedded in `relates_to`. */
-    fun quotePost(commentary: String, original: PostReference): JSONObject = post(commentary)
+    fun quotePost(commentary: String, original: PostReference, html: String? = null): JSONObject = post(commentary, html)
         .put(Msc4501.RELATES_TO, relatesTo(Msc4501.REL_TYPE_REPOST, original))
 
     /** An `m.reaction` annotation: 👍 is a like (MSC4501 "Liking"), 🔁 counts a repost (MSC4501 "Repost counts"). */

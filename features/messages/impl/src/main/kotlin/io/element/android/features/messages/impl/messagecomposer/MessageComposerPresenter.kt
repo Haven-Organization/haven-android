@@ -555,13 +555,19 @@ class MessageComposerPresenter(
     }
 
     /**
-     * Haven: a markdown message with `:shortcode:`s of custom emoji from the room's or the favorite packs gets HTML with
-     * their images, like Haven Desktop (the plain body keeps the shortcodes). Rich text messages are left alone.
+     * Haven: a message with `:shortcode:`s of custom emoji from the room's or the favorite packs gets HTML with their
+     * images, like Haven Desktop (the plain body keeps the shortcodes): a markdown message's from its markdown, a rich text
+     * message's in its HTML.
      */
     private suspend fun Message.withCustomEmoji(): Message {
-        if (html != null || !markdown.contains(':')) return this
+        if (!markdown.contains(':')) return this
         val shortcodes = runCatching { imagePackService.emoticonShortcodes(room.roomId) }.getOrDefault(emptyMap())
-        val customHtml = CustomEmojiHtml.htmlFromMarkdown(markdown, shortcodes, havenMarkdown) ?: return this
+        val richHtml = html
+        val customHtml = if (richHtml != null) {
+            CustomEmojiHtml.htmlWithCustomEmoji(richHtml, shortcodes)
+        } else {
+            CustomEmojiHtml.htmlFromMarkdown(markdown, shortcodes, havenMarkdown)
+        } ?: return this
         return copy(html = customHtml)
     }
 

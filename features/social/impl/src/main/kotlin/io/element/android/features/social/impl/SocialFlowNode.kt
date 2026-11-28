@@ -573,18 +573,18 @@ class SocialFlowNode(
                 navigator.back()
             }
 
-            override fun onTextSent(markdown: String) {
+            override fun onTextSent(markdown: String, html: String?) {
                 // MSC4501 "Cross-posted reply": a copy of the reply on the user's profile, for their followers.
                 if (target.kind != ComposeKind.Reply || targetRoomId == null || targetEventId == null) return
                 sessionScope.launch {
                     val parent = known ?: deps.timelineStore.feedPost(targetRoomId, targetEventId)
                         ?: deps.peek.post(targetRoomId, targetEventId).getOrNull()
                         ?: return@launch
-                    deps.actions.crossPostReply(parent, markdown)
+                    deps.actions.crossPostReply(parent, markdown, html)
                 }
             }
 
-            override suspend fun sendQuote(markdown: String, attachment: Pair<android.net.Uri, String>?): Result<Unit> {
+            override suspend fun sendQuote(markdown: String, html: String?, attachment: Pair<android.net.Uri, String>?): Result<Unit> {
                 if (targetRoomId == null || targetEventId == null) return Result.failure(IllegalStateException("No post to quote"))
                 val original = known ?: deps.timelineStore.feedPost(targetRoomId, targetEventId)
                     ?: deps.peek.post(targetRoomId, targetEventId).getOrNull()
@@ -592,13 +592,14 @@ class SocialFlowNode(
                 return deps.actions.publishQuote(
                     original,
                     markdown,
+                    html,
                     attachment?.let { (uri, mimeType) -> io.element.android.features.social.impl.data.PostAttachment(uri, mimeType) },
                 )
             }
 
-            override suspend fun sendEdit(markdown: String): Result<Unit> {
+            override suspend fun sendEdit(markdown: String, html: String?): Result<Unit> {
                 val post = known ?: return Result.failure(IllegalStateException("Couldn't load the post"))
-                return deps.actions.editPost(post, markdown)
+                return deps.actions.editPost(post, markdown, html)
             }
 
             @Composable

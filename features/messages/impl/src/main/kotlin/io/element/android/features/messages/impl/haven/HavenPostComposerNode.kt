@@ -6,6 +6,9 @@
 
 package io.element.android.features.messages.impl.haven
 
+import io.element.android.libraries.emoji.api.imagepacks.CustomEmojiHtml
+import io.element.android.libraries.emoji.api.imagepacks.ImagePackService
+import io.element.android.libraries.matrix.api.HavenMarkdown
 import io.element.android.libraries.matrix.api.timeline.item.event.toEventOrTransactionId
 import chat.schildi.lib.preferences.value
 import chat.schildi.lib.preferences.ScPrefs
@@ -153,6 +156,8 @@ class HavenPostComposerNode(
     private val scPreferencesStore: ScPreferencesStore,
     private val dispatchers: CoroutineDispatchers,
     private val buildMeta: BuildMeta,
+    private val imagePackService: ImagePackService,
+    private val havenMarkdown: HavenMarkdown,
 ) : BaseFlowNode<HavenPostComposerNode.NavTarget>(
     backstack = BackStack(initialElement = NavTarget.Composer, savedStateMap = buildContext.savedStateMap),
     buildContext = buildContext,
@@ -184,13 +189,16 @@ class HavenPostComposerNode(
         fun onClose()
 
         /** A text post or reply was sent, with this text (Social cross-posts replies to the user's profile). */
-        fun onTextSent(markdown: String)
+        fun onTextSent(markdown: String, html: String?)
 
-        /** Sends a quote post (with MSC4501's `relates_to`), with the attachment picked for it, if any. */
-        suspend fun sendQuote(markdown: String, attachment: Pair<Uri, String>?): Result<Unit>
+        /**
+         * Sends a quote post (with MSC4501's `relates_to`), with the attachment picked for it, if any. [html]: the text's
+         * HTML (its markdown formatting and custom emoji), when it has any.
+         */
+        suspend fun sendQuote(markdown: String, html: String?, attachment: Pair<Uri, String>?): Result<Unit>
 
-        /** Sends the edit of a post [Inputs.edit] says is [EditPost.raw]. */
-        suspend fun sendEdit(markdown: String): Result<Unit> = Result.failure(UnsupportedOperationException("Can't edit this post"))
+        /** Sends the edit of a post [Inputs.edit] says is [EditPost.raw] ([html] as for [sendQuote]). */
+        suspend fun sendEdit(markdown: String, html: String?): Result<Unit> = Result.failure(UnsupportedOperationException("Can't edit this post"))
 
         /** Above the text box: the post being replied to, or the room picker of a new post ([currentText] to keep). */
         @Composable
@@ -283,6 +291,16 @@ class HavenPostComposerNode(
     @Composable
     override fun View(modifier: Modifier) {
         BackstackView(modifier)
+    }
+
+    /**
+     * The HTML of text the [Callback] sends ([sendsItself]), like a message's: its custom emoji `:shortcode:`s as their
+     * images, and its markdown formatting; null when it has neither.
+     */
+    private suspend fun htmlOf(markdown: String): String? {
+        val shortcodes = runCatching { imagePackService.emoticonShortcodes(room.roomId) }.getOrDefault(emptyMap())
+        return CustomEmojiHtml.htmlFromMarkdown(markdown, shortcodes, havenMarkdown)
+            ?: runCatching { havenMarkdown.toHtml(markdown) }.getOrNull()
     }
 
     private fun currentMode(): Timeline.Mode = timelineController?.mainTimelineMode() ?: Timeline.Mode.Live
@@ -395,7 +413,7 @@ class HavenPostComposerNode(
         LaunchedEffect(sendingText) {
             val text = sendingText ?: return@LaunchedEffect
             snapshotFlow { markdown(latestState.textEditorState).isBlank() }.first { it }
-            callback.onTextSent(text)
+            callback.onTextSent(text, htmlOf(text))
             callback.onClose()
         }
         // A voice message: sent once its preview is gone.
@@ -411,7 +429,8 @@ class HavenPostComposerNode(
             quoteSending = true
             scope.launch {
                 val text = markdown(latestState.textEditorState).trim()
-                val result = if (inputs.edit != null) callback.sendEdit(text) else callback.sendQuote(text, quoteAttachment)
+                val html = htmlOf(text)
+                val result = if (inputs.edit != null) callback.sendEdit(text, html) else callback.sendQuote(text, html, quoteAttachment)
                 quoteSending = false
                 result.fold(onSuccess = { callback.onClose() }, onFailure = { quoteError = it.message ?: it.toString() })
             }
@@ -500,7 +519,7 @@ class HavenPostComposerNode(
                         isEmojiPickerShown = state.emojiPickerState != ComposerEmojiPickerState.Hidden && !state.isStickerPickerShown,
                         // Haven: stickers from image packs, left of the emoji button
                         onToggleSticker = rememberEmojiPickerKeyboardToggle(state, stickers = true)
-                            .takeIf { !ScPrefs.HAVEN_DISABLE_CUSTOM_EMOJI_PICKER.value() && !sendsItself },
+                            .takeIf { !ScPrefs.HAVEN_DISABLE_CUSTOM_EMOJI_PICKER.value() },
                         isStickerPickerShown = state.isStickerPickerShown,
                         // A quote post can't be a voice message (it couldn't carry the quote).
                         voiceMessageState = voiceState.voiceMessageState.takeIf { !textOnly },
