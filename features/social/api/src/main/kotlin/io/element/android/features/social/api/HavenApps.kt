@@ -87,4 +87,10 @@ interface HavenAppsService {
 
     /** Removes a widget app and unpins it. */
     suspend fun removeWidgetApp(appId: String): Result<Unit>
+
+    /**
+     * Brings the apps up to date (in the background, at most every so often): the lists from the account data, which
+     * another device may have changed, and each widget app's name and icon from its room's widget, like Haven Desktop.
+     */
+    fun refresh()
 }

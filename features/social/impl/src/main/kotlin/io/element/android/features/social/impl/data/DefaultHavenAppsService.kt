@@ -6,6 +6,7 @@
 
 package io.element.android.features.social.impl.data
 
+import java.util.concurrent.atomic.AtomicBoolean
 import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.SingleIn
 import io.element.android.features.social.api.HavenAppItem
@@ -82,6 +83,7 @@ class DefaultHavenAppsService(
             }
             save()
             syncWidgetRoomsFirst()
+            refreshFromRooms()
             cacheIcons()
         }
         // Created with the home screen: find and load the Social rooms ahead of time, so the Feed, Groups and Profile
@@ -105,6 +107,95 @@ class DefaultHavenAppsService(
             .mapNotNull { runCatching { RoomId(it) }.getOrNull() }
             .filter { roomId -> matrixClient.getRoom(roomId)?.use { true } != true }
         if (unknown.isNotEmpty()) matrixClient.roomListService.subscribeToVisibleRooms(unknown)
+    }
+
+    private val refreshing = AtomicBoolean(false)
+    @Volatile private var lastRefresh = 0L
+
+    override fun refresh() {
+        val now = System.currentTimeMillis()
+        if (now - lastRefresh < REFRESH_INTERVAL_MS || !refreshing.compareAndSet(false, true)) return
+        lastRefresh = now
+        sessionScope.launch {
+            try {
+                if (readAccountData()) save()
+                refreshFromRooms()
+                cacheIcons()
+            } finally {
+                refreshing.set(false)
+            }
+        }
+    }
+
+    /**
+     * Like Haven Desktop's refreshWidgetAppEntry: brings each widget app's entry in step with the widget as its room has
+     * it now (a new icon, name or URL), so the bar shows its current look and "Add it back" restores its latest version.
+     *
+     * A rewrite by another account only carries over when it's the same account that set the widget before, on the same
+     * site (Desktop's widgetAppConsentCarriesOver); otherwise the entry keeps its last version. The room name is left as
+     * it is: Desktop computes it differently, and the two would keep overwriting each other's.
+     */
+    private suspend fun refreshFromRooms() {
+        val me = matrixClient.sessionId.value
+        val updates = mutableMapOf<Pair<String, String>, JSONObject>()
+        widgetEntries.groupBy { it.getString("room_id") }.forEach { (roomId, entries) ->
+            val room = runCatching { RoomId(roomId) }.getOrNull()?.let { matrixClient.getRoom(it) } ?: return@forEach
+            // Widgets aren't in what sliding sync stores for a room, so its state comes from the server
+            val state = room.use { it.fetchFullRoomState().getOrNull() } ?: return@forEach
+            val events = state.mapNotNull { runCatching { JSONObject(it) }.getOrNull() }
+            entries.forEach { entry ->
+                val current = currentEntry(events, entry) ?: return@forEach
+                if (jsonEquals(entry, current)) return@forEach
+                val sender = current.optString("sender")
+                val origin = originOf(entry.optJSONObject("content")?.optStringOrNull("url"))
+                val carriesOver = origin != null && sender == entry.optString("sender") &&
+                    originOf(current.optJSONObject("content")?.optStringOrNull("url")) == origin
+                if (sender != me && !carriesOver) return@forEach
+                updates[roomId to entry.getString("widget_id")] = current
+            }
+        }
+        if (updates.isEmpty()) return
+        writeMutex.withLock {
+            // Re-read, so changes made on another device meanwhile aren't lost
+            val latest = runCatching { readWidgetEntries() }.getOrElse { return@withLock }
+            val updated = latest.map { e -> updates[e.getString("room_id") to e.getString("widget_id")] ?: e }
+            if (updated.zip(latest).all { (a, b) -> a === b }) return@withLock
+            matrixClient.setAccountData(HavenAccountData.WIDGET_APPS, JSONObject().put("widgets", JSONArray(updated)).toString())
+                .onSuccess {
+                    setWidgetEntries(updated)
+                    save()
+                }
+                .onFailure { Timber.w(it, "Couldn't update the widget apps") }
+        }
+    }
+
+    /** [entry] as its room's widget is now ([events], the room's state), or null when the room no longer has it. */
+    private fun currentEntry(events: List<JSONObject>, entry: JSONObject): JSONObject? {
+        val widgetId = entry.getString("widget_id")
+        fun widget(type: String) = events.firstOrNull { it.optString("type") == type && it.optString("state_key") == widgetId }
+        val legacy = widget(WIDGET_LEGACY) ?: return null
+        val content = legacy.optJSONObject("content")?.takeIf { it.optStringOrNull("url") != null } ?: return null
+        val stateTypes = JSONArray().put(WIDGET_LEGACY)
+        if (widget(WIDGET_STABLE)?.optJSONObject("content")?.optStringOrNull("url") != null) stateTypes.put(WIDGET_STABLE)
+        return JSONObject()
+            .put("room_id", entry.getString("room_id"))
+            .put("widget_id", widgetId)
+            .apply { entry.optStringOrNull("room_name")?.let { put("room_name", it) } }
+            .put("state_types", stateTypes)
+            .put("content", content)
+            .put("sender", legacy.optString("sender"))
+    }
+
+    private fun originOf(url: String?): String? = url?.let { runCatching { java.net.URI(it) }.getOrNull() }
+        ?.takeIf { it.scheme != null && it.host != null }
+        ?.let { "${it.scheme}://${it.host}${if (it.port != -1) ":${it.port}" else ""}" }
+
+    /** Whether two JSON values are the same, whatever order their keys are in. */
+    private fun jsonEquals(a: Any?, b: Any?): Boolean = when {
+        a is JSONObject && b is JSONObject -> a.length() == b.length() && a.keys().asSequence().all { b.has(it) && jsonEquals(a.opt(it), b.opt(it)) }
+        a is JSONArray && b is JSONArray -> a.length() == b.length() && (0 until a.length()).all { jsonEquals(a.opt(it), b.opt(it)) }
+        a is Number && b is Number -> a.toDouble() == b.toDouble()
+        else -> a == b
     }
 
     /** Returns whether both lists could be read (from the session's store, or else from the server). */
@@ -280,6 +371,9 @@ class DefaultHavenAppsService(
     }
 
     private companion object {
+        /** The least time between two [refresh]es. */
+        const val REFRESH_INTERVAL_MS = 60_000L
+
         /** Px; the same size the icons were already asked for, at most 64dp-ish on the bars. */
         const val ICON_SIZE = 128L
 

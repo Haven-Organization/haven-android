@@ -225,7 +225,10 @@ class HomeFlowNode(
                 loadingJoinedRoomJob.value = AsyncData.Loading(job)
             }
 
-            // Haven: Apps button and pinned apps on the home bars
+            // Haven: Apps button and pinned apps on the home bars, brought up to date whenever the home screen is back
+            io.element.android.libraries.designsystem.utils.OnLifecycleEvent { _, event ->
+                if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) havenAppsService.refresh()
+            }
             val havenPinnedAppIds by havenAppsService.pinnedAppIds.collectAsState()
             val havenWidgetApps by havenAppsService.widgetApps.collectAsState()
             val havenAllApps = io.element.android.features.social.api.HavenApp.entries.map { io.element.android.features.social.api.HavenAppItem.Builtin(it) } + havenWidgetApps
