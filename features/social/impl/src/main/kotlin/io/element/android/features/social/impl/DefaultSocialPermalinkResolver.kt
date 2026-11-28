@@ -6,6 +6,8 @@
 
 package io.element.android.features.social.impl
 
+import io.element.android.features.social.api.HavenApp
+import io.element.android.features.social.api.HavenAppsService
 import dev.zacsweers.metro.ContributesBinding
 import io.element.android.features.social.api.SocialPermalinkResolver
 import io.element.android.features.social.impl.data.SocialRepository
@@ -21,8 +23,11 @@ import timber.log.Timber
 class DefaultSocialPermalinkResolver(
     private val matrixClient: MatrixClient,
     private val repository: SocialRepository,
+    private val appsService: HavenAppsService,
 ) : SocialPermalinkResolver {
     override suspend fun socialRoomId(roomIdOrAlias: RoomIdOrAlias, via: List<String>): RoomId? {
+        // Social turned off (itself, or all apps, in Settings > Apps): links open rooms as they would without it
+        if (!appsService.appPreferences.value.isShown(HavenApp.Social.id)) return null
         if (roomIdOrAlias is RoomIdOrAlias.Id) {
             val roomId = roomIdOrAlias.roomId
             // A joined room: its type is known (cached after the first time), no need for a preview
