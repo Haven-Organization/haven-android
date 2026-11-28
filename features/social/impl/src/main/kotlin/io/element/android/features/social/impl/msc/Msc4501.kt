@@ -62,4 +62,7 @@ object HavenAccountData {
     const val PINNED_APPS = "software.haven.pinned_apps"
     const val FEED_FILTER = "software.haven.social.feed_filter"
     const val WIDGET_APPS = "software.haven.widget_apps"
+
+    /** Settings > Apps: `{"disabled": bool, "hidden": [app ids]}`. */
+    const val APP_PREFERENCES = "software.haven.app_preferences"
 }

@@ -44,6 +44,7 @@ private fun HavenSettingsItem(
         R.string.sc_pref_category_notifications -> R.string.haven_pref_notification_alerts_title to CompoundIcons.Notifications()
         R.string.haven_pref_labs_title -> screen.titleRes to CompoundIcons.Labs()
         R.string.haven_pref_emoji_stickers_title -> screen.titleRes to CompoundIcons.Reaction()
+        R.string.haven_pref_apps_title -> screen.titleRes to CompoundIcons.Extensions()
         R.string.haven_pref_advanced_title -> screen.titleRes to CompoundIcons.AdvancedSettings()
         else -> screen.titleRes to CompoundIcons.Settings()
     }

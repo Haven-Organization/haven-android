@@ -6,6 +6,7 @@
 
 package io.element.android.features.social.impl.data
 
+import io.element.android.features.social.api.HavenAppPreferences
 import java.util.concurrent.atomic.AtomicBoolean
 import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.SingleIn
@@ -70,6 +71,9 @@ class DefaultHavenAppsService(
 
     private val _widgetApps = MutableStateFlow<List<HavenAppItem.Widget>>(emptyList())
     override val widgetApps: StateFlow<List<HavenAppItem.Widget>> = _widgetApps.asStateFlow()
+
+    private val _appPreferences = MutableStateFlow(HavenAppPreferences())
+    override val appPreferences: StateFlow<HavenAppPreferences> = _appPreferences.asStateFlow()
 
     init {
         // The saved copy first (a small file, read here so the very first frame already has the pinned apps)...
@@ -204,6 +208,8 @@ class DefaultHavenAppsService(
             .onSuccess { content -> content?.let { _pinnedAppIds.value = it.optJSONArray("pinned").toStringList() } }
         val widgets = readContentOrError(HavenAccountData.WIDGET_APPS)
             .onSuccess { content -> content?.let { setWidgetEntries(validEntries(it)) } }
+        readContentOrError(HavenAccountData.APP_PREFERENCES)
+            .onSuccess { content -> _appPreferences.value = preferencesFrom(content) }
         return pinned.isSuccess && widgets.isSuccess
     }
 
@@ -260,6 +266,7 @@ class DefaultHavenAppsService(
             val saved = JSONObject(savedFile.readText())
             _pinnedAppIds.value = saved.optJSONArray("pinned").toStringList()
             setWidgetEntries(validEntries(saved))
+            _appPreferences.value = preferencesFrom(saved.optJSONObject("preferences"))
         }.onFailure { Timber.w(it, "Couldn't read the saved apps") }
     }
 
@@ -268,6 +275,10 @@ class DefaultHavenAppsService(
             val json = JSONObject()
                 .put("pinned", JSONArray(_pinnedAppIds.value))
                 .put("widgets", JSONArray(widgetEntries))
+                .put(
+                    "preferences",
+                    JSONObject().put("disabled", _appPreferences.value.disabled).put("hidden", JSONArray(_appPreferences.value.hidden)),
+                )
             cacheDir.mkdirs()
             val tmp = File(savedFile.path + ".tmp")
             tmp.writeText(json.toString())
@@ -330,6 +341,32 @@ class DefaultHavenAppsService(
                 save()
             }
     }
+
+    override suspend fun setAppsDisabled(disabled: Boolean): Result<Unit> = writePreferences { it.put("disabled", disabled) }
+
+    override suspend fun setAppHidden(appId: String, hidden: Boolean): Result<Unit> = writePreferences { content ->
+        val others = content.optJSONArray("hidden").toStringList().filter { it != appId }
+        content.put("hidden", JSONArray(if (hidden) others + appId else others))
+    }
+
+    /**
+     * Like Haven Desktop: changes the latest preferences (re-read, so changes made on another device aren't lost), keeping
+     * any fields a newer version added. When they can't be read, nothing is saved rather than saving over them.
+     */
+    private suspend fun writePreferences(change: (JSONObject) -> Unit): Result<Unit> = writeMutex.withLock {
+        val content = readContentOrError(HavenAccountData.APP_PREFERENCES).getOrElse { return@withLock Result.failure(it) } ?: JSONObject()
+        change(content)
+        matrixClient.setAccountData(HavenAccountData.APP_PREFERENCES, content.toString())
+            .onSuccess {
+                _appPreferences.value = preferencesFrom(content)
+                save()
+            }
+    }
+
+    private fun preferencesFrom(content: JSONObject?) = HavenAppPreferences(
+        disabled = content?.optBoolean("disabled") == true,
+        hidden = content?.optJSONArray("hidden").toStringList(),
+    )
 
     override suspend fun addWidgetApp(roomId: String, widgetId: String): Result<Unit> = runCatching {
         val room = matrixClient.getRoom(RoomId(roomId)) ?: error("Room not found")

@@ -32,8 +32,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import chat.schildi.lib.preferences.ScPrefs
-import chat.schildi.lib.preferences.value
 import com.bumble.appyx.core.modality.BuildContext
 import com.bumble.appyx.core.node.Node
 import com.bumble.appyx.core.plugin.Plugin
@@ -84,7 +82,7 @@ class ExtensionsNode(
         val widgetApps by appsService.widgetApps.collectAsState()
         val scope = rememberCoroutineScope()
         var error by remember { mutableStateOf<String?>(null) }
-        val appsEnabled = ScPrefs.HAVEN_APPS_ENABLED.value()
+        val appsEnabled = !appsService.appPreferences.collectAsState().value.disabled
         Scaffold(
             modifier = modifier,
             topBar = {

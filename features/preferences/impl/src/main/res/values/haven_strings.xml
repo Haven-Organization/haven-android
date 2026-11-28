@@ -5,4 +5,20 @@
     <string name="haven_screen_moderation_and_safety_send_read_receipts_description">Let others see when you\'ve read their messages. When off, your read position is still kept in sync privately between your own devices.</string>
     <string name="haven_screen_moderation_and_safety_send_typing_notifications">Send typing notifications</string>
     <string name="haven_screen_moderation_and_safety_send_typing_notifications_description">Let others see when you\'re typing.</string>
+    <!-- Haven: Settings > Apps (like Haven Desktop's Apps tab) -->
+    <string name="haven_apps_enable_title">Enable apps</string>
+    <string name="haven_apps_enable_summary">Turning this off hides the Apps button and all your apps, including pinned ones. Nothing is removed.</string>
+    <string name="haven_apps_origin_builtin">Built in</string>
+    <string name="haven_apps_origin_widget">Widget</string>
+    <string name="haven_apps_origin_widget_from">Widget from %1$s</string>
+    <string name="haven_apps_remove">Remove</string>
+    <string name="haven_apps_remove_title">Remove %1$s from Apps?</string>
+    <string name="haven_apps_remove_widget_description">"%1$s" will still be available in %2$s\'s extensions, so you can add it to your apps again from there.</string>
+    <string name="haven_apps_its_room">its room</string>
+    <string name="haven_apps_remove_failed_title">Couldn\'t remove it from Apps</string>
+    <string name="haven_apps_remove_failed_description">Check your connection and try again.</string>
+    <string name="haven_apps_back_to_apps">Back to Apps</string>
+    <string name="haven_apps_social_posting">Social: Posting</string>
+    <string name="haven_social_cross_post_replies">Cross-post replies to your profile</string>
+    <string name="haven_social_cross_post_replies_description">When off, your replies in groups and other profiles will not be shown on your profile</string>
 </resources>

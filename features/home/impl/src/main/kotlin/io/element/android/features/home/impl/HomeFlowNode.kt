@@ -231,7 +231,10 @@ class HomeFlowNode(
             }
             val havenPinnedAppIds by havenAppsService.pinnedAppIds.collectAsState()
             val havenWidgetApps by havenAppsService.widgetApps.collectAsState()
-            val havenAllApps = io.element.android.features.social.api.HavenApp.entries.map { io.element.android.features.social.api.HavenAppItem.Builtin(it) } + havenWidgetApps
+            // Settings > Apps: apps turned off, or one hidden (shared with Haven Desktop)
+            val havenAppPreferences by havenAppsService.appPreferences.collectAsState()
+            val havenAllApps = (io.element.android.features.social.api.HavenApp.entries.map { io.element.android.features.social.api.HavenAppItem.Builtin(it) } + havenWidgetApps)
+                .filter { havenAppPreferences.isShown(it.id) }
             val havenAppsBar = io.element.android.features.social.api.HavenAppsBarState(
                 allApps = havenAllApps,
                 // In the Apps menu's order (built-in apps, then widget apps), not the order they were pinned in, on both
@@ -242,7 +245,7 @@ class HomeFlowNode(
                 onRemoveWidgetApp = { app -> sessionCoroutineScope.launch { havenAppsService.removeWidgetApp(app.id) } },
                 onGoToRoom = { roomId -> navigateToRoom(io.element.android.libraries.matrix.api.core.RoomId(roomId), null) },
             )
-            val havenAppsEnabled = chat.schildi.lib.preferences.ScPrefs.HAVEN_APPS_ENABLED.value()
+            val havenAppsEnabled = !havenAppPreferences.disabled
             androidx.compose.runtime.CompositionLocalProvider(io.element.android.features.social.api.LocalHavenAppsBar provides havenAppsBar.takeIf { havenAppsEnabled }) {
                 HomeView(
                     homeState = state,

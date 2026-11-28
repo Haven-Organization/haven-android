@@ -6,6 +6,10 @@
 
 package io.element.android.features.social.impl.data
 
+import io.element.android.features.social.api.SocialSettings
+import io.element.android.libraries.di.annotations.SessionCoroutineScope
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 import io.element.android.libraries.matrix.api.timeline.Timeline
 import io.element.android.libraries.mediaupload.api.MediaOptimizationConfigProviderFactory
 import io.element.android.libraries.mediaupload.api.MediaSenderRoomTimelineFactory
@@ -41,9 +45,15 @@ class SocialActions(
     private val http: SocialHttpApi,
     private val mediaSenderFactory: MediaSenderRoomTimelineFactory,
     private val mediaOptimizationConfigProviderFactory: MediaOptimizationConfigProviderFactory,
+    private val socialSettings: SocialSettings,
+    @SessionCoroutineScope private val sessionScope: CoroutineScope,
 ) {
-    /** Haven Desktop's "Cross-post replies to your profile" setting defaults to on. */
-    var crossPostReplies: Boolean = true
+    /** Haven Desktop's "Cross-post replies to your profile" setting (on by default), shared with it ([SocialSettings]). */
+    var crossPostReplies: Boolean
+        get() = socialSettings.crossPostReplies.value
+        set(value) {
+            sessionScope.launch { socialSettings.setCrossPostReplies(value) }
+        }
 
     suspend fun post(roomId: RoomId, body: String): Result<Unit> = runCatching {
         val room = timelineStore.joinedRoom(roomId) ?: throw SocialActionException("Not a member of this room")

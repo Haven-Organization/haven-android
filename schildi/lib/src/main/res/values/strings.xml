@@ -21,9 +21,8 @@
     <string name="haven_formatted_display_names_title">Formatted names</string>
     <string name="haven_formatted_display_names_summary">Show display names and room names with bold, italics and custom emoji when they have them (MSC4589, MSC4591).</string>
     <string name="haven_pref_notification_alerts_title">Notification alerts</string>
-    <string name="haven_pref_category_apps">Apps</string>
-    <string name="haven_apps_enabled_title">Enable apps</string>
-    <string name="haven_apps_enabled_summary">Show the Apps button and pinned apps (Social, widget apps). When off, apps are hidden.</string>
+    <string name="haven_pref_apps_title">Apps</string>
+    <string name="haven_pref_apps_summary">Turn apps on or off, show or hide each one, and their settings</string>
     <string name="haven_apps_button_right_title">Apps button on the right</string>
     <string name="haven_apps_button_right_summary">Show the Apps button at the right end of the space bar instead of the left</string>
     <string name="haven_pinned_apps_right_title">Pinned apps on the right</string>

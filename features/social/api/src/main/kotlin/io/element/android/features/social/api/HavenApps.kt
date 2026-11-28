@@ -93,4 +93,33 @@ interface HavenAppsService {
      * another device may have changed, and each widget app's name and icon from its room's widget, like Haven Desktop.
      */
     fun refresh()
+
+    /** The user's choices about their apps (Settings > Apps), shared with Haven Desktop. */
+    val appPreferences: StateFlow<HavenAppPreferences>
+
+    /** Turns apps off altogether (or back on): the Apps button and every app, pinned ones too, are hidden. */
+    suspend fun setAppsDisabled(disabled: Boolean): Result<Unit>
+
+    /** Hides (or shows again) one app, keeping its pin and its place in the apps. */
+    suspend fun setAppHidden(appId: String, hidden: Boolean): Result<Unit>
+}
+
+/**
+ * Haven Desktop's `software.haven.app_preferences` account data: apps turned off altogether ([disabled]), and the ids of
+ * the apps the user has hidden ([hidden]), without removing them.
+ */
+data class HavenAppPreferences(
+    val disabled: Boolean = false,
+    val hidden: List<String> = emptyList(),
+) {
+    /** Whether [appId] shows: apps aren't turned off, and it isn't hidden. */
+    fun isShown(appId: String): Boolean = !disabled && appId !in hidden
+}
+
+/** Social's settings (Settings > Apps > Social), shared with Haven Desktop. */
+interface SocialSettings {
+    /** Haven Desktop's "Cross-post replies to your profile" (`Social.crossPostReplies`), on by default. */
+    val crossPostReplies: StateFlow<Boolean>
+
+    suspend fun setCrossPostReplies(enabled: Boolean): Result<Unit>
 }

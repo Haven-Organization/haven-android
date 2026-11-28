@@ -16,6 +16,8 @@
 
 package chat.schildi.preferences.tweaks
 
+import io.element.android.features.social.api.HavenAppsService
+import io.element.android.features.social.api.SocialSettings
 import androidx.compose.runtime.CompositionLocalProvider
 import io.element.android.libraries.emoji.api.imagepacks.ImagePackService
 import androidx.compose.runtime.Composable
@@ -57,6 +59,9 @@ class ScTweaksSettingsNode(
     private val imagePackService: ImagePackService,
     // Haven: Element's lab features, in Haven's Labs screen
     private val labsPresenter: LabsPresenter,
+    // Haven: Settings > Apps
+    private val havenAppsService: HavenAppsService,
+    private val socialSettings: SocialSettings,
 ) : Node(buildContext, plugins = plugins) {
 
     data class Inputs(
@@ -78,6 +83,7 @@ class ScTweaksSettingsNode(
                 when (key) {
                     ScPrefs.HAVEN_FAVORITE_PACKS.key -> HavenFavoritePacks(imagePackService)
                     ScPrefs.HAVEN_ELEMENT_LABS.key -> HavenElementLabs(labsPresenter)
+                    ScPrefs.HAVEN_APPS_SETTINGS.key -> HavenAppsSettings(havenAppsService, socialSettings)
                 }
             },
         ) {

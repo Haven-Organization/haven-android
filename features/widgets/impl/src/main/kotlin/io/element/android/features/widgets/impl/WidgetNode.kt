@@ -45,8 +45,6 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
-import chat.schildi.lib.preferences.ScPrefs
-import chat.schildi.lib.preferences.value
 import com.bumble.appyx.core.modality.BuildContext
 import com.bumble.appyx.core.node.Node
 import com.bumble.appyx.core.plugin.Plugin
@@ -260,7 +258,7 @@ class WidgetNode(
                 Icon(CompoundIcons.OverflowVertical(), contentDescription = stringResource(R.string.widgets_more))
             }
             DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                if (ScPrefs.HAVEN_APPS_ENABLED.value()) {
+                if (!appsService.appPreferences.collectAsState().value.disabled) {
                     DropdownMenuItem(
                         text = { Text(stringResource(if (isApp) R.string.widgets_remove_from_apps else R.string.widgets_add_to_apps)) },
                         onClick = {

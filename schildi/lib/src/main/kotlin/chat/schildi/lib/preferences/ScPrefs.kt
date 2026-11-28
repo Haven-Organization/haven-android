@@ -160,10 +160,12 @@ object ScPrefs {
     )
 
     // Haven: the Apps framework (Apps button, pinned apps, Social, widget apps) can be turned off entirely
-    val HAVEN_APPS_ENABLED = ScBoolPref("HAVEN_APPS_ENABLED", true, R.string.haven_apps_enabled_title, R.string.haven_apps_enabled_summary, upstreamChoice = false)
+    // Haven: Settings > Apps (like Haven Desktop's Apps tab): turning apps off, each app, and their settings; kept in
+    // account data, shared with Haven Desktop
+    val HAVEN_APPS_SETTINGS = ScCustomPref("HAVEN_APPS_SETTINGS", R.string.haven_pref_apps_title)
     // Haven: where the Apps button and pinned apps go on the space bar (left by default)
-    val HAVEN_APPS_BUTTON_RIGHT = ScBoolPref("HAVEN_APPS_BUTTON_RIGHT", false, R.string.haven_apps_button_right_title, R.string.haven_apps_button_right_summary, upstreamChoice = false, dependencies = SPACE_NAV.asDependencies() + HAVEN_APPS_ENABLED.asDependencies())
-    val HAVEN_PINNED_APPS_RIGHT = ScBoolPref("HAVEN_PINNED_APPS_RIGHT", false, R.string.haven_pinned_apps_right_title, R.string.haven_pinned_apps_right_summary, upstreamChoice = false, dependencies = SPACE_NAV.asDependencies() + HAVEN_APPS_ENABLED.asDependencies())
+    val HAVEN_APPS_BUTTON_RIGHT = ScBoolPref("HAVEN_APPS_BUTTON_RIGHT", false, R.string.haven_apps_button_right_title, R.string.haven_apps_button_right_summary, upstreamChoice = false, dependencies = SPACE_NAV.asDependencies())
+    val HAVEN_PINNED_APPS_RIGHT = ScBoolPref("HAVEN_PINNED_APPS_RIGHT", false, R.string.haven_pinned_apps_right_title, R.string.haven_pinned_apps_right_summary, upstreamChoice = false, dependencies = SPACE_NAV.asDependencies())
     val SPACE_SWIPE = ScBoolPref("SPACE_SWIPE", true, R.string.sc_space_swipe_title, R.string.sc_space_swipe_summary, upstreamChoice = false, authorsChoice = true, dependencies = SPACE_NAV.asDependencies())
     val PSEUDO_SPACE_ALL_ROOMS = ScBoolPref("PSEUDO_SPACE_ALL_CHATS", false, R.string.sc_space_all_rooms_title, R.string.sc_space_all_rooms_summary, dependencies = SPACE_NAV.asDependencies()) // Haven: default false (SC: true)
     val PSEUDO_SPACE_FAVORITES = ScBoolPref("PSEUDO_SPACE_FAVORITES", false, R.string.sc_pseudo_space_favorites, null, dependencies = SPACE_NAV.asDependencies())
@@ -257,10 +259,6 @@ object ScPrefs {
             ScPrefCategory(R.string.sc_pref_category_general_behaviour, null, listOf(
                 FAST_TRANSITIONS,
             )),
-            // Haven
-            ScPrefCategory(R.string.haven_pref_category_apps, null, listOf(
-                HAVEN_APPS_ENABLED,
-            )),
         )),
         ScPrefScreen(R.string.sc_pref_category_chat_overview, null, listOf(
             SC_OVERVIEW_LAYOUT,
@@ -342,6 +340,10 @@ object ScPrefs {
             ScPrefCategory(R.string.haven_favorite_packs_title, null, listOf(
                 HAVEN_FAVORITE_PACKS,
             )),
+        )),
+        // Haven: like Haven Desktop's Apps tab
+        ScPrefScreen(R.string.haven_pref_apps_title, R.string.haven_pref_apps_summary, listOf(
+            HAVEN_APPS_SETTINGS,
         )),
         ScPrefScreen(R.string.sc_pref_category_notifications, null, listOf(
             NOTIFICATION_ONLY_ALERT_ONCE,
