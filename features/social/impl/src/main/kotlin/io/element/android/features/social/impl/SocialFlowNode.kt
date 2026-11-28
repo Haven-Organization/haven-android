@@ -87,6 +87,7 @@ class SocialDeps(
     val permalinkParser: PermalinkParser,
     val dateFormatter: io.element.android.libraries.dateformatter.api.DateFormatter,
     val appPreferencesStore: io.element.android.libraries.preferences.api.store.AppPreferencesStore,
+    val polls: io.element.android.features.social.impl.data.SocialPolls,
 )
 
 /** Navigation between Social screens, and out to stock Element X screens. */

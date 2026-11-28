@@ -34,6 +34,8 @@ dependencies {
     implementation(projects.libraries.htmlrenderer.api)
     // The stock message reaction pills and reaction summary sheet, reused for posts' reactions shelf (like Haven Desktop).
     implementation(projects.features.messages.impl)
+    // Element X's poll card, for posts that are polls.
+    implementation(projects.features.poll.api)
     implementation(projects.libraries.dateformatter.api)
     implementation(projects.libraries.preferences.api)
     // Quote posts with an attachment: media pre-processing and sending.

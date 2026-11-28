@@ -84,6 +84,14 @@ import io.element.android.libraries.matrix.api.timeline.item.event.FormattedBody
 import io.element.android.libraries.matrix.api.timeline.item.event.MessageFormat
 import io.element.android.libraries.matrixmedia.api.MAX_VIDEO_FRAME_SOURCE_SIZE
 import io.element.android.libraries.matrixmedia.api.MediaRequestData
+import io.element.android.features.poll.api.pollcontent.PollContentState
+import io.element.android.features.poll.api.pollcontent.PollContentView
+import io.element.android.features.social.impl.msc.PollStart
+import io.element.android.libraries.matrix.api.core.EventId
+import io.element.android.libraries.matrix.api.core.RoomId
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.collections.immutable.toImmutableList
+import kotlinx.coroutines.launch
 
 /** What a post tile can do. Callbacks get the tile's own post. */
 class PostCallbacks(
@@ -178,7 +186,12 @@ fun PostTile(
                 // A plain repost shows only the original post.
                 EmbeddedPost(post, relation, deps, callbacks)
             } else {
-                PostBody(social.content, deps, onOpenMedia = { media -> callbacks.onOpenMedia(post, media) })
+                PostBody(
+                    social.content,
+                    deps,
+                    onOpenMedia = { media -> callbacks.onOpenMedia(post, media) },
+                    pollSource = post.eventId?.let { PollSource(post.roomId, it, post.sender.value, post) },
+                )
                 if (relation != null) EmbeddedPost(post, relation, deps, callbacks)
             }
             if (showActions) ReactionsShelf(post, deps, callbacks)
@@ -299,11 +312,19 @@ private fun RelationLine(emoji: String, text: String, indent: Dp, onClick: (() -
     )
 }
 
-/** The text and media of a post (or of an embedded post). */
+/** The text and media of a post (or of an embedded post), or its poll, with [pollSource] saying where the poll is. */
 @Composable
-fun PostBody(content: PostContent, deps: SocialDeps, maxLines: Int = Int.MAX_VALUE, onOpenMedia: ((PostMedia) -> Unit)? = null) {
+fun PostBody(
+    content: PostContent,
+    deps: SocialDeps,
+    maxLines: Int = Int.MAX_VALUE,
+    onOpenMedia: ((PostMedia) -> Unit)? = null,
+    pollSource: PollSource? = null,
+) {
     val media = content.media
-    val showText = content.body.isNotBlank() && (media == null || content.body != media.filename)
+    val poll = content.poll?.takeIf { pollSource != null }
+    // A poll shows Element X's poll card instead of its fallback text, like in a chat.
+    val showText = poll == null && content.body.isNotBlank() && (media == null || content.body != media.filename)
     if (showText) {
         val html = content.formattedBody
         val documentNode = remember(html) {
@@ -340,8 +361,46 @@ fun PostBody(content: PostContent, deps: SocialDeps, maxLines: Int = Int.MAX_VAL
             )
         }
     }
+    if (poll != null && pollSource != null) SocialPollView(poll, pollSource, deps)
     if (media != null) PostMediaView(media, onOpenMedia)
 }
+
+/**
+ * Where the poll in a [PostBody] is: the poll start event [eventId] in [roomId], sent by [sender]. [post] is the post
+ * it's shown as, to vote in and end; null for a read-only copy (e.g. in a repost or quote card).
+ */
+class PollSource(val roomId: RoomId, val eventId: EventId, val sender: String, val post: FeedPost?)
+
+/** Element X's poll card, with the poll's live results from [SocialDeps.polls]; read-only for peeked posts and copies. */
+@Composable
+private fun SocialPollView(start: PollStart, source: PollSource, deps: SocialDeps) {
+    val stateFlow = remember(source.roomId, source.eventId, source.sender, start) {
+        deps.polls.state(source.roomId, source.eventId, source.sender, start)
+    }
+    val state by stateFlow.collectAsState()
+    val votablePost = source.post?.takeIf { !it.peeked }
+    if (votablePost != null) {
+        // Live results: reloaded when the room gets new events.
+        LaunchedEffect(source.roomId, source.eventId) { deps.polls.watch(source.roomId, source.eventId) }
+    }
+    val scope = rememberCoroutineScope()
+    val shown = state?.let { if (votablePost != null) it else it.readOnly() } ?: return
+    // Errors are logged by SocialPolls, and the card goes back to the server's state.
+    PollContentView(
+        state = shown,
+        onSendPollResponse = { _, answerIds -> votablePost?.let { post -> scope.launch { deps.polls.vote(post, answerIds) } } },
+        onEditPoll = {},
+        onEndPoll = { votablePost?.let { post -> scope.launch { deps.polls.end(post) } } },
+        modifier = Modifier.padding(top = 8.dp),
+    )
+}
+
+/** No voting or ending: answers disabled, no event id for the card's callbacks, no creator button. */
+private fun PollContentState.readOnly() = copy(
+    eventId = null,
+    isMine = false,
+    answerItems = answerItems.map { it.copy(isEnabled = false) }.toImmutableList(),
+)
 
 /**
  * A tapped pill, through Social's link handling ([uriHandler]): a user's opens their Social profile, a room's its
@@ -496,6 +555,8 @@ private fun EmbeddedPost(post: FeedPost, relation: PostRelation, deps: SocialDep
                 deps,
                 maxLines = 12,
                 onOpenMedia = { media -> callbacks.onOpenEmbeddedMedia(post, relation, media) },
+                // A poll in another post's card: results only, it's voted on in its own post.
+                pollSource = PollSource(RoomId(relation.roomId), EventId(relation.eventId), relation.sender, post = null),
             )
         } else {
             Text(

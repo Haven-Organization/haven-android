@@ -22,6 +22,8 @@ data class PostContent(
     val media: PostMedia?,
     /** MSC4144 per-message profile (`com.beeper.per_message_profile`), e.g. a bridged post's real author. */
     val perMessageProfile: PerMessageProfile? = null,
+    /** The poll, for a poll start event (or an embedded copy of one), shown with Element X's poll card. */
+    val poll: PollStart? = null,
 )
 
 /** MSC4144, read like Haven Desktop's PerMessageProfile.ts. */
@@ -180,6 +182,8 @@ object SocialPostParser {
             media = media,
             // An inline repost's outer content is the reposter's own event: its per-message profile is theirs.
             perMessageProfile = if (inlineRepost) null else parsePerMessageProfile(content),
+            // Embedded copies have no event type: their content tells.
+            poll = if (eventType == null || SocialPollParser.isStartEventType(eventType)) SocialPollParser.parseStart(content) else null,
         )
     }
 
