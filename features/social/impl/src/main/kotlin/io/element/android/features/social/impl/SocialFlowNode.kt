@@ -200,6 +200,11 @@ class SocialFlowNode(
                     deps.timelineStore.rememberOpenedPost(mode.original)
                     NavTarget.Compose(ComposeKind.Quote, profileRoomId, mode.original.roomId, eventId.value)
                 }
+                is io.element.android.features.social.impl.ui.ComposeMode.Edit -> {
+                    val eventId = mode.post.eventId ?: return
+                    deps.timelineStore.rememberOpenedPost(mode.post)
+                    NavTarget.Compose(ComposeKind.Edit, mode.post.roomId, mode.post.roomId, eventId.value, initialText = mode.post.post.content.body)
+                }
             }
             backstack.push(target)
         }
@@ -426,7 +431,7 @@ class SocialFlowNode(
         ) : NavTarget
     }
 
-    enum class ComposeKind { Post, Reply, Quote }
+    enum class ComposeKind { Post, Reply, Quote, Edit }
 
     /**
      * The post composer: Element X's message composer for [Compose.roomId] (HavenPostComposerNode, in that room's scope,
@@ -442,12 +447,19 @@ class SocialFlowNode(
                     ComposeKind.Post -> R.string.social_new_post
                     ComposeKind.Reply -> R.string.social_action_reply
                     ComposeKind.Quote -> R.string.social_quote_post
+                    ComposeKind.Edit -> io.element.android.libraries.ui.strings.CommonStrings.action_edit
                 }
             ),
-            sendLabel = context.getString(if (target.kind == ComposeKind.Reply) R.string.social_action_reply else R.string.social_post),
+            sendLabel = context.getString(
+                when (target.kind) {
+                    ComposeKind.Reply -> R.string.social_action_reply
+                    ComposeKind.Edit -> io.element.android.libraries.ui.strings.CommonStrings.action_save
+                    else -> R.string.social_post
+                }
+            ),
             placeholder = context.getString(
                 when (target.kind) {
-                    ComposeKind.Post -> R.string.social_post_placeholder
+                    ComposeKind.Post, ComposeKind.Edit -> R.string.social_post_placeholder
                     ComposeKind.Reply -> R.string.social_reply_placeholder
                     ComposeKind.Quote -> R.string.social_quote_placeholder
                 }
@@ -461,6 +473,16 @@ class SocialFlowNode(
             replyToEventId = if (target.kind == ComposeKind.Reply) targetEventId?.let(::EventId) else null,
             isQuote = target.kind == ComposeKind.Quote,
             initialText = target.initialText,
+            // Edits: a message like one, a post with MSC4501's own event type (which the SDK can't edit) by Social
+            edit = if (target.kind == ComposeKind.Edit && targetEventId != null) {
+                io.element.android.features.messages.impl.haven.HavenPostComposerNode.EditPost(
+                    eventId = EventId(targetEventId),
+                    text = target.initialText.orEmpty(),
+                    raw = io.element.android.features.social.impl.msc.Msc4501.isSocialPostEventType(known?.post?.eventType),
+                )
+            } else {
+                null
+            },
         )
         val callback = object : io.element.android.features.messages.impl.haven.HavenPostComposerNode.Callback {
             override fun onClose() {
@@ -490,6 +512,11 @@ class SocialFlowNode(
                 )
             }
 
+            override suspend fun sendEdit(markdown: String): Result<Unit> {
+                val post = known ?: return Result.failure(IllegalStateException("Couldn't load the post"))
+                return deps.actions.editPost(post, markdown)
+            }
+
             @Composable
             override fun Header(currentText: () -> String) {
                 when (target.kind) {
@@ -500,7 +527,7 @@ class SocialFlowNode(
                     ComposeKind.Reply -> if (targetRoomId != null && targetEventId != null) {
                         io.element.android.features.social.impl.ui.ReplyComposerHeader(deps, targetRoomId, targetEventId)
                     }
-                    ComposeKind.Quote -> Unit
+                    ComposeKind.Quote, ComposeKind.Edit -> Unit
                 }
             }
 

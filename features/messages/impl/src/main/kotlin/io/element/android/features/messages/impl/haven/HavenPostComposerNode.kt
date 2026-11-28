@@ -6,6 +6,7 @@
 
 package io.element.android.features.messages.impl.haven
 
+import io.element.android.libraries.matrix.api.timeline.item.event.toEventOrTransactionId
 import chat.schildi.lib.preferences.value
 import chat.schildi.lib.preferences.ScPrefs
 import androidx.compose.foundation.layout.Spacer
@@ -169,7 +170,15 @@ class HavenPostComposerNode(
         val isQuote: Boolean,
         /** Text to start with, e.g. when switching the room a new post goes to. */
         val initialText: String?,
+        /** Haven: editing a post instead of sending a new one. */
+        val edit: EditPost? = null,
     ) : NodeInputs
+
+    /**
+     * A post to edit, with its current [text]. A message is edited like one (the composer's edit mode); a post with its
+     * own event type ([raw], which the SDK can't edit) by [Callback.sendEdit].
+     */
+    data class EditPost(val eventId: EventId, val text: String, val raw: Boolean)
 
     interface Callback : Plugin {
         fun onClose()
@@ -179,6 +188,9 @@ class HavenPostComposerNode(
 
         /** Sends a quote post (with MSC4501's `relates_to`), with the attachment picked for it, if any. */
         suspend fun sendQuote(markdown: String, attachment: Pair<Uri, String>?): Result<Unit>
+
+        /** Sends the edit of a post [Inputs.edit] says is [EditPost.raw]. */
+        suspend fun sendEdit(markdown: String): Result<Unit> = Result.failure(UnsupportedOperationException("Can't edit this post"))
 
         /** Above the text box: the post being replied to, or the room picker of a new post ([currentText] to keep). */
         @Composable
@@ -205,6 +217,12 @@ class HavenPostComposerNode(
 
     private val inputs = inputs<Inputs>()
     private val callback = callback<Callback>()
+
+    /** Sent by the [Callback] rather than the room: quote posts, and edits of posts the SDK can't edit. */
+    private val sendsItself get() = inputs.isQuote || inputs.edit?.raw == true
+
+    /** Only text: no attachments, voice messages, polls or locations (quote posts take one attachment, see below). */
+    private val textOnly get() = inputs.isQuote || inputs.edit != null
 
     private var timeline: Timeline? by mutableStateOf(null)
     private var timelineController: TimelineController? by mutableStateOf(null)
@@ -294,6 +312,7 @@ class HavenPostComposerNode(
 
     // MessagesNavigator: the composer's own navigation.
     override fun navigateToPreviewAttachments(attachments: ImmutableList<Attachment>, inReplyToEventId: EventId?) {
+        if (inputs.edit != null) return
         if (inputs.isQuote) {
             // One attachment, sent by Social with the quote post.
             val media = attachments.firstNotNullOfOrNull { it as? Attachment.Media } ?: return
@@ -338,7 +357,15 @@ class HavenPostComposerNode(
         LaunchedEffect(Unit) {
             if (composerSetUp) return@LaunchedEffect
             composerSetUp = true
-            inputs.initialText?.takeIf { it.isNotEmpty() }?.let { baseState.textEditorState.setMarkdown(it) }
+            val edit = inputs.edit
+            when {
+                // The composer's edit mode puts the text in
+                edit != null && !edit.raw -> baseState.eventSink(
+                    MessageComposerEvent.SetMode(MessageComposerMode.Edit(edit.eventId.toEventOrTransactionId(), edit.text))
+                )
+                edit != null -> baseState.textEditorState.setMarkdown(edit.text)
+                else -> inputs.initialText?.takeIf { it.isNotEmpty() }?.let { baseState.textEditorState.setMarkdown(it) }
+            }
             baseState.textEditorState.requestFocus()
         }
         // Replies: always answering the post (the composer's reply mode, as for a message in the thread; its "replying
@@ -355,6 +382,12 @@ class HavenPostComposerNode(
 
         fun markdown(state: TextEditorState) = state.messageMarkdown(permalinkBuilder)
         var sendingText by remember { mutableStateOf<String?>(null) }
+        // Edits: leaving the edit mode (its close button) is leaving the edit
+        var wasEditing by remember { mutableStateOf(false) }
+        LaunchedEffect(baseState.mode) {
+            if (inputs.edit == null || inputs.edit?.raw == true) return@LaunchedEffect
+            if (baseState.mode is MessageComposerMode.Edit) wasEditing = true else if (wasEditing && sendingText == null) callback.onClose()
+        }
         var quoteSending by remember { mutableStateOf(false) }
         var quoteError by remember { mutableStateOf<String?>(null) }
 
@@ -377,13 +410,15 @@ class HavenPostComposerNode(
             if (quoteSending) return
             quoteSending = true
             scope.launch {
-                val result = callback.sendQuote(markdown(latestState.textEditorState).trim(), quoteAttachment)
+                val text = markdown(latestState.textEditorState).trim()
+                val result = if (inputs.edit != null) callback.sendEdit(text) else callback.sendQuote(text, quoteAttachment)
                 quoteSending = false
                 result.fold(onSuccess = { callback.onClose() }, onFailure = { quoteError = it.message ?: it.toString() })
             }
         }
-        // Quote posts: sending goes to Social (with MSC4501's relates_to) instead of the room.
-        val state = if (inputs.isQuote) {
+        // Quote posts: sending goes to Social (with MSC4501's relates_to) instead of the room; so do edits of posts the
+        // SDK can't edit.
+        val state = if (sendsItself) {
             baseState.copy(eventSink = { event -> if (event is MessageComposerEvent.SendMessage) sendQuote() else baseState.eventSink(event) })
         } else {
             baseState
@@ -396,7 +431,7 @@ class HavenPostComposerNode(
             val current = latestState
             val text = markdown(current.textEditorState).trim()
             if (quoteSending || sendingText != null) return
-            if (inputs.isQuote) {
+            if (sendsItself) {
                 if (text.isNotEmpty() || quoteAttachment != null) sendQuote()
             } else if (text.isNotEmpty()) {
                 sendingText = text
@@ -449,7 +484,7 @@ class HavenPostComposerNode(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 4.dp, vertical = 8.dp),
-                        scBeforeSend = { if (!inputs.isQuote) sendingText = markdown(state.textEditorState).trim() },
+                        scBeforeSend = { if (!sendsItself) sendingText = markdown(state.textEditorState).trim() },
                         minInputHeight = 180.dp,
                         // Sending is the top bar's button; voice messages and emoji are on the shelf below.
                         showEndButton = false,
@@ -465,17 +500,17 @@ class HavenPostComposerNode(
                         isEmojiPickerShown = state.emojiPickerState != ComposerEmojiPickerState.Hidden && !state.isStickerPickerShown,
                         // Haven: stickers from image packs, left of the emoji button
                         onToggleSticker = rememberEmojiPickerKeyboardToggle(state, stickers = true)
-                            .takeIf { !ScPrefs.HAVEN_DISABLE_CUSTOM_EMOJI_PICKER.value() && !inputs.isQuote },
+                            .takeIf { !ScPrefs.HAVEN_DISABLE_CUSTOM_EMOJI_PICKER.value() && !sendsItself },
                         isStickerPickerShown = state.isStickerPickerShown,
                         // A quote post can't be a voice message (it couldn't carry the quote).
-                        voiceMessageState = voiceState.voiceMessageState.takeIf { !inputs.isQuote },
+                        voiceMessageState = voiceState.voiceMessageState.takeIf { !textOnly },
                         onVoiceRecorderEvent = { voiceState.eventSink(VoiceMessageComposerEvent.RecorderEvent(it)) },
                         // Not leaving reply mode afterwards (unlike the stock button): this composer only answers its post.
                         onSendVoiceMessage = { voiceState.eventSink(VoiceMessageComposerEvent.SendVoiceMessage) },
                         onAddAttachment = { state.eventSink(MessageComposerEvent.AddAttachment) },
                         onPickFromGallery = { state.eventSink(MessageComposerEvent.PickAttachmentSource.FromGallery) },
                         // A quote post can't be a poll (it couldn't carry the quote).
-                        onCreatePoll = if (inputs.isQuote) {
+                        onCreatePoll = if (textOnly) {
                             null
                         } else {
                             {
@@ -526,7 +561,7 @@ class HavenPostComposerNode(
             // On the shelf instead.
             showGallery = false,
             showPoll = false,
-            showLocation = !inputs.isQuote,
+            showLocation = !textOnly,
         )
         if (voiceState.showPermissionRationaleDialog) {
             VoiceMessagePermissionRationaleDialog(

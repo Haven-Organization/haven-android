@@ -73,6 +73,9 @@ sealed interface ComposeMode {
     data class NewPost(val defaultRoomId: RoomId?) : ComposeMode
     data class Reply(val parent: FeedPost) : ComposeMode
     data class Quote(val original: FeedPost) : ComposeMode
+
+    /** Editing the user's own post: the composer, filled in with its text (like Haven Desktop). */
+    data class Edit(val post: FeedPost) : ComposeMode
 }
 
 /** Pending dialogs and sheets for post interactions on a screen. */

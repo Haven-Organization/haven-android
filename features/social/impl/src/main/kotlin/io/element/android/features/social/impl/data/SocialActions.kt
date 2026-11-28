@@ -172,6 +172,35 @@ class SocialActions(
         sendRepostReaction(original)
     }
 
+    /**
+     * Edits [post] (one the SDK can't edit: sent with MSC4501's own event type) to [text]: an `m.replace` of the same
+     * event type, whose `m.new_content` is the post's content with the new text, keeping the rest (its msgtype, what it
+     * quotes or reposts).
+     */
+    suspend fun editPost(post: FeedPost, text: String): Result<Unit> = runCatching {
+        val eventId = post.eventId ?: throw SocialActionException("This post isn't sent yet")
+        val room = timelineStore.joinedRoom(post.roomId) ?: throw followRequired(post)
+        val newContent = post.contentJson?.let { runCatching { JSONObject(it) }.getOrNull() } ?: JSONObject().put("msgtype", "m.text")
+        newContent.remove("m.relates_to")
+        newContent.remove("m.new_content")
+        if (newContent.has(Msc4501.BODY)) {
+            // The post's own text is its MSC4501 body (its body is a fallback, e.g. a link)
+            newContent.put(Msc4501.BODY, text)
+            newContent.remove(Msc4501.FORMATTED_BODY)
+        } else {
+            newContent.put("body", text)
+            newContent.remove("format")
+            newContent.remove("formatted_body")
+        }
+        if (!newContent.has("msgtype")) newContent.put("msgtype", "m.text")
+        val edit = JSONObject()
+            .put("msgtype", newContent.optString("msgtype"))
+            .put("body", "* $text")
+            .put("m.new_content", newContent)
+            .put("m.relates_to", JSONObject().put("rel_type", "m.replace").put("event_id", eventId.value))
+        room.sendRaw(post.post.eventType, edit.toString()).getOrThrow()
+    }
+
     /** Likes or unlikes a post: a 👍 reaction (MSC4501 "Liking"). */
     suspend fun toggleLike(post: FeedPost): Result<Unit> = toggleReaction(post, Msc4501.LIKE_KEY)
 
